@@ -251,9 +251,13 @@ export function renderSetup(opts) {
       <p class="hint" style="margin:0 0 10px">${backupLine}</p>
       <div class="btnrow" style="margin-top:0">
         <button class="btn" data-action="export">${t('exportData')}</button>
-        <button class="btn" data-action="import">${t('importData')}</button>
+        ${opts.canAutoImport
+          ? `<button class="btn" data-action="import-auto">🔎 ${t('findBackup')}</button>`
+          : `<button class="btn" data-action="import">${t('importData')}</button>`}
         <button class="btn danger" data-action="reset">${t('resetData')}</button>
       </div>
+      ${opts.canAutoImport ? `<p class="hint" style="margin:10px 0 0">${t('findBackupHint')}
+        <button class="link" style="padding:0" data-action="import">${t('chooseFileManually')}</button></p>` : ''}
       <input type="file" accept="application/json,.json" id="importFile" hidden>
       ${opts.recovery ? `<div class="card" style="margin-top:10px">${toggleRow(t('restoreAvailable'), fmtAgo(opts.recovery.at, getLang()), `<button class="btn small" data-action="restore-recovery">${t('restore')}</button>`)}</div>` : ''}
     </div>
