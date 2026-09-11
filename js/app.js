@@ -27,6 +27,7 @@ let view = state.onboarded ? 'live' : 'ob';
 let occs = [];
 const phases = new Map();       // occurrence key -> last seen phase
 const fresh = new Set();        // keys that just changed phase (animate once)
+const expanded = new Set();     // keys of secondary active moments tapped open
 let renderedDay = '';
 let lastCurrentKey = '';
 let dirty = true;
@@ -69,7 +70,7 @@ function render(now = Date.now()) {
   } else {
     for (const o of occs) o.fresh = fresh.has(o.key);
     fresh.clear();
-    app.innerHTML = U.renderLive(occs, now, { updateReady, recovery: state.habits.length ? null : getRecoverySnapshot() });
+    app.innerHTML = U.renderLive(occs, now, { updateReady, recovery: state.habits.length ? null : getRecoverySnapshot(), expanded });
     renderedDay = dayKey(new Date(now));
     const cur = E.currentOf(occs);
     const key = cur ? cur.key : '';
@@ -94,9 +95,10 @@ function frame() {
       phaseChanged = true;
       if (prev) fresh.add(o.key);
       phases.set(o.key, o.phase);
+      if (o.phase !== 'active') expanded.delete(o.key); // no longer relevant once resolved
     }
   }
-  for (const k of Array.from(phases.keys())) if (!seen.has(k)) { phases.delete(k); phaseChanged = true; }
+  for (const k of Array.from(phases.keys())) if (!seen.has(k)) { phases.delete(k); expanded.delete(k); fresh.delete(k); phaseChanged = true; }
   if (view !== 'live') return;
   if (dirty || changed || phaseChanged || dayKey(new Date(now)) !== renderedDay) render(now);
   else U.updateCountdowns(occs, now);
@@ -291,6 +293,35 @@ app.addEventListener('click', async (e) => {
     case 'undo': {
       const o = findOcc(btn.dataset.key); if (!o) break;
       if (E.undo(o)) { N.feedback('tap'); refresh(); }
+      break;
+    }
+    case 'toggle-expand': {
+      const key = btn.dataset.key; if (!key) break;
+      if (expanded.has(key)) expanded.delete(key); else expanded.add(key);
+      N.feedback('tap'); refresh();
+      break;
+    }
+    case 'recap': {
+      const o = findOcc(btn.dataset.key); if (!o) break;
+      U.openRecapSheet(o, { onUndo: () => { if (E.undo(o)) { N.feedback('tap'); refresh(); } } });
+      break;
+    }
+    case 'upcoming-detail': {
+      const o = findOcc(btn.dataset.key); if (!o) break;
+      U.openUpcomingSheet(o, {
+        onDoNow: () => {
+          const r = E.complete(o, now); if (!r) return;
+          N.feedback('done'); N.dismiss(o.key);
+          U.toast(r.early ? t('toastEarly', { n: r.pts }) : t('toastDone', { n: r.pts }), 'good');
+          refresh();
+        },
+        onSkip: () => {
+          const r = E.skip(o, now); if (!r) return;
+          N.dismiss(o.key);
+          U.toast(t('skipped') + ' · ' + r.pts, 'bad');
+          refresh();
+        },
+      });
       break;
     }
     case 'quick':
