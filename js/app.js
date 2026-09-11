@@ -133,18 +133,49 @@ function addPreset(p) {
 
 function refresh() { dirty = true; if (view === 'live') frame(); else render(); }
 
-function exportData() {
+// Exporting from an installed PWA window gives no download-shelf feedback with the
+// classic <a download> trick, so try the two mechanisms built for that: a native
+// Save dialog on desktop, a share sheet on mobile. Always end with a visible toast.
+async function exportData() {
   const text = exportJSON();
-  const file = new File([text], 'momen2m-' + dayKey() + '.json', { type: 'application/json' });
-  if (navigator.canShare && navigator.canShare({ files: [file] })) {
-    navigator.share({ files: [file], title: 'Momen2m' }).catch(() => {});
-    return;
+  const name = 'momen2m-' + dayKey() + '.json';
+  try {
+    if (window.showSaveFilePicker) {
+      try {
+        const handle = await window.showSaveFilePicker({
+          suggestedName: name,
+          types: [{ description: 'JSON', accept: { 'application/json': ['.json'] } }],
+        });
+        const w = await handle.createWritable();
+        await w.write(text);
+        await w.close();
+        U.toast(t('exported'), 'good');
+        return;
+      } catch (err) {
+        if (err && err.name === 'AbortError') return; // user cancelled the dialog
+        // fall through to the next method
+      }
+    }
+    const file = new File([text], name, { type: 'application/json' });
+    if (navigator.canShare && navigator.canShare({ files: [file] })) {
+      try {
+        await navigator.share({ files: [file], title: 'Momen2m' });
+        return;
+      } catch (err) {
+        if (err && err.name === 'AbortError') return; // user cancelled the share sheet
+        // fall through to the next method
+      }
+    }
+    const url = URL.createObjectURL(file);
+    const a = document.createElement('a');
+    a.href = url; a.download = name; a.rel = 'noopener';
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 4000);
+    U.toast(t('exported'), 'good');
+  } catch (err) {
+    console.error('export failed', err);
+    U.toast(t('exportFailed'), 'bad');
   }
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(file);
-  a.download = file.name;
-  document.body.appendChild(a); a.click(); a.remove();
-  setTimeout(() => URL.revokeObjectURL(a.href), 2000);
 }
 
 // ---- events (delegated) ------------------------------------------------------------
