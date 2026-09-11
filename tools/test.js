@@ -18,6 +18,8 @@ globalThis.window = globalThis;
   const E = await import(url('engine.js'));
   const T = await import(url('time.js'));
   const { suggestEmoji } = await import(url('emoji.js'));
+  globalThis.Notification = { permission: 'granted' };
+  const N = await import(url('notify.js'));
 
   const today = T.dayKey(new Date(2026, 8, 10)); // a Thursday
   const D = (dayOffset, hm) => T.at(today, hm, dayOffset);
@@ -26,9 +28,9 @@ globalThis.window = globalThis;
   const habit = (id, start, end, extra = {}) => ({ id, name: id, emoji: '✅', desc: '', slots: [{ start, end }], days: [0, 1, 2, 3, 4, 5, 6], importance: 2, snooze: true, enabled: true, once: null, createdAt: D(0, '08:00'), ...extra });
 
   let passed = 0;
-  const test = (name, fn) => { fn(); passed++; console.log('  ✓', name); };
+  const test = async (name, fn) => { await fn(); passed++; console.log('  ✓', name); };
 
-  test('emoji suggestions', () => {
+  await test('emoji suggestions', () => {
     assert.strictEqual(suggestEmoji('Drink water'), '💧');
     assert.strictEqual(suggestEmoji('Boire de l’eau'), '💧');
     assert.strictEqual(suggestEmoji('Call the dentist'), '📞');
@@ -36,7 +38,7 @@ globalThis.window = globalThis;
     assert.strictEqual(suggestEmoji('xyz'), '✅');
   });
 
-  test('start, ending warning and miss fire once each', () => {
+  await test('start, ending warning and miss fire once each', () => {
     state.habits = [habit('water', '10:00', '10:30')];
     state.days = {}; state.game.xp = 100; state.game.lastEvaluated = T.addDays(today, -1);
     E.tick(D(0, '09:00'), hooks);
@@ -58,7 +60,7 @@ globalThis.window = globalThis;
     assert.strictEqual(state.game.xp, 80);
   });
 
-  test('snooze extends the deadline and costs points', () => {
+  await test('snooze extends the deadline and costs points', () => {
     state.habits = [habit('meds', '10:00', '10:30', { importance: 3 })];
     state.days = {}; state.game.xp = 100; events.length = 0;
     E.tick(D(0, '10:26'), hooks);
@@ -80,7 +82,7 @@ globalThis.window = globalThis;
     assert.ok(events.includes('missed:meds#0'));
   });
 
-  test('complete early earns a bonus; undo reverts it', () => {
+  await test('complete early earns a bonus; undo reverts it', () => {
     state.habits = [habit('read', '11:00', '12:00', { importance: 1 })];
     state.days = {}; state.game.xp = 0;
     E.tick(D(0, '11:05'), hooks);
@@ -97,7 +99,7 @@ globalThis.window = globalThis;
     assert.strictEqual(E.complete(o, D(0, '11:50')).pts, 10);
   });
 
-  test('skip costs half and blocks a perfect day', () => {
+  await test('skip costs half and blocks a perfect day', () => {
     state.habits = [habit('a', '11:00', '12:00'), habit('b', '13:00', '14:00')];
     state.days = {}; state.game.xp = 50;
     E.tick(D(0, '11:05'), hooks);
@@ -106,7 +108,7 @@ globalThis.window = globalThis;
     assert.strictEqual(state.game.xp, 40);
   });
 
-  test('windows that ended before the moment existed are ignored', () => {
+  await test('windows that ended before the moment existed are ignored', () => {
     state.habits = [habit('late', '09:00', '10:00', { createdAt: D(0, '12:00') }), habit('ok', '13:00', '14:00', { createdAt: D(0, '12:00') })];
     state.days = {}; state.game.xp = 100;
     E.tick(D(0, '12:01'), hooks);
@@ -115,7 +117,7 @@ globalThis.window = globalThis;
     assert.strictEqual(state.game.xp, 100);
   });
 
-  test('a window crossing midnight stays active after 00:00', () => {
+  await test('a window crossing midnight stays active after 00:00', () => {
     state.habits = [habit('sleep', '23:30', '00:30', { createdAt: D(-1, '08:00') })];
     state.days = {}; state.game.lastEvaluated = T.addDays(today, -2);
     E.tick(D(-1, '23:40'), hooks);
@@ -130,7 +132,7 @@ globalThis.window = globalThis;
     assert.strictEqual(state.game.lastEvaluated, T.addDays(today, -1));
   });
 
-  test('streak grows on perfect days and resets on a miss', () => {
+  await test('streak grows on perfect days and resets on a miss', () => {
     state.habits = [habit('water', '10:00', '10:30', { createdAt: D(-2, '08:00') })];
     state.days = {}; state.game.xp = 100; state.game.streak = 0; state.game.lastEvaluated = T.addDays(today, -3);
     for (const off of [-2, -1]) {
@@ -148,14 +150,14 @@ globalThis.window = globalThis;
     assert.strictEqual(state.game.lastEvaluated, T.addDays(today, 1));
   });
 
-  test('one-off tasks only exist on their day', () => {
+  await test('one-off tasks only exist on their day', () => {
     state.habits = [habit('once', '15:00', '15:30', { once: today, days: [] })];
     state.days = {};
     assert.strictEqual(E.buildOccurrences(D(0, '14:00')).length, 1);
     assert.strictEqual(E.buildOccurrences(D(1, '14:00')).length, 0);
   });
 
-  test('levels', () => {
+  await test('levels', () => {
     assert.strictEqual(E.levelFor(0), 1);
     assert.strictEqual(E.levelFor(59), 1);
     assert.strictEqual(E.levelFor(60), 2);
@@ -165,7 +167,7 @@ globalThis.window = globalThis;
 
   // The remaining tests reassign S.state (reset/import/restore), so from here
   // on they read S.state directly rather than the destructured local above.
-  test('needsBackup tracks habit changes against the last backup', () => {
+  await test('needsBackup tracks habit changes against the last backup', () => {
     S.state.habits = [];
     S.state.habitsVersion = 0; S.state.backedUpAtVersion = -1; S.state.lastBackupAt = 0;
     assert.strictEqual(S.needsBackup(), false, 'no habits yet, nothing to back up');
@@ -179,7 +181,7 @@ globalThis.window = globalThis;
     assert.strictEqual(S.needsBackup(), true, 'a later edit needs a new backup');
   });
 
-  test('resetAll snapshots the previous setup before wiping it', () => {
+  await test('resetAll snapshots the previous setup before wiping it', () => {
     S.state.habits = [{ id: 'x', name: 'Test' }];
     S.state.lang = 'fr';
     S.resetAll();
@@ -190,7 +192,7 @@ globalThis.window = globalThis;
     assert.strictEqual(snap.data.habits[0].id, 'x');
   });
 
-  test('importJSON validates before touching anything, and snapshots on success', () => {
+  await test('importJSON validates before touching anything, and snapshots on success', () => {
     S.state.habits = [{ id: 'keep' }];
     assert.throws(() => S.importJSON('not json'));
     assert.strictEqual(S.state.habits[0].id, 'keep', 'untouched after a garbage import');
@@ -203,10 +205,51 @@ globalThis.window = globalThis;
     assert.strictEqual(snap.data.habits[0].id, 'keep', 'the pre-import data was saved for undo');
   });
 
-  test('restoreSnapshot brings back a previous setup', () => {
+  await test('restoreSnapshot brings back a previous setup', () => {
     const snap = S.getRecoverySnapshot(); // left over from the import test: { habits: [{ id: 'keep' }] }
     S.restoreSnapshot(snap.data);
     assert.strictEqual(S.state.habits[0].id, 'keep');
+  });
+
+  await test('alert style: gentle by default, strong for critical or when chosen', () => {
+    Object.assign(S.state.settings, { alertStyle: 'gentle', criticalAlarm: true });
+    assert.strictEqual(N.isStrong(2), false);
+    assert.strictEqual(N.isStrong(3), true);
+    S.state.settings.criticalAlarm = false;
+    assert.strictEqual(N.isStrong(3), false);
+    S.state.settings.alertStyle = 'alarm';
+    assert.strictEqual(N.isStrong(1), true);
+  });
+
+  await test('vibration follows the tone when synced, the chosen pattern otherwise, tripled when strong', () => {
+    Object.assign(S.state.settings, { vibSync: true, soundName: 'chime', vibPattern: 'sos' });
+    assert.deepStrictEqual(N.vibrationPattern(false), [80, 60, 80]);
+    assert.strictEqual(N.vibrationPattern(true).length, 3 * 3 + 2);
+    S.state.settings.vibSync = false;
+    assert.strictEqual(N.vibrationPattern(false).length, 17, 'SOS pattern');
+    S.state.settings.vibPattern = 'nonsense';
+    assert.deepStrictEqual(N.vibrationPattern(false), [80, 60, 80], 'unknown pattern falls back to double');
+  });
+
+  await test('system notification options follow the sound output and alert style', async () => {
+    let opts = null;
+    N.setRegistration({ showNotification: async (_title, o) => { opts = o; }, getNotifications: async () => [] });
+    Object.assign(S.state.settings, { notifications: true, sound: true, vibrate: true, alertStyle: 'gentle', criticalAlarm: true, soundOutput: 'app', vibSync: true, soundName: 'bell' });
+    assert.strictEqual(await N.notify('t', 'b', 'k', 2), true);
+    assert.strictEqual(opts.silent, true, 'in-app output keeps the system notification quiet');
+    assert.strictEqual(opts.requireInteraction, false);
+    assert.deepStrictEqual(opts.vibrate, [400]);
+    S.state.settings.soundOutput = 'system';
+    await N.notify('t', 'b', 'k', 3);
+    assert.strictEqual(opts.silent, false, 'system output lets the phone play its notification sound');
+    assert.strictEqual(opts.requireInteraction, true, 'a strong alert stays until dismissed');
+    assert.deepStrictEqual(opts.vibrate, [400, 250, 400, 250, 400]);
+    S.state.settings.soundOutput = 'both'; S.state.settings.sound = false;
+    await N.notify('t', 'b', 'k', 2);
+    assert.strictEqual(opts.silent, true, 'sound switched off silences the system sound too');
+    S.state.settings.vibrate = false;
+    await N.notify('t', 'b', 'k', 2);
+    assert.strictEqual(opts.vibrate, undefined);
   });
 
   console.log(`\n${passed} tests passed`);
