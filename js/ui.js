@@ -140,7 +140,7 @@ export function renderLive(occs, now, opts) {
   if (upcoming.length) {
     body += `<div class="group-title">${t('upcoming')}</div>`;
     for (const o of upcoming.slice(0, 6)) {
-      body += occRow(o, 'upcoming', `<div class="side" data-in="${esc(o.key)}">${t('in', { t: fmtDuration(o.start - now, lang) })}</div>`, '', 'upcoming-detail');
+      body += occRow(o, 'upcoming', `<div class="side">${o.snoozes ? '💤 ' : ''}<span data-in="${esc(o.key)}">${t('in', { t: fmtDuration(o.start - now, lang) })}</span></div>`, '', 'upcoming-detail');
     }
   }
   body += `</div>`;

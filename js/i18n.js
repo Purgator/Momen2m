@@ -171,6 +171,7 @@ const STRINGS = {
     toastEarly: 'Quick! +{n} pts',
     toastMissed: '{n} pts',
     toastSnooze: '{n} pts',
+    snoozedUntil: 'Back at {t}',
     toastPerfectDay: 'Perfect day! Streak {n}',
     rankNames: ['Newcomer', 'Starter', 'Regular', 'Steady', 'Focused', 'Reliable', 'Unstoppable', 'Legend'],
     // Notifications
@@ -363,6 +364,7 @@ const STRINGS = {
     toastEarly: 'Rapide ! +{n} pts',
     toastMissed: '{n} pts',
     toastSnooze: '{n} pts',
+    snoozedUntil: 'De retour à {t}',
     toastPerfectDay: 'Journée parfaite ! Série {n}',
     rankNames: ['Nouveau', 'Débutant', 'Régulier', 'Constant', 'Concentré', 'Fiable', 'Inarrêtable', 'Légende'],
     nStart: '{emoji} {name}',
