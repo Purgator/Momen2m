@@ -293,5 +293,18 @@ input[type="time"] { font-variant-numeric: tabular-nums; }
   *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; }
 }
 
+/* import / restore preview */
+.diff { margin: 10px 0 12px; max-height: 40vh; overflow-y: auto; border: 1px solid var(--line); border-radius: 12px; padding: 6px 10px; font-size: 14px; }
+.diff-head { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; margin: 8px 0 2px; color: var(--muted); }
+.diff-head.add { color: var(--ok); } .diff-head.del { color: var(--danger); } .diff-head.chg { color: var(--accent); }
+.diff-row { display: flex; align-items: flex-start; gap: 8px; padding: 4px 0; color: var(--text); }
+.diff-row .sign { font-weight: 800; width: 12px; flex: none; }
+.diff-row.add .sign { color: var(--ok); } .diff-row.del .sign { color: var(--danger); } .diff-row.chg .sign { color: var(--accent); }
+.diff-row.del .name { text-decoration: line-through; opacity: .8; }
+.diff-row .emo { flex: none; }
+.diff-row .txt { display: flex; flex-direction: column; min-width: 0; }
+.diff-row .sub { color: var(--muted); font-size: 12px; overflow-wrap: anywhere; }
+.diff-row.same, .diff-row.more, .diff-row.pts { color: var(--muted); margin-top: 4px; }
+
 /* offline / update banner */
 .banner { background: var(--card); border: 1px solid var(--accent); border-radius: 14px; padding: 10px 14px; display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 12px; font-size: 14px; }
