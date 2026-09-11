@@ -1,6 +1,6 @@
 // Momen2m service worker: offline app shell + versioned cache + notification clicks.
 // VERSION is bumped by tools/bump.js; a changed file is what triggers an update.
-const VERSION = '1.3.0';
+const VERSION = '1.4.0';
 const CACHE = 'momen2m-' + VERSION;
 // On localhost, always try the network first so developers see their edits immediately.
 const DEV = ['localhost', '127.0.0.1'].includes(self.location.hostname);
