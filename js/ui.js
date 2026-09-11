@@ -53,8 +53,8 @@ function pastSide(o) {
   return `<div class="side">${mark} ${pts} <span class="muted">${time}</span>${undo}</div>`;
 }
 
-function occRow(o, cls, side, extra = '') {
-  return `<div class="occ ${cls} ${extra}" data-key="${esc(o.key)}">
+function occRow(o, cls, side, extra = '', action = null) {
+  return `<div class="occ ${cls} ${extra}" data-key="${esc(o.key)}" ${action ? `data-action="${action}"` : ''}>
     <div class="emo">${esc(o.habit.emoji)}</div>
     <div><div class="name">${habitName(o.habit)}</div><div class="when">${slotOf(o)}</div></div>
     ${side}
@@ -66,13 +66,17 @@ function slotOf(o) {
   return fmtClock(o.start, lang) + ' – ' + fmtClock(o.end, lang);
 }
 
-function currentCard(o, now) {
+// The one big "current" card. `collapsible` is true for a second (or third…)
+// simultaneously active moment the user expanded by tapping it — tapping its
+// header again collapses it back. The primary current moment is never
+// collapsible, so it can't accidentally be tapped away.
+function currentCard(o, now, collapsible = false) {
   const stake = BASE_PTS[o.habit.importance] || 20;
   const sn = canSnooze(o);
   const snoozeLabel = sn === 'ok' ? '💤 ' + t('snoozeMin', { n: state.settings.snoozeMinutes }) : sn === 'exhausted' ? t('noSnoozeLeft') : t('snoozeDisabled');
   const showSnooze = !(sn === 'disabled' && (!state.settings.snoozeAllowed || o.habit.snooze === false));
   const desc = habitDesc(o.habit);
-  return `<div class="occ current ${o.fresh ? 'enter' : ''}" data-key="${esc(o.key)}">
+  return `<div class="occ current ${collapsible ? 'expandable' : ''} ${o.fresh ? 'enter' : ''}" data-key="${esc(o.key)}" ${collapsible ? 'data-action="toggle-expand"' : ''}>
     <div class="emo">${esc(o.habit.emoji)}</div>
     <div class="name">${habitName(o.habit)}</div>
     ${desc ? `<div class="desc">${desc}</div>` : ''}
@@ -112,7 +116,7 @@ export function renderLive(occs, now, opts) {
   if (past.length) {
     body += `<div class="group-title">${t('earlier')}</div>`;
     const shown = past.slice(-6);
-    for (const o of shown) body += occRow(o, 'past ' + o.status, pastSide(o), o.fresh ? 'leave' : '');
+    for (const o of shown) body += occRow(o, 'past ' + o.status, pastSide(o), o.fresh ? 'leave' : '', 'recap');
   }
   if (!state.habits.length) {
     body += `<div class="empty"><div class="emo">🌱</div><h2>${t('liveNoHabits')}</h2><p>${t('liveNoHabitsHint')}</p>
@@ -120,8 +124,13 @@ export function renderLive(occs, now, opts) {
       ${opts.recovery ? `<p style="margin-top:6px"><button class="link" data-action="restore-recovery">${t('restoreAvailable')}</button></p>` : ''}</div>`;
   } else if (cur) {
     body += currentCard(cur, now);
+    const expanded = opts.expanded || new Set();
     for (const o of active) if (o !== cur) {
-      body += occRow(o, 'active', `<div class="side" data-cd="${esc(o.key)}">${fmtCountdown(o.end - now)}</div>`, o.fresh ? 'enter' : '');
+      if (expanded.has(o.key)) {
+        body += currentCard(o, now, true);
+      } else {
+        body += occRow(o, 'active', `<div class="side" data-cd="${esc(o.key)}">${fmtCountdown(o.end - now)}</div>`, o.fresh ? 'enter' : '', 'toggle-expand');
+      }
     }
   } else if (!upcoming.length) {
     body += `<div class="empty"><div class="emo">${past.length ? '🌙' : '🫧'}</div><h2>${past.length ? t('liveAllDone') : t('liveEmpty')}</h2><p>${past.length ? t('liveAllDoneHint') : t('liveEmptyHint')}</p></div>`;
@@ -131,7 +140,7 @@ export function renderLive(occs, now, opts) {
   if (upcoming.length) {
     body += `<div class="group-title">${t('upcoming')}</div>`;
     for (const o of upcoming.slice(0, 6)) {
-      body += occRow(o, 'upcoming', `<div class="side" data-in="${esc(o.key)}">${t('in', { t: fmtDuration(o.start - now, lang) })}</div>`);
+      body += occRow(o, 'upcoming', `<div class="side" data-in="${esc(o.key)}">${t('in', { t: fmtDuration(o.start - now, lang) })}</div>`, '', 'upcoming-detail');
     }
   }
   body += `</div>`;
@@ -522,6 +531,49 @@ export function openResetSheet(onBackupThenErase, onEraseOnly) {
   $('[data-cancel]', el).addEventListener('click', closeSheet);
   $('[data-backup-erase]', el).addEventListener('click', () => { closeSheet(); onBackupThenErase(); });
   $('[data-erase-only]', el).addEventListener('click', () => { closeSheet(); onEraseOnly(); });
+}
+
+// Read-only recap for a done/missed/skipped moment, with Undo when it's still
+// fresh enough to matter (mirrors the inline Undo already on the row itself).
+export function openRecapSheet(o, { onUndo } = {}) {
+  const desc = habitDesc(o.habit);
+  const lang = getLang();
+  const statusWord = o.status === 'done' ? t('completed') : o.status === 'missed' ? t('missed') : t('skipped');
+  const ptsText = (o.pts > 0 ? '+' : '') + o.pts + ' pts';
+  const canUndo = !!onUndo && (o.status === 'done' || o.status === 'skipped') && Date.now() - o.at < 5 * 60000;
+  const el = openSheet(`
+    <h2>${esc(o.habit.emoji)} ${habitName(o.habit)}</h2>
+    ${desc ? `<p class="hint" style="margin-top:2px">${desc}</p>` : ''}
+    <div class="card" style="margin-top:14px">
+      ${toggleRow(t('timeRange'), '', `<span>${slotOf(o)}</span>`)}
+      ${toggleRow(statusWord, o.at ? fmtClock(o.at, lang) : '', `<span style="font-weight:700">${ptsText}</span>`)}
+    </div>
+    <div class="btnrow">
+      ${canUndo ? `<button class="btn" data-undo>${t('undo')}</button>` : ''}
+      <button class="btn ${canUndo ? '' : 'primary wide'}" data-close>${t('close')}</button>
+    </div>`);
+  $('[data-close]', el).addEventListener('click', closeSheet);
+  if (canUndo) $('[data-undo]', el).addEventListener('click', () => { closeSheet(); onUndo(); });
+}
+
+// Lets an upcoming moment be resolved ahead of its scheduled time, without
+// waiting for it to become the current one — e.g. "I already did this later
+// today" or "I know I'll skip this one".
+export function openUpcomingSheet(o, { onDoNow, onSkip } = {}) {
+  const desc = habitDesc(o.habit);
+  const lang = getLang();
+  const el = openSheet(`
+    <h2>${esc(o.habit.emoji)} ${habitName(o.habit)}</h2>
+    ${desc ? `<p class="hint" style="margin-top:2px">${desc}</p>` : ''}
+    <p class="hint" style="margin-top:10px">${slotOf(o)} · ${t('in', { t: fmtDuration(o.start - Date.now(), lang) })}</p>
+    <div class="btnrow" style="margin-top:16px">
+      <button class="btn ok" data-donenow>✓ ${t('doNow')}</button>
+      <button class="btn danger" data-skip>${t('skip')}</button>
+    </div>
+    <button class="btn ghost wide" style="margin-top:10px" data-close>${t('close')}</button>`);
+  $('[data-close]', el).addEventListener('click', closeSheet);
+  $('[data-donenow]', el).addEventListener('click', () => { closeSheet(); onDoNow(); });
+  $('[data-skip]', el).addEventListener('click', () => { closeSheet(); onSkip(); });
 }
 
 // ---- toasts & sparkles --------------------------------------------------------
