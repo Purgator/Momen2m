@@ -23,6 +23,8 @@ const ASSETS = [
   './js/fsstore.js',
   './js/autobackup.js',
   './js/diff.js',
+  './js/game.js',
+  './js/share.js',
   './icons/icon-192.png',
   './icons/icon-512.png',
   './icons/maskable-512.png',

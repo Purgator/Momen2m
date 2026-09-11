@@ -308,3 +308,77 @@ input[type="time"] { font-variant-numeric: tabular-nums; }
 
 /* offline / update banner */
 .banner { background: var(--card); border: 1px solid var(--accent); border-radius: 14px; padding: 10px 14px; display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 12px; font-size: 14px; }
+
+/* ---- hover tooltips (pointer devices only; taps open a sheet instead) ---- */
+@media (hover: hover) and (pointer: fine) {
+  [data-tip] { position: relative; }
+  [data-tip]:hover::after {
+    content: attr(data-tip); position: absolute; left: 50%; bottom: calc(100% + 8px); transform: translateX(-50%);
+    background: var(--card2); color: var(--text); border: 1px solid var(--line); border-radius: 10px; padding: 8px 10px;
+    font-size: 12px; font-weight: 500; line-height: 1.35; width: max-content; max-width: 240px; text-align: left; white-space: normal;
+    box-shadow: var(--shadow); z-index: 40; pointer-events: none; animation: toastin .15s ease;
+  }
+}
+.stat { cursor: pointer; }
+.xpwrap { cursor: pointer; }
+
+/* ---- progress tab -------------------------------------------------------- */
+.screen.progress { padding-bottom: calc(var(--tab-h) + var(--sab) + 32px); }
+.ptitle { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
+.hero { display: flex; gap: 16px; align-items: center; padding: 16px; cursor: pointer; background: linear-gradient(135deg, var(--card), var(--card2)); }
+.hero .lvl { width: 78px; height: 78px; border-radius: 50%; flex: none; display: flex; flex-direction: column; align-items: center; justify-content: center; background: linear-gradient(135deg, var(--accent), var(--accent2)); color: #fff; box-shadow: 0 8px 24px rgba(108, 112, 255, .35); }
+.hero .lvl .big { font-size: 30px; font-weight: 800; line-height: 1; }
+.hero .lvl .lbl { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; opacity: .9; }
+.hero .hero-txt { flex: 1; min-width: 0; }
+.hero .rankname { font-size: 20px; font-weight: 800; margin-bottom: 6px; }
+.hero .xpbar { margin: 0 0 6px; height: 6px; }
+.tiles { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin: 12px 0 4px; }
+.tile { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 12px 14px; display: flex; flex-direction: column; align-items: flex-start; gap: 2px; text-align: left; cursor: pointer; }
+.tile:active { transform: scale(.98); }
+.tile .v { font-size: 22px; font-weight: 800; letter-spacing: -.01em; }
+.tile .v.pos { color: var(--ok); } .tile .v.neg { color: var(--danger); }
+.tile .l { font-size: 13px; font-weight: 700; }
+.tile .s { font-size: 12px; color: var(--muted); }
+.progress .section h2 { display: flex; justify-content: space-between; align-items: baseline; margin: 18px 0 10px; }
+.chart { display: flex; gap: 8px; align-items: flex-end; height: 120px; }
+.chart .col { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; height: 100%; gap: 6px; position: relative; }
+.chart .bar { width: 100%; height: 88px; display: flex; align-items: flex-end; }
+.chart .bar i { display: block; width: 100%; border-radius: 6px 6px 3px 3px; background: var(--accent2); opacity: .55; transition: height .4s ease; }
+.chart .col.today .bar i { opacity: 1; background: linear-gradient(180deg, var(--accent2), var(--accent)); }
+.chart .col.neg .bar i { background: var(--danger); }
+.chart .lbl { font-size: 12px; color: var(--muted); font-weight: 700; }
+.chart .col.today .lbl { color: var(--text); }
+.chart .star { position: absolute; top: -2px; font-size: 11px; color: var(--warn); }
+.badges { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 10px; }
+.badge { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 12px 8px 10px; display: flex; flex-direction: column; align-items: center; gap: 4px; cursor: pointer; }
+.badge:active { transform: scale(.97); }
+.badge .emo { font-size: 30px; line-height: 1.1; }
+.badge .bname { font-size: 12px; font-weight: 700; text-align: center; line-height: 1.2; }
+.badge.earned { border-color: var(--accent); box-shadow: 0 0 0 1px rgba(108, 112, 255, .25) inset, 0 6px 18px rgba(108, 112, 255, .18); }
+.badge.locked .emo { filter: grayscale(1); opacity: .45; }
+.badge.locked .bname { color: var(--muted); }
+.bprog { width: 100%; height: 4px; background: var(--card2); border-radius: 2px; overflow: hidden; margin-top: 4px; }
+.bprog i { display: block; height: 100%; background: var(--accent2); }
+.bprog.big { height: 8px; margin: 14px auto 8px; max-width: 220px; }
+.badge-hero { font-size: 64px; line-height: 1.1; margin: 4px 0 8px; }
+.badge-hero.locked { filter: grayscale(1); opacity: .5; }
+.hrow { display: flex; gap: 10px; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--line); }
+.hrow:last-child { border-bottom: 0; }
+.hrow .emo { font-size: 22px; flex: none; }
+.hrow .txt { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 5px; }
+.hrow .name { font-weight: 700; font-size: 15px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ratebar { height: 5px; background: var(--card2); border-radius: 3px; overflow: hidden; }
+.ratebar i { display: block; height: 100%; background: var(--ok); border-radius: 3px; }
+.hrow .pct { font-weight: 800; font-variant-numeric: tabular-nums; min-width: 44px; text-align: right; }
+.hrow .pct.low { color: var(--warn); }
+.tips p { padding: 8px 0; border-bottom: 1px solid var(--line); font-size: 14px; }
+.tips p:last-child { border-bottom: 0; }
+.ladder { margin-top: 12px; }
+.lrow { display: flex; justify-content: space-between; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--line); font-size: 14px; }
+.lrow:last-child { border-bottom: 0; }
+.lrow.on { font-weight: 800; color: var(--accent2); }
+.pos { color: var(--ok); font-weight: 700; } .neg { color: var(--danger); font-weight: 700; }
+.dots-week { display: flex; gap: 8px; justify-content: center; margin: 14px 0 6px; }
+.dot-day { width: 38px; height: 44px; border-radius: 12px; background: var(--card); border: 1px solid var(--line); display: flex; flex-direction: column; align-items: center; justify-content: center; font-weight: 800; color: var(--muted); }
+.dot-day small { font-size: 10px; font-weight: 700; }
+.dot-day.ok { color: var(--ok); border-color: var(--ok); } .dot-day.ko { color: var(--danger); border-color: var(--danger); }

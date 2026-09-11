@@ -4,8 +4,9 @@ import { t, pick, getLang } from './i18n.js';
 import { state } from './store.js';
 import { PRESETS } from './presets.js';
 import { suggestEmoji } from './emoji.js';
-import { BASE_PTS, canSnooze, currentOf, levelFor, xpForLevel, todayPoints } from './engine.js';
-import { fmtClock, fmtCountdown, fmtDuration, fmtAgo, fmtDateTime, fmtWhenShort, nowHM, minutesToHM, parseHM } from './time.js';
+import { BASE_PTS, SNOOZE_PENALTY, canSnooze, currentOf, todayPoints } from './engine.js';
+import { levelInfo, rankLadder, BADGES, badgeProgress, tips as gameTips } from './game.js';
+import { fmtClock, fmtCountdown, fmtDuration, fmtAgo, fmtDate, fmtDateTime, fmtWhenShort, nowHM, minutesToHM, parseHM, dayKey, weekday } from './time.js';
 import { permission, TONE_NAMES, PATTERN_NAMES } from './notify.js';
 
 export const $ = (sel, root = document) => root.querySelector(sel);
@@ -20,6 +21,7 @@ const RING_C = 2 * Math.PI * RING_R;
 export function tabbar(view) {
   return `<nav class="tabbar">
     <button class="tab ${view === 'live' ? 'on' : ''}" data-action="tab" data-view="live"><span class="ico">⏱️</span>${t('tabNow')}</button>
+    <button class="tab ${view === 'progress' ? 'on' : ''}" data-action="tab" data-view="progress"><span class="ico">🏆</span>${t('tabProgress')}</button>
     <button class="tab ${view === 'setup' ? 'on' : ''}" data-action="tab" data-view="setup"><span class="ico">🎛️</span>${t('tabSetup')}</button>
   </nav>`;
 }
@@ -80,7 +82,7 @@ function currentCard(o, now, collapsible = false) {
     <div class="emo">${esc(o.habit.emoji)}</div>
     <div class="name">${habitName(o.habit)}</div>
     ${desc ? `<div class="desc">${desc}</div>` : ''}
-    <div class="when">${slotOf(o)} · <span class="stake">${t('ptsAtStake', { n: stake })}</span></div>
+    <div class="when">${slotOf(o)} · <span class="stake" data-tip="${esc(t('tipStake', { n: stake, m: stake + Math.round(stake / 2) }))}">${t('ptsAtStake', { n: stake })}</span></div>
     <div class="ringwrap" data-ring="${esc(o.key)}">
       <svg viewBox="0 0 160 160"><circle class="track" cx="80" cy="80" r="${RING_R}"/><circle class="prog" cx="80" cy="80" r="${RING_R}" stroke-dasharray="${RING_C.toFixed(1)}" stroke-dashoffset="0"/></svg>
       <div class="count"><span data-cd="${esc(o.key)}">${fmtCountdown(o.end - now)}</span><small>${t('left', { t: '' }).trim()}</small></div>
@@ -96,12 +98,11 @@ function currentCard(o, now, collapsible = false) {
 export function renderLive(occs, now, opts) {
   const lang = getLang();
   const g = state.game;
-  const level = levelFor(g.xp);
-  const lo = xpForLevel(level), hi = xpForLevel(level + 1);
-  const pct = Math.round(((g.xp - lo) / (hi - lo)) * 100);
-  const today = todayPoints(now);
   const ranks = t('rankNames');
-  const rank = ranks[Math.min(ranks.length - 1, Math.floor((level - 1) / 2))];
+  const li = levelInfo(g.xp, ranks.length);
+  const level = li.level, hi = li.hi, pct = li.pct;
+  const today = todayPoints(now);
+  const rank = ranks[li.rankIdx];
 
   const past = occs.filter((o) => o.phase === 'past');
   const active = occs.filter((o) => o.phase === 'active');
@@ -149,13 +150,15 @@ export function renderLive(occs, now, opts) {
     <div class="topbar">
       <div class="clock" data-clock>${fmtClock(now, lang)}</div>
       <div class="stats">
-        <span class="stat">⭐ ${t('level', { n: level })}</span>
-        ${g.streak ? `<span class="stat">🔥 ${g.streak}</span>` : ''}
-        <span class="stat today ${today < 0 ? 'neg' : ''}">${today >= 0 ? '+' : ''}${today}</span>
+        <button class="stat" data-action="explain" data-topic="level" data-tip="${esc(t('tipLevel', { rank, n: hi - g.xp }))}">⭐ ${t('level', { n: level })}</button>
+        ${g.streak ? `<button class="stat" data-action="explain" data-topic="streak" data-tip="${esc(t('tipStreak', { n: g.streak, best: g.bestStreak }))}">🔥 ${g.streak}</button>` : ''}
+        <button class="stat today ${today < 0 ? 'neg' : ''}" data-action="explain" data-topic="today" data-tip="${esc(t('tipToday'))}">${today >= 0 ? '+' : ''}${today}</button>
       </div>
     </div>
-    <div class="xpbar"><div class="xpfill" style="width:${pct}%"></div></div>
-    <div class="rank"><span>${esc(rank)}</span><span>${t('xpToNext', { n: hi - g.xp })}</span></div>
+    <div class="xpwrap" data-action="explain" data-topic="level" data-tip="${esc(t('tipXp', { n: g.xp, hi }))}">
+      <div class="xpbar"><div class="xpfill" style="width:${pct}%"></div></div>
+      <div class="rank"><span>${esc(rank)}</span><span>${t('xpToNext', { n: hi - g.xp })}</span></div>
+    </div>
     ${body}
   </div>
   <button class="fab" data-action="quick" aria-label="${t('quickTask')}">+</button>
@@ -186,6 +189,164 @@ export function updateCountdowns(occs, now) {
   }
 }
 const cssEsc = (s) => (window.CSS && CSS.escape ? CSS.escape(s) : s.replace(/["\\]/g, '\\$&'));
+
+// ---- progress -----------------------------------------------------------------
+
+const pctText = (r) => (r === null || r === undefined ? '–' : Math.round(r * 100) + '%');
+const signed = (n) => (n > 0 ? '+' : '') + n;
+const dayLetter = (day) => t('dayLetters')[weekday(day)];
+
+// Seven small bars: points per day, today highlighted, negatives in red.
+function weekChart(week, now) {
+  const today = dayKey(new Date(now));
+  const max = Math.max(1, ...week.map((d) => Math.abs(d.pts)));
+  return `<div class="chart">${week.map((d) => {
+    const h = Math.max(4, Math.round((Math.abs(d.pts) / max) * 100));
+    const tip = t('chartTip', { pts: signed(d.pts), done: d.done, missed: d.missed + d.skipped });
+    const cls = (d.day === today ? 'today ' : '') + (d.pts < 0 ? 'neg ' : '') + (d.perfect === true ? 'perfect' : '');
+    return `<div class="col ${cls}" data-tip="${esc(tip)}"><div class="bar"><i style="height:${h}%"></i></div><span class="lbl">${esc(dayLetter(d.day))}</span>${d.perfect === true ? '<span class="star">★</span>' : ''}</div>`;
+  }).join('')}</div>`;
+}
+
+function badgeTile(b, p) {
+  const names = t('badgeNames');
+  const tip = p.earned ? t('badgeEarnedTip', { name: names[b.id] }) : t('badgeLockedTip', { name: names[b.id], n: p.n, of: p.of });
+  return `<button class="badge ${p.earned ? 'earned' : 'locked'}" data-action="badge" data-id="${b.id}" data-tip="${esc(tip)}">
+    <span class="emo">${b.emoji}</span><span class="bname">${esc(names[b.id])}</span>
+    ${p.earned ? '' : `<span class="bprog"><i style="width:${Math.round((p.n / p.of) * 100)}%"></i></span>`}
+  </button>`;
+}
+
+export function renderProgress(s, now) {
+  const ranks = t('rankNames');
+  const li = s.level;
+  const rank = ranks[li.rankIdx];
+  const earned = BADGES.map((b) => [b, badgeProgress(b, s)]);
+  const nEarned = earned.filter(([, p]) => p.earned).length;
+  const tipList = gameTips(s);
+  const perHabit = s.perHabit.filter((p) => p.total > 0);
+  const bestDay = s.period.bestDay;
+
+  return `<div class="screen progress">
+    <div class="ptitle"><h1>${t('tabProgress')}</h1><button class="btn small primary" data-action="share-progress">📤 ${t('share')}</button></div>
+
+    <div class="card hero" data-action="explain" data-topic="level" data-tip="${esc(t('tipXp', { n: li.xp, hi: li.hi }))}">
+      <div class="lvl"><span class="big">${li.level}</span><span class="lbl">${t('levelWord')}</span></div>
+      <div class="hero-txt">
+        <div class="rankname">${esc(rank)}</div>
+        <div class="xpbar"><div class="xpfill" style="width:${li.pct}%"></div></div>
+        <div class="hint">${t('xpProgress', { xp: li.xp, hi: li.hi })} · ${t('xpToNext', { n: li.toNext })}</div>
+      </div>
+    </div>
+
+    <div class="tiles">
+      <button class="tile" data-action="explain" data-topic="streak" data-tip="${esc(t('tipStreak', { n: s.streak, best: s.bestStreak }))}"><span class="v">🔥 ${s.streak}</span><span class="l">${t('streakWord')}</span><span class="s">${t('best', { n: s.bestStreak })}</span></button>
+      <button class="tile" data-action="explain" data-topic="rate" data-tip="${esc(t('tipRate'))}"><span class="v">🎯 ${pctText(s.period.rate)}</span><span class="l">${t('successRate')}</span><span class="s">${t('last30')}</span></button>
+      <button class="tile" data-action="explain" data-topic="today" data-tip="${esc(t('tipToday'))}"><span class="v">✅ ${s.lifetime.done}</span><span class="l">${t('doneWord')}</span><span class="s">${t('early', { n: s.lifetime.early })}</span></button>
+      <button class="tile" data-action="explain" data-topic="today" data-tip="${esc(t('tipToday'))}"><span class="v ${s.today.pts < 0 ? 'neg' : 'pos'}">${signed(s.today.pts)}</span><span class="l">${t('today')}</span><span class="s">${t('todayCount', { done: s.today.done, total: s.today.total })}</span></button>
+    </div>
+
+    <div class="section">
+      <h2>${t('last7')}</h2>
+      <div class="card pad">${weekChart(s.week, now)}
+        <p class="hint" style="margin-top:8px">${bestDay ? t('bestDay', { pts: signed(bestDay.pts), d: fmtDate(new Date(bestDay.day + 'T12:00').getTime()) }) : t('noHistoryYet')}</p>
+      </div>
+    </div>
+
+    <div class="section">
+      <h2>${t('badges')} <span class="hint">${nEarned}/${BADGES.length}</span></h2>
+      <div class="badges">${earned.map(([b, p]) => badgeTile(b, p)).join('')}</div>
+    </div>
+
+    ${perHabit.length ? `<div class="section">
+      <h2>${t('byMoment')}</h2>
+      <div class="card">${perHabit.map((p) => `<div class="hrow" data-tip="${esc(t('hrowTip', { done: p.done, missed: p.missed, skipped: p.skipped }))}">
+        <span class="emo">${esc(p.habit.emoji)}</span>
+        <span class="txt"><span class="name">${habitName(p.habit)}</span><span class="ratebar"><i style="width:${Math.round((p.rate || 0) * 100)}%"></i></span></span>
+        <span class="pct ${p.rate !== null && p.rate < 0.5 ? 'low' : ''}">${pctText(p.rate)}</span>
+      </div>`).join('')}</div>
+    </div>` : ''}
+
+    <div class="section">
+      <h2>${t('tipsTitle')}</h2>
+      <div class="card tips">${tipList.map((x) => `<p>💡 ${t(x.key, x.vars ? { ...x.vars, name: x.vars.name ? habitName({ name: x.vars.name }) : '' } : undefined)}</p>`).join('')}</div>
+    </div>
+
+    <div class="section">
+      <h2>${t('shareTitle')}</h2>
+      <div class="card pad">
+        <p class="hint">${t('shareHint')}</p>
+        <div class="btnrow" style="margin-top:12px">
+          <button class="btn primary" data-action="share-progress">📤 ${t('shareProgress')}</button>
+          <button class="btn" data-action="share-app">💌 ${t('inviteFriend')}</button>
+        </div>
+      </div>
+    </div>
+  </div>
+  ${tabbar('progress')}`;
+}
+
+// Explanations behind the numbers, opened by a tap on any stat.
+export function openExplainSheet(topic, s, todayOccs = []) {
+  const ranks = t('rankNames');
+  let html = '';
+  if (topic === 'level') {
+    const li = s.level;
+    html = `<h2>⭐ ${t('level', { n: li.level })} · ${esc(ranks[li.rankIdx])}</h2>
+      <p class="hint" style="margin-top:6px">${t('explainLevel', { xp: li.xp, n: li.toNext, l: li.level + 1 })}</p>
+      <div class="xpbar" style="margin:12px 2px"><div class="xpfill" style="width:${li.pct}%"></div></div>
+      <div class="card ladder">${rankLadder(ranks.length).map((r) => `<div class="lrow ${r.rankIdx === li.rankIdx ? 'on' : ''}"><span>${esc(ranks[r.rankIdx])}</span><span class="muted">${t('fromLevel', { l: r.fromLevel, xp: r.fromXp })}</span></div>`).join('')}</div>`;
+  } else if (topic === 'streak') {
+    const dots = s.week.map((d) => `<span class="dot-day ${d.perfect === true ? 'ok' : d.perfect === false ? 'ko' : ''}" title="${esc(d.day)}">${d.perfect === true ? '✓' : d.perfect === false ? '✗' : '·'}<small>${esc(dayLetter(d.day))}</small></span>`).join('');
+    html = `<h2>🔥 ${t('streak', { n: s.streak })}</h2>
+      <p class="hint" style="margin-top:6px">${t('explainStreak', { best: s.bestStreak })}</p>
+      <div class="dots-week">${dots}</div>`;
+  } else if (topic === 'rate') {
+    const p = s.period;
+    html = `<h2>🎯 ${t('successRate')} · ${pctText(p.rate)}</h2>
+      <p class="hint" style="margin-top:6px">${t('explainRate', { done: p.done, missed: p.missed, skipped: p.skipped })}</p>`;
+  } else {
+    const today = dayKey(new Date());
+    const rows = todayOccs.filter((o) => o.day === today && o.status !== 'open').sort((a, b) => a.at - b.at)
+      .map((o) => `<div class="lrow"><span>${esc(o.habit.emoji)} ${habitName(o.habit)} <small class="muted">${o.status === 'done' ? t('completed') : o.status === 'missed' ? t('missed') : t('skipped')}${o.snoozes ? ' · 💤×' + o.snoozes : ''}</small></span><span class="${o.pts >= 0 ? 'pos' : 'neg'}">${signed(o.pts)}</span></div>`).join('');
+    html = `<h2>${t('today')} · ${signed(s.today.pts)} pts</h2>
+      <p class="hint" style="margin-top:6px">${t('explainToday')}</p>
+      ${rows ? `<div class="card ladder" style="margin-top:10px">${rows}</div>` : ''}
+      <div class="card ladder" style="margin-top:10px">
+        <div class="lrow"><span>${t('ruleDone')}</span><span class="pos">+${BASE_PTS[1]} / +${BASE_PTS[2]} / +${BASE_PTS[3]}</span></div>
+        <div class="lrow"><span>${t('ruleEarly')}</span><span class="pos">+50%</span></div>
+        <div class="lrow"><span>${t('ruleMissed')}</span><span class="neg">−${BASE_PTS[1]} / −${BASE_PTS[2]} / −${BASE_PTS[3]}</span></div>
+        <div class="lrow"><span>${t('ruleSkipped')}</span><span class="neg">−50%</span></div>
+        <div class="lrow"><span>${t('ruleSnooze')}</span><span class="neg">−${SNOOZE_PENALTY}</span></div>
+      </div>`;
+  }
+  const el = openSheet(html + `<div class="btnrow"><button class="btn primary wide" data-close>${t('close')}</button></div>`);
+  $('[data-close]', el).addEventListener('click', closeSheet);
+}
+
+export function openBadgeSheet(b, p, { onShare } = {}) {
+  const names = t('badgeNames'), descs = t('badgeDescs');
+  const el = openSheet(`
+    <div class="center"><div class="badge-hero ${p.earned ? 'earned' : 'locked'}">${b.emoji}</div>
+    <h2>${esc(names[b.id])}</h2>
+    <p class="hint" style="margin-top:6px">${esc(descs[b.id])}</p>
+    ${p.earned ? `<p class="hint" style="margin-top:8px">🏅 ${t('earnedOn', { t: p.unlockedAt ? fmtDateTime(p.unlockedAt) : '—' })}</p>`
+      : `<div class="bprog big"><i style="width:${Math.round((p.n / p.of) * 100)}%"></i></div><p class="hint">${t('badgeProgress', { n: p.n, of: p.of })}</p>`}</div>
+    <div class="btnrow">
+      ${p.earned && onShare ? `<button class="btn" data-share>📤 ${t('share')}</button>` : ''}
+      <button class="btn ${p.earned && onShare ? '' : 'primary wide'}" data-close>${t('close')}</button>
+    </div>`);
+  $('[data-close]', el).addEventListener('click', closeSheet);
+  if (p.earned && onShare) $('[data-share]', el).addEventListener('click', () => { closeSheet(); onShare(); });
+}
+
+// A bigger burst than sparkles(): centred, for level-ups and badges.
+export function celebrate(emojis) {
+  const x = innerWidth / 2, y = innerHeight / 2.6;
+  sparkles(x, y, emojis);
+  setTimeout(() => sparkles(x - 60, y + 40, emojis), 150);
+  setTimeout(() => sparkles(x + 60, y + 40, emojis), 300);
+}
 
 // ---- setup --------------------------------------------------------------------
 
