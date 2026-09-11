@@ -1,12 +1,19 @@
 // Controller: wires state, engine, notifications and UI together.
-import { state, save, uid, resetAll, exportJSON, importJSON } from './store.js';
-import { t, setLang, pick } from './i18n.js';
+import {
+  state, save, uid, resetAll, exportJSON, importJSON,
+  snapshotRecovery, getRecoverySnapshot, restoreSnapshot, touchHabits, needsBackup, markBackedUp,
+} from './store.js';
+import { t, setLang, pick, getLang } from './i18n.js';
 import { PRESETS } from './presets.js';
 import * as E from './engine.js';
 import * as N from './notify.js';
 import * as U from './ui.js';
 import { initUpdates, applyUpdate, checkForUpdate } from './update.js';
-import { dayKey, addDays, at, nowHM, minutesToHM, parseHM, fmtDuration } from './time.js';
+import { dayKey, addDays, at, nowHM, minutesToHM, parseHM, fmtDuration, fmtAgo } from './time.js';
+
+// Ask the browser not to garbage-collect this origin's storage under pressure.
+// Silent and best-effort: it cannot be forced, and some browsers ignore it.
+if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
 
 const VERSION = self.MOMEN2M_VERSION || 'dev';
 const app = document.getElementById('app');
@@ -54,11 +61,14 @@ function render(now = Date.now()) {
   if (view === 'ob') {
     app.innerHTML = U.renderOnboarding(ob.step, { selected: ob.selected, isIosBrowser, canInstall: !!installPrompt, standalone });
   } else if (view === 'setup') {
-    app.innerHTML = U.renderSetup({ version: VERSION, updateReady, canInstall: !!installPrompt, isIosBrowser });
+    app.innerHTML = U.renderSetup({
+      version: VERSION, updateReady, canInstall: !!installPrompt, isIosBrowser,
+      needsBackup: needsBackup(), recovery: getRecoverySnapshot(),
+    });
   } else {
     for (const o of occs) o.fresh = fresh.has(o.key);
     fresh.clear();
-    app.innerHTML = U.renderLive(occs, now, { updateReady });
+    app.innerHTML = U.renderLive(occs, now, { updateReady, recovery: state.habits.length ? null : getRecoverySnapshot() });
     renderedDay = dayKey(new Date(now));
     const cur = E.currentOf(occs);
     const key = cur ? cur.key : '';
@@ -129,6 +139,15 @@ function addPreset(p) {
     slots: p.slots.map(([start, end]) => ({ start, end })),
     days: [0, 1, 2, 3, 4, 5, 6], importance: p.importance, snooze: true, enabled: true, once: null, createdAt: Date.now(),
   });
+  touchHabits();
+}
+
+// Adds the presets picked during onboarding to real habits (idempotent: safe to
+// call more than once). Kept separate from 'ob-start' so the backup step, which
+// comes before it, has real moments to back up rather than an empty list.
+function finishSetup() {
+  for (const p of PRESETS) if (ob.selected.has(p.id) && !state.habits.some((h) => h.preset === p.id)) addPreset(p);
+  save();
 }
 
 function refresh() { dirty = true; if (view === 'live') frame(); else render(); }
@@ -136,6 +155,7 @@ function refresh() { dirty = true; if (view === 'live') frame(); else render(); 
 // Exporting from an installed PWA window gives no download-shelf feedback with the
 // classic <a download> trick, so try the two mechanisms built for that: a native
 // Save dialog on desktop, a share sheet on mobile. Always end with a visible toast.
+// Returns true only once the data has actually been handed off somewhere.
 async function exportData() {
   const text = exportJSON();
   const name = 'momen2m-' + dayKey() + '.json';
@@ -149,10 +169,11 @@ async function exportData() {
         const w = await handle.createWritable();
         await w.write(text);
         await w.close();
+        markBackedUp();
         U.toast(t('exported'), 'good');
-        return;
+        return true;
       } catch (err) {
-        if (err && err.name === 'AbortError') return; // user cancelled the dialog
+        if (err && err.name === 'AbortError') return false; // user cancelled the dialog
         // fall through to the next method
       }
     }
@@ -160,9 +181,10 @@ async function exportData() {
     if (navigator.canShare && navigator.canShare({ files: [file] })) {
       try {
         await navigator.share({ files: [file], title: 'Momen2m' });
-        return;
+        markBackedUp();
+        return true;
       } catch (err) {
-        if (err && err.name === 'AbortError') return; // user cancelled the share sheet
+        if (err && err.name === 'AbortError') return false; // user cancelled the share sheet
         // fall through to the next method
       }
     }
@@ -171,10 +193,13 @@ async function exportData() {
     a.href = url; a.download = name; a.rel = 'noopener';
     document.body.appendChild(a); a.click(); a.remove();
     setTimeout(() => URL.revokeObjectURL(url), 4000);
+    markBackedUp();
     U.toast(t('exported'), 'good');
+    return true;
   } catch (err) {
     console.error('export failed', err);
     U.toast(t('exportFailed'), 'bad');
+    return false;
   }
 }
 
@@ -233,7 +258,7 @@ app.addEventListener('click', async (e) => {
     case 'add':
       U.openHabitSheet(null, (h) => {
         state.habits.push({ id: uid(), preset: null, once: null, createdAt: Date.now(), ...h });
-        save(); refresh();
+        touchHabits(); save(); refresh();
       });
       break;
     case 'edit': {
@@ -242,9 +267,9 @@ app.addEventListener('click', async (e) => {
         // Keep translatable preset texts when the user did not change them.
         if (typeof h.name === 'object' && data.name === pick(h.name)) data.name = h.name;
         if (typeof h.desc === 'object' && data.desc === pick(h.desc)) data.desc = h.desc;
-        Object.assign(h, data); save(); refresh();
+        Object.assign(h, data); touchHabits(); save(); refresh();
       },
-        () => { state.habits = state.habits.filter((x) => x !== h); save(); refresh(); });
+        () => { state.habits = state.habits.filter((x) => x !== h); touchHabits(); save(); refresh(); });
       break;
     }
     case 'preset': {
@@ -261,8 +286,35 @@ app.addEventListener('click', async (e) => {
     case 'export': exportData(); break;
     case 'import': U.$('#importFile').click(); break;
     case 'reset':
-      if (confirm(t('confirmReset'))) { resetAll(); setLang(state.lang); ob.step = 0; view = 'ob'; render(); }
+      U.openResetSheet(
+        async () => {
+          const ok = await exportData();
+          if (!ok) { U.toast(t('resetCancelled')); return; }
+          resetAll(); setLang(state.lang); ob.step = 0; view = 'ob'; render();
+        },
+        () => { resetAll(); setLang(state.lang); ob.step = 0; view = 'ob'; render(); },
+      );
       break;
+    case 'restore-recovery': {
+      const snap = getRecoverySnapshot();
+      if (!snap) break;
+      U.openConfirmSheet({
+        title: t('restore'),
+        body: t('restoreConfirm', { t: fmtAgo(snap.at, getLang()) }),
+        confirmLabel: t('restore'),
+        onConfirm: () => {
+          snapshotRecovery('before-restore');
+          restoreSnapshot(snap.data);
+          setLang(state.lang);
+          phases.clear();
+          U.toast(t('restoreDone'), 'good');
+          view = state.onboarded ? 'live' : 'ob';
+          dirty = true;
+          if (view === 'live') startTicker(); else render();
+        },
+      });
+      break;
+    }
     case 'check-update':
       btn.disabled = true;
       checkForUpdate(true).then((has) => { updateReady = has; U.toast(has ? t('updateAvailable') : t('upToDate'), has ? '' : 'good'); render(); });
@@ -281,10 +333,15 @@ app.addEventListener('click', async (e) => {
       btn.classList.toggle('on', ob.selected.has(id));
       break;
     }
-    case 'ob-next': ob.step = Math.min(2, ob.step + 1); render(); scrollTo(0, 0); break;
+    case 'ob-next':
+      // Turn the picked presets into real habits before the backup step, so
+      // "Back up now" there actually has something to back up.
+      if (ob.step === 2) finishSetup();
+      ob.step = Math.min(3, ob.step + 1); render(); scrollTo(0, 0);
+      break;
     case 'ob-back': ob.step = Math.max(0, ob.step - 1); render(); scrollTo(0, 0); break;
     case 'ob-start':
-      for (const p of PRESETS) if (ob.selected.has(p.id) && !state.habits.some((h) => h.preset === p.id)) addPreset(p);
+      finishSetup();
       state.onboarded = true; save();
       view = 'live'; dirty = true; startTicker(); scrollTo(0, 0);
       break;
@@ -295,14 +352,42 @@ app.addEventListener('click', async (e) => {
 app.addEventListener('change', (e) => {
   const el = e.target;
   if (el.id === 'importFile') {
-    const f = el.files && el.files[0]; if (!f) return;
-    f.text().then((text) => { importJSON(text); setLang(state.lang); U.toast(t('imported'), 'good'); phases.clear(); refresh(); })
-      .catch(() => U.toast(t('importFailed'), 'bad'));
+    const f = el.files && el.files[0];
+    el.value = ''; // let the same file be picked again later
+    if (!f) return;
+    f.text().then((text) => {
+      let parsed;
+      try {
+        parsed = JSON.parse(text);
+        if (!parsed || !Array.isArray(parsed.habits)) throw new Error('bad');
+      } catch {
+        U.toast(t('importFailed'), 'bad');
+        return;
+      }
+      // "moment"/"moments" pluralizes the same way in English and French.
+      const label = parsed.habits.length + ' moment' + (parsed.habits.length === 1 ? '' : 's');
+      const when = parsed.lastBackupAt ? fmtAgo(parsed.lastBackupAt, getLang()) : null;
+      U.openConfirmSheet({
+        title: t('importData'),
+        body: when ? t('importConfirmDated', { label, t: when }) : t('importConfirm', { label }),
+        confirmLabel: t('importReplace'),
+        onConfirm: () => {
+          try {
+            importJSON(text); // re-validates and snapshots the current data first
+            setLang(state.lang);
+            U.toast(t('imported'), 'good');
+            phases.clear(); refresh();
+          } catch {
+            U.toast(t('importFailed'), 'bad');
+          }
+        },
+      });
+    }).catch(() => U.toast(t('importFailed'), 'bad'));
     return;
   }
   if (el.dataset.action === 'toggle') {
     const h = findHabit(el.dataset.id); if (!h) return;
-    h.enabled = el.checked; save();
+    h.enabled = el.checked; touchHabits(); save();
     el.closest('.item').classList.toggle('off', !h.enabled);
     return;
   }
