@@ -289,5 +289,87 @@ globalThis.window = globalThis;
     assert.strictEqual(T.fileStamp(new Date(2026, 8, 11, 14, 5, 3)), '2026-09-11_14-05-03');
   });
 
+  await test('gamification: levels, ranks and ladder', async () => {
+    const G = await import(url('game.js'));
+    assert.deepStrictEqual(G.levelInfo(0), { xp: 0, level: 1, lo: 0, hi: 60, toNext: 60, pct: 0, rankIdx: 0 });
+    const li = G.levelInfo(300); // level 3 (60*4=240 .. 60*9=540)
+    assert.strictEqual(li.level, 3); assert.strictEqual(li.lo, 240); assert.strictEqual(li.hi, 540);
+    assert.strictEqual(li.toNext, 240); assert.strictEqual(li.pct, 20); assert.strictEqual(li.rankIdx, 1);
+    assert.strictEqual(G.levelInfo(60 * 14 * 14).rankIdx, 7, 'rank caps at the last name');
+    const ladder = G.rankLadder(8);
+    assert.strictEqual(ladder.length, 8);
+    assert.deepStrictEqual(ladder[1], { rankIdx: 1, fromLevel: 3, fromXp: 240 });
+  });
+
+  await test('gamification: stats, badges (persisted), tips and combo', async () => {
+    const G = await import(url('game.js'));
+    const now = D(0, '12:00');
+    // Fresh world: two habits, yesterday perfect, the day before with a miss.
+    S.state.habits = [habit('water', '09:00', '10:00', { createdAt: D(-5, '00:00') }), habit('walk', '18:00', '19:00', { createdAt: D(-5, '00:00') })];
+    S.state.days = {};
+    S.state.game = { xp: 200, streak: 1, bestStreak: 1, lastEvaluated: T.addDays(today, -1), done: 3, missed: 1, early: 2, shares: 0, badges: {} };
+    const d1 = T.addDays(today, -1), d2 = T.addDays(today, -2);
+    S.state.days[d2] = { 'water#0': { status: 'done', pts: 30, snoozes: 0, at: D(-2, '09:10'), early: true }, 'walk#0': { status: 'missed', pts: -20, snoozes: 1, at: D(-2, '19:00') } };
+    S.state.days[d1] = { 'water#0': { status: 'done', pts: 20, snoozes: 0, at: D(-1, '09:50') }, 'walk#0': { status: 'done', pts: 30, snoozes: 0, at: D(-1, '23:00'), early: true } };
+    S.state.days[today] = { 'water#0': { status: 'done', pts: 20, snoozes: 0, at: D(0, '09:55') } };
+    const occs = E.buildOccurrences(now);
+    const st = G.computeStats(now, occs);
+    assert.strictEqual(st.week.length, 7);
+    assert.strictEqual(st.history.length, 30);
+    const y = st.history[st.history.length - 2];
+    assert.deepStrictEqual([y.done, y.missed, y.pts, y.perfect], [2, 0, 50, true]);
+    assert.strictEqual(st.history[st.history.length - 3].perfect, false, 'a day with a miss is not perfect');
+    assert.strictEqual(st.history[st.history.length - 1].perfect, null, 'today is not judged yet');
+    assert.deepStrictEqual([st.period.done, st.period.missed, st.period.skipped, st.period.early, st.period.snoozes], [4, 1, 0, 2, 1]);
+    assert.strictEqual(st.period.rate, 0.8);
+    assert.strictEqual(st.period.night, 1);
+    assert.strictEqual(st.period.distinct, 2);
+    assert.strictEqual(st.period.comeback, true, 'a miss followed by a perfect day');
+    assert.deepStrictEqual(st.period.bestDay, { day: d1, pts: 50 });
+    assert.deepStrictEqual(st.today, { total: 2, done: 1, resolved: 1, left: 1, pts: 20 });
+    assert.strictEqual(st.perHabit[0].habit.id, 'water');
+    assert.strictEqual(st.perHabit[0].rate, 1);
+    assert.strictEqual(st.perHabit[1].rate, 0.5);
+
+    // Badges: first, perfect and comeback are earned; ten is 3/10.
+    const fresh = G.unlockBadges(st, now);
+    assert.deepStrictEqual(fresh.map((b) => b.id).sort(), ['comeback', 'first', 'perfect']);
+    assert.strictEqual(S.state.game.badges.first, now, 'unlock time is persisted');
+    assert.deepStrictEqual(G.unlockBadges(st, now), [], 'idempotent');
+    const ten = G.badgeProgress(G.BADGES.find((b) => b.id === 'ten'), st);
+    assert.deepStrictEqual([ten.n, ten.of, ten.earned], [3, 10, false]);
+    // A persisted badge stays earned even if the live goal no longer holds.
+    S.state.game.done = 0;
+    assert.strictEqual(G.badgeProgress(G.BADGES.find((b) => b.id === 'first'), G.computeStats(now, occs)).earned, true);
+    S.state.game.done = 3;
+
+    // Tips: notifications are 'granted' in this shim, so no notif tip; streak is 1 → keep it; 1 left today.
+    const tips = G.tips(st, 5).map((x) => x.key);
+    assert.ok(tips.includes('tipStreakKeep'), tips.join());
+    assert.ok(tips.includes('tipLeftToday'), tips.join());
+    assert.ok(!tips.includes('tipNotif'));
+
+    // Combo counts consecutive dones from the latest resolved moment today.
+    assert.strictEqual(G.todayCombo(occs, now), 1);
+    S.state.days[today]['walk#0'] = { status: 'done', pts: 20, snoozes: 0, at: D(0, '11:00') };
+    assert.strictEqual(G.todayCombo(E.buildOccurrences(now), now), 2);
+    S.state.days[today]['walk#0'] = { status: 'skipped', pts: -10, snoozes: 0, at: D(0, '11:00') };
+    assert.strictEqual(G.todayCombo(E.buildOccurrences(now), now), 0, 'a skip breaks the combo');
+  });
+
+  await test('complete() records early and undo reverts the early counter', () => {
+    const now = D(0, '12:00');
+    S.state.habits = [habit('meds', '11:00', '13:00', { createdAt: D(-1, '00:00') })];
+    S.state.days = {}; S.state.game.early = 0;
+    const o = E.buildOccurrences(now).find((x) => x.habit.id === 'meds');
+    const r = E.complete(o, D(0, '11:30'));
+    assert.strictEqual(r.early, true);
+    assert.strictEqual(S.state.game.early, 1);
+    assert.strictEqual(S.state.days[today]['meds#0'].early, true);
+    E.undo(o);
+    assert.strictEqual(S.state.game.early, 0);
+    assert.strictEqual(S.state.days[today]['meds#0'].early, false);
+  });
+
   console.log(`\n${passed} tests passed`);
 })().catch((e) => { console.error(e); process.exit(1); });

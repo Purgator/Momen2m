@@ -73,6 +73,8 @@ const TONES = {
 const FX = {
   done: [[523, 0, 0.08, 'sine'], [659, 0.08, 0.08, 'sine'], [784, 0.16, 0.14, 'sine']],
   miss: [[220, 0, 0.25, 'sine']],
+  levelup: [[523, 0, 0.1, 'sine'], [659, 0.1, 0.1, 'sine'], [784, 0.2, 0.1, 'sine'], [1047, 0.3, 0.3, 'sine']],
+  badge: [[659, 0, 0.08, 'triangle'], [880, 0.09, 0.08, 'triangle'], [1319, 0.18, 0.2, 'triangle']],
 };
 
 export const PATTERN_NAMES = ['short', 'double', 'long', 'heartbeat', 'sos'];
@@ -201,6 +203,8 @@ export function feedback(kind, importance) {
   }
   if (kind === 'miss') { vibrate([200]); if (s.sound && !document.hidden) playNotes(FX.miss, 0.15); return; }
   if (kind === 'done') { vibrate([30]); if (s.sound && !document.hidden) playNotes(FX.done, 0.15); return; }
+  if (kind === 'levelup') { vibrate([40, 60, 40, 60, 90]); if (s.sound && !document.hidden) playNotes(FX.levelup, 0.18); return; }
+  if (kind === 'badge') { vibrate([30, 40, 30]); if (s.sound && !document.hidden) playNotes(FX.badge, 0.15); return; }
   vibrate([10]);
 }
 

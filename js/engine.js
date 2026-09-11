@@ -24,7 +24,7 @@ function habitOnDay(h, day) {
 }
 
 // Raw occurrences of one day (no phase computed).
-function occurrencesOfDay(day) {
+export function occurrencesOfDay(day) {
   const list = [];
   for (const h of state.habits) {
     if (!habitOnDay(h, day)) continue;
@@ -93,7 +93,7 @@ function markMisses(day, now, hooks) {
   return changed;
 }
 
-function dayComplete(day) {
+export function dayComplete(day) {
   const occs = occurrencesOfDay(day);
   if (!occs.length) return null;
   return occs.every((o) => o.status === 'done');
@@ -163,8 +163,10 @@ export function complete(o, now) {
   rec.status = 'done';
   rec.pts = (rec.pts || 0) + pts;
   rec.at = now;
+  rec.early = early;
   applyXp(pts);
   state.game.done++;
+  if (early) state.game.early = (state.game.early || 0) + 1;
   const perfect = dayComplete(o.day) === true;
   save();
   return { pts, early, perfect };
@@ -212,7 +214,11 @@ export function skip(o, now) {
 export function undo(o) {
   const rec = record(o.day, o.occ, false);
   if (!rec || rec.status === 'open' || rec.status === 'missed') return false;
-  if (rec.status === 'done') state.game.done = Math.max(0, state.game.done - 1);
+  if (rec.status === 'done') {
+    state.game.done = Math.max(0, state.game.done - 1);
+    if (rec.early) state.game.early = Math.max(0, (state.game.early || 0) - 1);
+  }
+  rec.early = false;
   // Snooze penalties stay; only the done/skip points are reverted.
   const snoozePts = -rec.snoozes * SNOOZE_PENALTY;
   applyXp(-((rec.pts || 0) - snoozePts));
