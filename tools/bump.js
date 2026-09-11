@@ -14,4 +14,5 @@ const edit = (file, fn) => {
 };
 edit('version.js', (s) => s.replace(/MOMEN2M_VERSION = '[^']+'/, "MOMEN2M_VERSION = '" + v + "'"));
 edit('package.json', (s) => s.replace(/"version": "[^"]+"/, '"version": "' + v + '"'));
+edit('sw.js', (s) => s.replace(/const VERSION = '[^']+'/, "const VERSION = '" + v + "'"));
 console.log('version ->', v);
