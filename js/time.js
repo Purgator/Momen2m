@@ -52,6 +52,10 @@ export function fmtClock(ts) {
 // Exact moment, to the second: "11 Sept 2026, 14:05:33" (device locale).
 const dateTimeFmt = new Intl.DateTimeFormat(navigator.language || 'en', { dateStyle: 'medium', timeStyle: 'medium' });
 const timeSecFmt = new Intl.DateTimeFormat(navigator.language || 'en', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+const dateFmt = new Intl.DateTimeFormat(navigator.language || 'en', { weekday: 'short', day: 'numeric', month: 'short' });
+export function fmtDate(ts) {
+  return dateFmt.format(ts);
+}
 export function fmtDateTime(ts) {
   return dateTimeFmt.format(ts);
 }
