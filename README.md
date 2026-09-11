@@ -103,21 +103,30 @@ a slip of the thumb — or a lost phone — doesn't cost you your setup:
   ("Last backup: 3 days ago" or "Never backed up").
 - **Reset and Import can't surprise you.** Reset now offers *Back up, then erase* as the
   main button, with *Erase without backing up* as a plain link for when you're sure.
-  Import shows what it's about to replace, with a count and the backup's own date, before
-  doing anything.
-- **Import can find your backup itself.** Where the browser supports it (desktop Chrome
-  and Edge today), *Setup → Data* offers *Find my backup* instead of a plain file picker.
-  The first time, you point it at the one folder where you keep backups — Momen2m
-  remembers that folder and, every time after, scans it for the most recently modified
-  file that actually looks like a Momen2m export (even renamed), one level of subfolders
-  included, and offers to restore it in one tap. No website can search a whole device —
-  no browser allows that — so this only ever looks inside the one folder you chose, never
-  anywhere else. *Choose a file instead* stays one tap away for a one-off restore or on
-  browsers where this isn't available (Safari, Firefox, iOS, some Android versions), where
-  it's the only option, same as before.
+  Import and Restore show exactly what is about to change before doing anything: the
+  backup's own date (to the second), then the moments it **adds**, **removes** and
+  **changes** compared to what is on the device, with the old and new times side by side.
+- **Every export gets its own file.** Backups are named to the second
+  (`momen2m-2026-09-11_14-05-33.json`), so saving twice never overwrites an earlier one.
+- **One backup folder, chosen once.** Where the browser supports it (desktop Chrome and
+  Edge today), *Setup → Data* offers *Find my backup* instead of a plain file picker. The
+  first time, you point it at a folder of your own — Momen2m remembers it, writes every
+  later *Export* straight into it (no dialog, a toast names the file), and *Find my backup*
+  scans it for the most recently modified file that actually looks like a Momen2m export
+  (even renamed), one level of subfolders included, then offers to restore it in one tap.
+  The Data section shows which folder is in use, with a *Change* link. No website can
+  search a whole device — no browser allows that — so this only ever looks inside the one
+  folder you chose. One catch worth knowing: browsers refuse to hand out the *Downloads*,
+  *Desktop*, *Documents* and home folders themselves (they may hold system files), which
+  shows up as a "can't open this folder" message — pick or create a subfolder such as
+  *Downloads › Momen2m* instead. *Choose a file instead* stays one tap away for a one-off
+  restore, and is the only option on browsers without folder access (Safari, Firefox, iOS,
+  Android), same as before.
 - **A one-step undo sits behind both of them.** Right before Reset or Import changes
   anything, Momen2m silently keeps one copy of what you had. If a tap goes wrong, *Setup →
-  Data → Restore* (or a link on the empty *Now* screen) brings it straight back.
+  Data → Restore* (or a link on the empty *Now* screen) brings it straight back. The
+  button shows exactly when that copy was taken and why (before a reset, an import, a
+  restore), and the confirmation lists what restoring it would add, remove and change.
 - **The browser is asked to protect the storage.** Momen2m calls the Storage API's
   `persist()` on load, which on Android tells Chrome not to clear the site's data when the
   device is low on space. It's best-effort and invisible — there's nothing to configure.
@@ -155,6 +164,9 @@ js/app.js             controller: tick loop, event delegation, install and updat
 js/ui.js              rendering (template strings), bottom sheets, toasts
 js/engine.js          occurrences, statuses, misses, scoring, streaks
 js/store.js           localStorage persistence, export/import
+js/diff.js            what an import or restore would add / remove / change
+js/autobackup.js      remembered backup folder: direct export, newest-backup scan
+js/fsstore.js         persists the folder handle in IndexedDB
 js/notify.js          Notification API via the service worker, sound and vibration
 js/update.js          service worker registration and update handling
 js/i18n.js            English and French strings
@@ -181,7 +193,8 @@ npm test
 ```
 
 Simulated-time tests for the engine: start/end/miss transitions, snooze limits, scoring,
-undo, streaks, midnight-crossing windows and one-off tasks.
+undo, streaks, midnight-crossing windows and one-off tasks, plus backup safety (recovery
+snapshots, import preview, export stamping) and notification options.
 
 ### Release a new version
 
