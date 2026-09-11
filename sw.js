@@ -27,6 +27,7 @@ const ASSETS = [
   './icons/maskable-512.png',
   './icons/apple-touch-icon.png',
   './icons/favicon-32.png',
+  './icons/badge-96.png',
 ];
 
 self.addEventListener('install', (event) => {
@@ -70,12 +71,22 @@ self.addEventListener('fetch', (event) => {
   );
 });
 
+// A tap on the notification focuses (or opens) the app. A tap on one of its
+// action buttons (Done / Snooze) is forwarded to an open window, or carried
+// in the URL when the app has to be opened first.
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
+  const action = event.action || '';
+  const key = (event.notification.data && event.notification.data.key) || '';
   event.waitUntil(
     self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((list) => {
-      for (const c of list) { if ('focus' in c) return c.focus(); }
-      if (self.clients.openWindow) return self.clients.openWindow('./');
+      const win = list.find((c) => 'focus' in c);
+      if (win) {
+        if (action && key) win.postMessage({ type: 'NOTIF_ACTION', action, key });
+        return win.focus();
+      }
+      const url = action && key ? './?notif=' + encodeURIComponent(action) + '&key=' + encodeURIComponent(key) : './';
+      if (self.clients.openWindow) return self.clients.openWindow(url);
     })
   );
 });
