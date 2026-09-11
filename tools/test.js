@@ -60,20 +60,27 @@ globalThis.window = globalThis;
     assert.strictEqual(state.game.xp, 80);
   });
 
-  await test('snooze extends the deadline and costs points', () => {
+  await test('snooze pushes the window back into "coming up", then it pops again', () => {
     state.habits = [habit('meds', '10:00', '10:30', { importance: 3 })];
     state.days = {}; state.game.xp = 100; events.length = 0;
     E.tick(D(0, '10:26'), hooks);
+    assert.deepStrictEqual(events, ['ending:meds#0'], 'the start was 26 min ago: too old to alert, only the ending warning fires');
     let o = E.buildOccurrences(D(0, '10:27'))[0];
     const r = E.snooze(o, D(0, '10:27'));
-    assert.strictEqual(r.deadline, D(0, '10:40'));
+    assert.strictEqual(r.start, D(0, '10:37'), 'start moves by the snooze length');
+    assert.strictEqual(r.deadline, D(0, '10:40'), 'deadline moves by the same amount');
     assert.strictEqual(state.game.xp, 97);
     E.tick(D(0, '10:31'), hooks);
     o = E.buildOccurrences(D(0, '10:31'))[0];
+    assert.strictEqual(o.phase, 'upcoming', 'off the screen while snoozed');
+    assert.deepStrictEqual(events, ['ending:meds#0'], 'no new alert while snoozed');
+    E.tick(D(0, '10:37') + 1000, hooks);
+    o = E.buildOccurrences(D(0, '10:38'))[0];
     assert.strictEqual(o.phase, 'active');
+    assert.deepStrictEqual(events.slice(-1), ['start:meds#0'], 'a fresh start alert when it comes back');
     assert.strictEqual(E.canSnooze(o), 'ok');
-    E.snooze(o, D(0, '10:31'));
-    o = E.buildOccurrences(D(0, '10:31'))[0];
+    E.snooze(o, D(0, '10:38'));
+    o = E.buildOccurrences(D(0, '10:38'))[0];
     assert.strictEqual(E.canSnooze(o), 'exhausted');
     E.tick(D(0, '10:51'), hooks);
     o = E.buildOccurrences(D(0, '10:51'))[0];
