@@ -44,7 +44,7 @@ French, chosen automatically from your device.
 - **Feedback that lands.** Each completion gets points plus a word of praise, combos
   ("3 in a row!"), a perfect-day cheer, a level-up fanfare with a burst of stars, and
   badge unlocks announced as they happen — sound and vibration included, all optional.
-- **Notifications** when a moment starts, shortly before it ends, and when it's missed. Strong alerts stay in the tray until dismissed.
+- **Notifications** when a moment starts, shortly before it ends, and when it's missed. Strong alerts stay in the tray until dismissed. They play the system notification sound by default so Android shows them as a pop-up (silent notifications are shown minimised there, and cannot vibrate).
 - **Alerts your way.** Pick a tone (chime, bell, marimba, pulse, siren), a volume, and
   test it on the spot. Choose *gentle* (one short tone and buzz, like a notification) or
   *strong* (louder, repeated with a longer vibration until you tap the screen, like an
@@ -78,10 +78,13 @@ home-screen icon.
 
 ### Good to know
 
-- **Reminders work while Momen2m is open or in the background.** Web apps cannot wake a
-  phone up on their own, so open Momen2m at the start of your day and leave it running
-  (switching to other apps is fine). If you come back after hours away, it catches up:
-  missed moments are marked, points are settled, nothing is lost.
+- **Reminders are reliable while Momen2m is on screen.** Web apps cannot wake a phone
+  up on their own, and phones pause a web app a few minutes after you switch away from it
+  (Android is strict about this: the page is frozen, its timers stop). A reminder due
+  during that pause shows up when you come back. Nothing is lost: missed moments are
+  marked and points settled. For a day of reminders, keep Momen2m open — on a stand, or
+  simply as the app you return to. Reminders that wake the phone need a push server; see
+  *Why there is no push server* below.
 - **Everything stays on your phone.** There is no server and no account. Use
   *Setup → Data → Export* to save a backup file, and *Import* to restore it on another device.
 - **Updates are automatic.** A new version is fetched in the background and applied the
@@ -250,11 +253,17 @@ so it works from a sub-folder too.
 
 ### Why there is no push server
 
-Scheduled notifications while the app is fully closed need a Web Push server that holds
-subscriptions and sends messages at the right time. Momen2m is deliberately serverless and
-keeps all data on the device, so it reminds you while it is open or in the background and
-settles up when you come back. A self-hosted push relay would be the natural extension if
-you need wake-the-phone reminders.
+Scheduled notifications while the app is closed or paused need a Web Push server: the
+phone's push service (Google's or Apple's) is the only thing allowed to wake a web app,
+and it only relays messages sent by a server at the right moment. Momen2m is deliberately
+serverless and keeps all data on the device, so it reminds you while it is on screen and
+settles up when you come back.
+
+What background reminders would take, for the record: a tiny relay (a Cloudflare Worker
+with a scheduled alarm fits) holding each device's push subscription plus the day's
+reminder times and titles, sending a push at each time; `sw.js` would gain a `push`
+handler showing the notification. It stays optional — the app must keep working with no
+relay configured — and it is the one feature that sends anything off the device.
 
 ## License
 
