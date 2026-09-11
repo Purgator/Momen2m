@@ -259,5 +259,35 @@ globalThis.window = globalThis;
     assert.strictEqual(opts.vibrate, undefined);
   });
 
+  await test('import preview: added / removed / changed / points', async () => {
+    const { diffStates } = await import(url('diff.js'));
+    const a = habit('water', '09:00', '10:00'), b = habit('walk', '18:00', '19:00'), c = habit('read', '21:00', '22:00');
+    const cur = { habits: [a, b, c], game: { xp: 120 } };
+    const next = { habits: [a, { ...b, slots: [{ start: '18:30', end: '19:30' }] }, habit('meds', '08:00', '08:30')], game: { xp: 40 } };
+    const d = diffStates(cur, next);
+    assert.deepStrictEqual(d.added.map((h) => h.id), ['meds']);
+    assert.deepStrictEqual(d.removed.map((h) => h.id), ['read']);
+    assert.deepStrictEqual(d.changed.map((x) => x.to.id + ':' + x.facets.join('+')), ['walk:time']);
+    assert.deepStrictEqual(d.same.map((h) => h.id), ['water']);
+    assert.deepStrictEqual(d.xp, { from: 120, to: 40 });
+    assert.strictEqual(d.identical, false);
+    assert.strictEqual(diffStates(cur, { habits: [a, b, c], game: { xp: 120 } }).identical, true);
+    // day order and a missing enabled flag are not "changes"
+    const d2 = diffStates({ habits: [{ ...a, days: [6, 0, 1, 2, 3, 4, 5] }] }, { habits: [{ ...a, enabled: undefined }] });
+    assert.strictEqual(d2.changed.length, 0);
+  });
+
+  await test('export stamps the file itself as the backup, to the second', () => {
+    const before = S.state.lastBackupAt;
+    const parsed = JSON.parse(S.exportJSON(1800000000000));
+    assert.strictEqual(parsed.lastBackupAt, 1800000000000, 'the file says when it was made');
+    assert.strictEqual(parsed.backedUpAtVersion, S.state.habitsVersion || 0);
+    assert.strictEqual(S.state.lastBackupAt, before, 'exporting alone does not mark the device as backed up');
+    S.markBackedUp(1800000000000);
+    assert.strictEqual(S.state.lastBackupAt, 1800000000000);
+    assert.strictEqual(S.needsBackup(), false);
+    assert.strictEqual(T.fileStamp(new Date(2026, 8, 11, 14, 5, 3)), '2026-09-11_14-05-03');
+  });
+
   console.log(`\n${passed} tests passed`);
 })().catch((e) => { console.error(e); process.exit(1); });
