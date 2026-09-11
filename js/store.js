@@ -34,6 +34,7 @@ function defaults() {
     habitsVersion: 0,        // bumped on every habit add/edit/delete/toggle
     backedUpAtVersion: -1,   // habitsVersion at the moment of the last successful backup
     lastBackupAt: 0,         // ms epoch of the last successful export, 0 = never
+    backupFolder: '',        // name of the remembered backup folder (handle lives in IndexedDB)
   };
 }
 
@@ -105,8 +106,8 @@ export function needsBackup() {
   return state.habits.length > 0 && (state.habitsVersion || 0) !== (state.backedUpAtVersion ?? -1);
 }
 
-export function markBackedUp() {
-  state.lastBackupAt = Date.now();
+export function markBackedUp(at = Date.now()) {
+  state.lastBackupAt = at;
   state.backedUpAtVersion = state.habitsVersion || 0;
   save();
 }
@@ -119,8 +120,10 @@ export function resetAll() {
   flush();
 }
 
-export function exportJSON() {
-  return JSON.stringify(state, null, 2);
+// The file records its own creation as the last backup, so a later import can
+// say "made 3 days ago" about the file itself rather than about the backup before it.
+export function exportJSON(at = Date.now()) {
+  return JSON.stringify({ ...state, lastBackupAt: at, backedUpAtVersion: state.habitsVersion || 0 }, null, 2);
 }
 
 export function importJSON(text) {
