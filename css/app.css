@@ -223,6 +223,7 @@ input[type="time"] { font-variant-numeric: tabular-nums; }
 .switch span::after { content: ""; position: absolute; top: 3px; left: 3px; width: 24px; height: 24px; border-radius: 50%; background: #fff; transition: transform .2s; }
 .switch input:checked + span { background: var(--ok); }
 .switch input:checked + span::after { transform: translateX(20px); }
+.toggle input[type="range"] { width: 48%; accent-color: var(--accent); margin: 0; }
 .toggle select { width: auto; min-height: 38px; padding: 6px 30px 6px 12px; background-image: linear-gradient(45deg, transparent 50%, var(--muted) 50%), linear-gradient(135deg, var(--muted) 50%, transparent 50%); background-position: calc(100% - 16px) 50%, calc(100% - 11px) 50%; background-size: 5px 5px; background-repeat: no-repeat; }
 
 .card { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); padding: 6px 14px; }

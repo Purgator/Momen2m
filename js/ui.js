@@ -6,7 +6,7 @@ import { PRESETS } from './presets.js';
 import { suggestEmoji } from './emoji.js';
 import { BASE_PTS, canSnooze, currentOf, levelFor, xpForLevel, todayPoints } from './engine.js';
 import { fmtClock, fmtCountdown, fmtDuration, fmtAgo, nowHM, minutesToHM, parseHM } from './time.js';
-import { permission } from './notify.js';
+import { permission, TONE_NAMES, PATTERN_NAMES } from './notify.js';
 
 export const $ = (sel, root = document) => root.querySelector(sel);
 export const $$ = (sel, root = document) => Array.from(root.querySelectorAll(sel));
@@ -195,8 +195,8 @@ function toggleRow(label, sub, control) {
 function sw(setting, on) {
   return `<label class="switch"><input type="checkbox" data-setting="${setting}" ${on ? 'checked' : ''}><span></span></label>`;
 }
-function sel(setting, options, value) {
-  return `<select data-setting="${setting}">${options.map(([v, l]) => `<option value="${v}" ${String(v) === String(value) ? 'selected' : ''}>${l}</option>`).join('')}</select>`;
+function sel(setting, options, value, disabled = false) {
+  return `<select data-setting="${setting}" ${disabled ? 'disabled' : ''}>${options.map(([v, l]) => `<option value="${v}" ${String(v) === String(value) ? 'selected' : ''}>${l}</option>`).join('')}</select>`;
 }
 
 export function renderSetup(opts) {
@@ -240,10 +240,32 @@ export function renderSetup(opts) {
         ${toggleRow(t('language'), '', sel('lang', [['en', 'English'], ['fr', 'Français']], state.lang))}
         ${toggleRow(t('notifications'), perm === 'granted' ? t('notifOn') : perm === 'denied' ? t('notifBlocked') : t('notifOff'), notifControl)}
         ${toggleRow(t('reminderBefore'), '', sel('reminderBefore', [[0, '–'], [2, t('minutes', { n: 2 })], [5, t('minutes', { n: 5 })], [10, t('minutes', { n: 10 })], [15, t('minutes', { n: 15 })]], s.reminderBefore))}
-        ${toggleRow(t('sound'), '', sw('sound', s.sound))}
-        ${toggleRow(t('vibration'), '', sw('vibrate', s.vibrate))}
       </div>
       <p class="hint" style="margin-top:10px">${t('notifBackgroundNote')}</p>
+    </div>
+
+    <div class="section">
+      <h2>${t('alertsTitle')}</h2>
+      <div class="card">
+        ${toggleRow(t('sound'), '', sw('sound', s.sound))}
+        ${toggleRow(t('alertStyle'), '', sel('alertStyle', [['gentle', t('styleGentle')], ['alarm', t('styleAlarm')]], s.alertStyle))}
+        ${s.alertStyle === 'gentle' ? toggleRow(t('criticalAlarm'), '', sw('criticalAlarm', s.criticalAlarm)) : ''}
+        ${toggleRow(t('alarmSeconds'), '', sel('alarmSeconds', [10, 15, 20, 30, 60].map((n) => [n, t('seconds', { n })]), s.alarmSeconds))}
+        ${toggleRow(t('tone'), '', sel('soundName', TONE_NAMES.map((n) => [n, t('toneNames')[n]]), s.soundName))}
+        <div class="toggle"><div class="t">${t('volume')}</div><input type="range" min="10" max="100" step="10" value="${s.volume}" data-setting="volume" aria-label="${t('volume')}"></div>
+        ${toggleRow(t('soundOutput'), '', sel('soundOutput', [['app', t('outputApp')], ['system', t('outputSystem')], ['both', t('outputBoth')]], s.soundOutput))}
+        <div class="toggle"><div class="btnrow" style="margin:0;width:100%">
+          <button class="btn small" data-action="test-sound">🔊 ${t('testSound')}</button>
+          <button class="btn small" data-action="notif-test">🔔 ${t('testNotification')}</button>
+        </div></div>
+      </div>
+      <div class="card" style="margin-top:10px">
+        ${toggleRow(t('vibration'), '', sw('vibrate', s.vibrate))}
+        ${toggleRow(t('vibSync'), '', sw('vibSync', s.vibSync))}
+        ${toggleRow(t('vibPattern'), '', sel('vibPattern', PATTERN_NAMES.map((n) => [n, t('patternNames')[n]]), s.vibPattern, s.vibSync))}
+        <div class="toggle"><button class="btn small" data-action="test-vibration">📳 ${t('testVibration')}</button></div>
+      </div>
+      <p class="hint" style="margin-top:10px">${t('alertsNote')}</p>
     </div>
 
     <div class="section">
