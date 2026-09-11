@@ -27,14 +27,15 @@ French, chosen automatically from your device.
 - **Overlapping moments stay reachable.** If a second one is already running, tap it to
   expand it into its own full card with Done/Snooze/Skip, right there in the list; tap its
   header again to collapse it back.
-- **Done, snooze or skip.** Snooze can be limited or disabled in the settings.
+- **Done, snooze or skip.** Snooze pushes the moment back by the snooze length: it leaves the screen, waits in *Coming up*, and pops up again (with a fresh alert) when the time comes. Snooze can be limited or disabled in the settings.
+- **Act from the notification.** On Android the reminder carries *Done* and *Snooze* buttons; a tap on them works whether the app is open or has to be opened first.
 - **Tap any moment for more.** A finished one shows a recap (what happened, when, how many
   points) with Undo if it just happened. An upcoming one offers *Do it now* or *Skip* —
   no need to wait for its time to come around.
 - **Quick tasks** for one-off things ("call the dentist, 15 minutes") from the `+` button.
 - **Points, levels and streaks.** Finishing on time pays, finishing early pays more,
   missing costs points, snoozing costs a little. A perfect day extends your streak.
-- **Notifications** when a moment starts, shortly before it ends, and when it's missed.
+- **Notifications** when a moment starts, shortly before it ends, and when it's missed. Strong alerts stay in the tray until dismissed.
 - **Alerts your way.** Pick a tone (chime, bell, marimba, pulse, siren), a volume, and
   test it on the spot. Choose *gentle* (one short tone and buzz, like a notification) or
   *strong* (louder, repeated with a longer vibration until you tap the screen, like an
