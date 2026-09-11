@@ -6,7 +6,7 @@ const RECOVERY_KEY = 'momen2m.v1.recovery';
 
 function defaults() {
   return {
-    v: 1,
+    v: 2,
     lang: detectLang(),
     onboarded: false,
     settings: {
@@ -19,7 +19,7 @@ function defaults() {
       criticalAlarm: true,    // critical moments always use the strong style
       soundName: 'chime',     // see TONE_NAMES in notify.js
       volume: 70,             // 10..100
-      soundOutput: 'app',     // 'app' (media volume) | 'system' (notification sound) | 'both'
+      soundOutput: 'both',    // 'app' (media volume) | 'system' (notification sound) | 'both'
       alarmSeconds: 15,       // how long a strong alert repeats
       vibSync: true,          // vibration follows the tone
       vibPattern: 'double',   // used when vibSync is off; kept even while it is on
@@ -48,11 +48,19 @@ function defaults() {
 // defaults, so an older backup or a partial file never crashes the app.
 function mergeWithDefaults(raw) {
   const d = defaults();
-  return {
+  const s = {
     ...d, ...raw,
     settings: { ...d.settings, ...(raw.settings || {}) },
     game: { ...d.game, ...(raw.game || {}) },
   };
+  // v1 -> v2: "in-app only" made every system notification silent, which Android
+  // shows minimised (no pop-up, no vibration). Reminders must pop up: switch the
+  // old default to "both" once. Users can still pick "in-app" again afterwards.
+  if ((raw.v || 1) < 2) {
+    if (s.settings.soundOutput === 'app') s.settings.soundOutput = 'both';
+    s.v = 2;
+  }
+  return s;
 }
 
 function load() {

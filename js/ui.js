@@ -417,7 +417,7 @@ export function renderSetup(opts) {
         ${toggleRow(t('alarmSeconds'), '', sel('alarmSeconds', [10, 15, 20, 30, 60].map((n) => [n, t('seconds', { n })]), s.alarmSeconds))}
         ${toggleRow(t('tone'), '', sel('soundName', TONE_NAMES.map((n) => [n, t('toneNames')[n]]), s.soundName))}
         <div class="toggle"><div class="t">${t('volume')}</div><input type="range" min="10" max="100" step="10" value="${s.volume}" data-setting="volume" aria-label="${t('volume')}"></div>
-        ${toggleRow(t('soundOutput'), '', sel('soundOutput', [['app', t('outputApp')], ['system', t('outputSystem')], ['both', t('outputBoth')]], s.soundOutput))}
+        ${toggleRow(t('soundOutput'), s.soundOutput === 'app' ? t('soundOutputAppWarn') : '', sel('soundOutput', [['app', t('outputApp')], ['system', t('outputSystem')], ['both', t('outputBoth')]], s.soundOutput))}
         <div class="toggle"><div class="btnrow" style="margin:0;width:100%">
           <button class="btn small" data-action="test-sound">🔊 ${t('testSound')}</button>
           <button class="btn small" data-action="notif-test">🔔 ${t('testNotification')}</button>

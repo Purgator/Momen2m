@@ -32,6 +32,11 @@ export async function notify(title, body, tag, importance, actions) {
   if (!state.settings.notifications || permission() !== 'granted') return false;
   const s = state.settings;
   const strong = isStrong(importance);
+  // Chrome rejects a silent notification that also carries a vibration pattern
+  // ("Silent notifications must not specify vibration patterns"), and Android
+  // shows silent ones minimised, without a pop-up. So: vibrate only when the
+  // system sound is on; while the app is open, feedback() vibrates on its own.
+  const silent = s.soundOutput === 'app' || !s.sound;
   const options = {
     body, tag,
     data: { key: tag },
@@ -40,8 +45,8 @@ export async function notify(title, body, tag, importance, actions) {
     timestamp: Date.now(),
     renotify: true,
     requireInteraction: strong, // an alarm should stay until dismissed
-    silent: s.soundOutput === 'app' || !s.sound, // system sound only when asked for
-    vibrate: s.vibrate ? vibrationPattern(strong) : undefined,
+    silent,
+    vibrate: s.vibrate && !silent ? vibrationPattern(strong) : undefined,
   };
   if (actions && actions.length && swReg) options.actions = actions; // buttons need the SW path
   try {
