@@ -22,9 +22,15 @@ French, chosen automatically from your device.
   bedtime and a dozen more), allow notifications. Add your own with a name and a time range;
   the emoji is guessed for you, and you can add a note, several times per day, repeat days
   and an importance level.
-- **The Now screen** shows one thing: the current moment, big, with a countdown ring.
-  New moments arrive from the bottom, finished ones fade away at the top.
+- **The Now screen** shows one thing by default: the current moment, big, with a
+  countdown ring. New moments arrive from the bottom, finished ones fade away at the top.
+- **Overlapping moments stay reachable.** If a second one is already running, tap it to
+  expand it into its own full card with Done/Snooze/Skip, right there in the list; tap its
+  header again to collapse it back.
 - **Done, snooze or skip.** Snooze can be limited or disabled in the settings.
+- **Tap any moment for more.** A finished one shows a recap (what happened, when, how many
+  points) with Undo if it just happened. An upcoming one offers *Do it now* or *Skip* —
+  no need to wait for its time to come around.
 - **Quick tasks** for one-off things ("call the dentist, 15 minutes") from the `+` button.
 - **Points, levels and streaks.** Finishing on time pays, finishing early pays more,
   missing costs points, snoozing costs a little. A perfect day extends your streak.
