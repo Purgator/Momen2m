@@ -34,8 +34,13 @@ French, chosen automatically from your device.
 - **Quick tasks** for one-off things ("call the dentist, 15 minutes") from the `+` button.
 - **Points, levels and streaks.** Finishing on time pays, finishing early pays more,
   missing costs points, snoozing costs a little. A perfect day extends your streak.
-- **Notifications** when a moment starts, shortly before it ends, and when it's missed,
-  with optional sound and vibration.
+- **Notifications** when a moment starts, shortly before it ends, and when it's missed.
+- **Alerts your way.** Pick a tone (chime, bell, marimba, pulse, siren), a volume, and
+  test it on the spot. Choose *gentle* (one short tone and buzz, like a notification) or
+  *strong* (louder, repeated with a longer vibration until you tap the screen, like an
+  alarm) — critical moments can always be strong. Play the sound in-app (media volume),
+  through the system notification (notification volume), or both. Vibration either
+  follows the tone or has its own pattern; the pattern is kept even while it's synced.
 - **Works offline**, stores everything on your device, updates itself silently.
 - **Light on the battery**: no framework, no background polling, one tiny timer that goes
   to sleep when the app is not on screen.
@@ -72,6 +77,18 @@ home-screen icon.
 - **Updates are automatic.** A new version is fetched in the background and applied the
   next time you leave the app. *Setup → About → Check for updates* forces a check.
 - You can restart the guided setup at any time from *Setup → About*.
+
+## Sounds, vibration and the "alarm channel"
+
+A web app has two sound channels, and Setup → Alerts exposes both: **in-app sound**
+(synthesized on the spot, follows the phone's media volume) and the **system
+notification's own sound** (the phone's notification sound for the browser, follows the
+notification volume — it can only be switched on or off). Neither is Android's alarm
+channel; no browser lets a website use it. The *strong* alert style is the honest
+substitute: a louder tone and a longer vibration, repeated for 10–60 s or until you tap
+the screen, and a notification that stays until dismissed.
+
+Vibration only works on Android; iPhone ignores it from web apps.
 
 ## Never losing your setup
 
