@@ -49,6 +49,23 @@ export function fmtClock(ts) {
   return clockFmt.format(ts);
 }
 
+// Exact moment, to the second: "11 Sept 2026, 14:05:33" (device locale).
+const dateTimeFmt = new Intl.DateTimeFormat(navigator.language || 'en', { dateStyle: 'medium', timeStyle: 'medium' });
+const timeSecFmt = new Intl.DateTimeFormat(navigator.language || 'en', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+export function fmtDateTime(ts) {
+  return dateTimeFmt.format(ts);
+}
+// Same, but drops the date when it is today ("14:05:33"): fits on a button.
+export function fmtWhenShort(ts) {
+  return dayKey(new Date(ts)) === dayKey() ? timeSecFmt.format(ts) : dateTimeFmt.format(ts);
+}
+
+// Filesystem-safe timestamp for backup names: "2026-09-11_14-05-33". To the
+// second, so two exports the same day never overwrite each other.
+export function fileStamp(d = new Date()) {
+  return dayKey(d) + '_' + pad(d.getHours()) + '-' + pad(d.getMinutes()) + '-' + pad(d.getSeconds());
+}
+
 // Countdown such as "12:34" (under an hour) or "1:05:09".
 export function fmtCountdown(ms) {
   if (ms < 0) ms = 0;
