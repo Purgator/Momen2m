@@ -5,7 +5,7 @@ import { state } from './store.js';
 import { PRESETS } from './presets.js';
 import { suggestEmoji } from './emoji.js';
 import { BASE_PTS, canSnooze, currentOf, levelFor, xpForLevel, todayPoints } from './engine.js';
-import { fmtClock, fmtCountdown, fmtDuration, nowHM, minutesToHM, parseHM } from './time.js';
+import { fmtClock, fmtCountdown, fmtDuration, fmtAgo, nowHM, minutesToHM, parseHM } from './time.js';
 import { permission } from './notify.js';
 
 export const $ = (sel, root = document) => root.querySelector(sel);
@@ -116,7 +116,8 @@ export function renderLive(occs, now, opts) {
   }
   if (!state.habits.length) {
     body += `<div class="empty"><div class="emo">🌱</div><h2>${t('liveNoHabits')}</h2><p>${t('liveNoHabitsHint')}</p>
-      <p style="margin-top:14px"><button class="btn primary" data-action="tab" data-view="setup">${t('tabSetup')}</button></p></div>`;
+      <p style="margin-top:14px"><button class="btn primary" data-action="tab" data-view="setup">${t('tabSetup')}</button></p>
+      ${opts.recovery ? `<p style="margin-top:6px"><button class="link" data-action="restore-recovery">${t('restoreAvailable')}</button></p>` : ''}</div>`;
   } else if (cur) {
     body += currentCard(cur, now);
     for (const o of active) if (o !== cur) {
@@ -207,8 +208,11 @@ export function renderSetup(opts) {
     : perm === 'denied' || perm === 'unsupported' ? ''
     : `<button class="btn small primary" data-action="notif-enable">${t('notifEnable')}</button>`;
 
+  const backupLine = state.lastBackupAt ? t('lastBackup', { t: fmtAgo(state.lastBackupAt, getLang()) }) : t('neverBackedUp');
+
   return `<div class="screen setup">
     <h1>${t('setupTitle')}</h1>
+    ${opts.needsBackup ? `<div class="banner"><span>🛟 ${t('backupNeeded')}</span><button class="btn small primary" data-action="export">${t('backupNow')}</button></div>` : ''}
 
     <div class="section">
       <h2>${t('myMoments')} <button class="btn small primary" data-action="add">+ ${t('addMoment')}</button></h2>
@@ -244,12 +248,14 @@ export function renderSetup(opts) {
 
     <div class="section">
       <h2>${t('dataTitle')}</h2>
+      <p class="hint" style="margin:0 0 10px">${backupLine}</p>
       <div class="btnrow" style="margin-top:0">
         <button class="btn" data-action="export">${t('exportData')}</button>
         <button class="btn" data-action="import">${t('importData')}</button>
         <button class="btn danger" data-action="reset">${t('resetData')}</button>
       </div>
       <input type="file" accept="application/json,.json" id="importFile" hidden>
+      ${opts.recovery ? `<div class="card" style="margin-top:10px">${toggleRow(t('restoreAvailable'), fmtAgo(opts.recovery.at, getLang()), `<button class="btn small" data-action="restore-recovery">${t('restore')}</button>`)}</div>` : ''}
     </div>
 
     <div class="section">
@@ -270,8 +276,9 @@ export function renderSetup(opts) {
 
 // ---- onboarding ---------------------------------------------------------------
 
+const OB_STEPS = 4;
 export function renderOnboarding(step, data) {
-  const dots = `<div class="dots">${[0, 1, 2].map((i) => `<i class="${i === step ? 'on' : ''}"></i>`).join('')}</div>`;
+  const dots = `<div class="dots">${Array.from({ length: OB_STEPS }, (_, i) => `<i class="${i === step ? 'on' : ''}"></i>`).join('')}</div>`;
   let body = '', foot = '';
   if (step === 0) {
     body = `<img class="logo" src="icons/icon-192.png" alt="">
@@ -285,7 +292,7 @@ export function renderOnboarding(step, data) {
     body = `<h1>${t('obPickTitle')}</h1><p>${t('obPickText')}</p>
       <div class="chips">${PRESETS.map((p) => `<button class="chip ${data.selected.has(p.id) ? 'on' : ''}" data-action="ob-preset" data-preset="${p.id}">${p.emoji} ${esc(pick(p.name))}</button>`).join('')}</div>`;
     foot = `<button class="btn ghost big" data-action="ob-back">${t('obBack')}</button><button class="btn primary big" data-action="ob-next">${t('obNext')}</button>`;
-  } else {
+  } else if (step === 2) {
     const perm = permission();
     const status = perm === 'granted' ? `<p class="note" style="color:var(--ok)">${t('obNotifGranted')}</p>`
       : perm === 'denied' ? `<p class="note">${t('obNotifDenied')}</p>`
@@ -294,6 +301,11 @@ export function renderOnboarding(step, data) {
       ${data.isIosBrowser ? `<p class="note">${t('obIosInstall')}</p>` : ''}
       ${data.canInstall ? `<button class="btn big wide" data-action="install" style="margin-top:14px">📲 ${t('install')}</button>` : ''}
       ${!data.isIosBrowser && !data.canInstall && !data.standalone ? `<p class="note">${t('obInstallHint')}</p>` : ''}`;
+    foot = `<button class="btn ghost big" data-action="ob-back">${t('obBack')}</button><button class="btn primary big" data-action="ob-next">${t('obNext')}</button>`;
+  } else {
+    body = `<h1>${t('obBackupTitle')}</h1><p>${t('obBackupText')}</p>
+      <button class="btn primary big wide" data-action="export" style="margin-top:20px">💾 ${t('backupNow')}</button>
+      <p class="note">${t('obBackupNote')}</p>`;
     foot = `<button class="btn ghost big" data-action="ob-back">${t('obBack')}</button><button class="btn ok big" data-action="ob-start">${t('obStart')}</button>`;
   }
   return `<div class="ob"><div class="body">${body}</div>${dots}<div class="foot">${foot}</div></div>`;
@@ -478,6 +490,34 @@ export function openQuickSheet(onAdd) {
   $('[data-save]', el).addEventListener('click', submit);
   nameIn.addEventListener('keydown', (e) => { if (e.key === 'Enter') submit(); });
   setTimeout(() => nameIn.focus(), 300);
+}
+
+// A plain Cancel/Confirm sheet for a single destructive decision (used by Import).
+export function openConfirmSheet({ title, body, confirmLabel, onConfirm }) {
+  const el = openSheet(`
+    <h2>${esc(title)}</h2>
+    <p class="hint" style="margin:10px 0 4px">${body}</p>
+    <div class="btnrow">
+      <button class="btn ghost" data-cancel>${t('cancel')}</button>
+      <button class="btn primary" data-confirm>${esc(confirmLabel)}</button>
+    </div>`);
+  $('[data-cancel]', el).addEventListener('click', closeSheet);
+  $('[data-confirm]', el).addEventListener('click', () => { closeSheet(); onConfirm(); });
+}
+
+// Reset needs a stronger, more deliberate choice than a single OK button: the
+// safe path (back up, then erase) is the prominent one, erasing without a
+// backup is a plain text link, and cancelling needs no confirmation.
+export function openResetSheet(onBackupThenErase, onEraseOnly) {
+  const el = openSheet(`
+    <h2>⚠️ ${t('resetData')}</h2>
+    <p class="hint" style="margin:10px 0 16px">${t('confirmReset')}</p>
+    <button class="btn primary wide" data-backup-erase>💾 ${t('backupThenErase')}</button>
+    <p class="center" style="margin-top:14px"><button class="link" data-erase-only>${t('eraseWithoutBackup')}</button></p>
+    <div class="btnrow" style="margin-top:10px"><button class="btn ghost wide" data-cancel>${t('cancel')}</button></div>`);
+  $('[data-cancel]', el).addEventListener('click', closeSheet);
+  $('[data-backup-erase]', el).addEventListener('click', () => { closeSheet(); onBackupThenErase(); });
+  $('[data-erase-only]', el).addEventListener('click', () => { closeSheet(); onEraseOnly(); });
 }
 
 // ---- toasts & sparkles --------------------------------------------------------
