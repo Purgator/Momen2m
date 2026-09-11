@@ -29,7 +29,13 @@ function defaults() {
     },
     habits: [],
     days: {},               // dayKey -> occKey -> record
-    game: { xp: 0, streak: 0, bestStreak: 0, lastEvaluated: null, done: 0, missed: 0 },
+    game: {
+      xp: 0, streak: 0, bestStreak: 0, lastEvaluated: null, done: 0, missed: 0,
+      early: 0,     // completions in the first half of the window
+      shares: 0,    // times progress was shared
+      badges: {},   // badge id -> ms epoch when unlocked (kept even if history is pruned)
+      badgesInit: false, // set once badges already earned from old history were persisted quietly
+    },
     lastSeen: Date.now(),
     habitsVersion: 0,        // bumped on every habit add/edit/delete/toggle
     backedUpAtVersion: -1,   // habitsVersion at the moment of the last successful backup
