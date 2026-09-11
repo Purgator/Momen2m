@@ -9,8 +9,9 @@ import * as E from './engine.js';
 import * as N from './notify.js';
 import * as U from './ui.js';
 import { initUpdates, applyUpdate, checkForUpdate } from './update.js';
-import { dayKey, addDays, at, nowHM, minutesToHM, parseHM, fmtDuration, fmtAgo, fmtClock } from './time.js';
+import { dayKey, addDays, at, nowHM, minutesToHM, parseHM, fmtDuration, fmtClock, fmtDateTime, fileStamp } from './time.js';
 import * as AutoImport from './autobackup.js';
+import { diffStates } from './diff.js';
 
 // Ask the browser not to garbage-collect this origin's storage under pressure.
 // Silent and best-effort: it cannot be forced, and some browsers ignore it.
@@ -190,14 +191,30 @@ function handleNotifAction(action, key) {
   else if (action === 'snooze') doSnooze(o, Date.now());
 }
 
-// Exporting from an installed PWA window gives no download-shelf feedback with the
-// classic <a download> trick, so try the two mechanisms built for that: a native
-// Save dialog on desktop, a share sheet on mobile. Always end with a visible toast.
+// Exporting: straight into the remembered backup folder when there is one (desktop
+// Chrome/Edge), else a native Save dialog, else the share sheet (mobile), else the
+// classic <a download>. Always ends with a visible toast and a refreshed Setup
+// screen so the "changes since your last backup" banner goes away right there.
 // Returns true only once the data has actually been handed off somewhere.
 async function exportData() {
-  const text = exportJSON();
-  const name = 'momen2m-' + dayKey() + '.json';
+  const when = Date.now();
+  const text = exportJSON(when);
+  const name = 'momen2m-' + fileStamp(new Date(when)) + '.json';
+  const done = (where, quiet) => {
+    markBackedUp(when);
+    if (!quiet) U.toast(where ? t('exportedTo', { where }) : t('exported'), 'good', { ms: 5000 });
+    if (view === 'setup') render();
+    return true;
+  };
   try {
+    if (AutoImport.supported) {
+      try {
+        const folder = await AutoImport.writeToBackupFolder(name, text);
+        if (folder !== null) return done((folder ? folder + ' › ' : '') + name);
+      } catch (err) {
+        console.warn('backup folder write failed, falling back to a dialog', err);
+      }
+    }
     if (window.showSaveFilePicker) {
       try {
         const handle = await window.showSaveFilePicker({
@@ -209,9 +226,7 @@ async function exportData() {
         const w = await handle.createWritable();
         await w.write(text);
         await w.close();
-        markBackedUp();
-        U.toast(t('exported'), 'good');
-        return true;
+        return done(handle.name || name);
       } catch (err) {
         if (err && err.name === 'AbortError') return false; // user cancelled the dialog
         // fall through to the next method
@@ -221,8 +236,7 @@ async function exportData() {
     if (navigator.canShare && navigator.canShare({ files: [file] })) {
       try {
         await navigator.share({ files: [file], title: 'Momen2m' });
-        markBackedUp();
-        return true;
+        return done(null, true); // the share sheet was the feedback
       } catch (err) {
         if (err && err.name === 'AbortError') return false; // user cancelled the share sheet
         // fall through to the next method
@@ -233,9 +247,7 @@ async function exportData() {
     a.href = url; a.download = name; a.rel = 'noopener';
     document.body.appendChild(a); a.click(); a.remove();
     setTimeout(() => URL.revokeObjectURL(url), 4000);
-    markBackedUp();
-    U.toast(t('exported'), 'good');
-    return true;
+    return done(name);
   } catch (err) {
     console.error('export failed', err);
     U.toast(t('exportFailed'), 'bad');
@@ -250,10 +262,10 @@ const momentsLabel = (n) => n + ' moment' + (n === 1 ? '' : 's');
 // import through the usual validate + pre-import-snapshot path. `body` is
 // pre-worded by the caller since a manual pick and an auto-found file read
 // differently (the latter names the file; the user didn't just choose it).
-function confirmAndApplyImport(text, body) {
+function confirmAndApplyImport(text, body, parsed) {
   U.openConfirmSheet({
     title: t('importData'),
-    body,
+    body: body + U.diffHtml(diffStates(state, parsed)),
     confirmLabel: t('importReplace'),
     onConfirm: () => {
       try {
@@ -277,15 +289,32 @@ async function runAutoImport(opts) {
       return;
     }
     const label = momentsLabel(found.parsed.habits.length);
-    const when = found.parsed.lastBackupAt ? fmtAgo(found.parsed.lastBackupAt, getLang()) : null;
-    const body = when
-      ? t('autoImportFoundDated', { file: found.fileName, label, t: when })
+    const made = found.parsed.lastBackupAt || found.modified;
+    const body = made
+      ? t('autoImportFoundDated', { file: found.fileName, label, t: fmtDateTime(made) })
       : t('autoImportFound', { file: found.fileName, label });
-    confirmAndApplyImport(found.text, body);
+    confirmAndApplyImport(found.text, body, found.parsed);
   } catch (err) {
-    if (err && err.name === 'AbortError') return; // user cancelled the folder picker
+    const kind = AutoImport.classifyError(err);
+    if (kind === 'cancelled') return; // user closed the folder picker
     console.error('auto-import failed', err);
-    U.toast(t('autoImportFailed'), 'bad');
+    const retry = { label: t('changeBackupFolder'), fn: () => runAutoImport({ forceNewFolder: true }) };
+    if (kind === 'gesture') U.toast(t('autoImportTapAgain'), 'bad', { ms: 6000 });
+    else U.toast(t(kind === 'blocked' ? 'autoImportBlocked' : 'autoImportFailed'), 'bad', { action: retry, ms: 9000 });
+  }
+}
+
+// (Re)choose the backup folder without importing anything.
+async function changeBackupFolder() {
+  try {
+    const dir = await AutoImport.pickFolder();
+    U.toast(t('folderSet', { name: dir.name }), 'good', { ms: 5000 });
+    if (view === 'setup') render();
+  } catch (err) {
+    const kind = AutoImport.classifyError(err);
+    if (kind === 'cancelled') return;
+    console.error('folder pick failed', err);
+    U.toast(t(kind === 'gesture' ? 'autoImportTapAgain' : 'autoImportBlocked'), 'bad', { ms: 9000 });
   }
 }
 
@@ -393,6 +422,7 @@ app.addEventListener('click', async (e) => {
     case 'export': exportData(); break;
     case 'import': U.$('#importFile').click(); break;
     case 'import-auto': runAutoImport(); break;
+    case 'change-folder': changeBackupFolder(); break;
     case 'reset':
       U.openResetSheet(
         async () => {
@@ -408,7 +438,7 @@ app.addEventListener('click', async (e) => {
       if (!snap) break;
       U.openConfirmSheet({
         title: t('restore'),
-        body: t('restoreConfirm', { t: fmtAgo(snap.at, getLang()) }),
+        body: t('restoreConfirm', { t: fmtDateTime(snap.at) }) + U.diffHtml(diffStates(state, snap.data)),
         confirmLabel: t('restore'),
         onConfirm: () => {
           snapshotRecovery('before-restore');
@@ -473,9 +503,9 @@ app.addEventListener('change', (e) => {
         return;
       }
       const label = momentsLabel(parsed.habits.length);
-      const when = parsed.lastBackupAt ? fmtAgo(parsed.lastBackupAt, getLang()) : null;
-      const body = when ? t('importConfirmDated', { label, t: when }) : t('importConfirm', { label });
-      confirmAndApplyImport(text, body);
+      const made = parsed.lastBackupAt || f.lastModified;
+      const body = made ? t('importConfirmDated', { label, t: fmtDateTime(made) }) : t('importConfirm', { label });
+      confirmAndApplyImport(text, body, parsed);
     }).catch(() => U.toast(t('importFailed'), 'bad'));
     return;
   }
