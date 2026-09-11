@@ -10,6 +10,7 @@ import * as N from './notify.js';
 import * as U from './ui.js';
 import { initUpdates, applyUpdate, checkForUpdate } from './update.js';
 import { dayKey, addDays, at, nowHM, minutesToHM, parseHM, fmtDuration, fmtAgo } from './time.js';
+import * as AutoImport from './autobackup.js';
 
 // Ask the browser not to garbage-collect this origin's storage under pressure.
 // Silent and best-effort: it cannot be forced, and some browsers ignore it.
@@ -63,7 +64,7 @@ function render(now = Date.now()) {
   } else if (view === 'setup') {
     app.innerHTML = U.renderSetup({
       version: VERSION, updateReady, canInstall: !!installPrompt, isIosBrowser,
-      needsBackup: needsBackup(), recovery: getRecoverySnapshot(),
+      needsBackup: needsBackup(), recovery: getRecoverySnapshot(), canAutoImport: AutoImport.supported,
     });
   } else {
     for (const o of occs) o.fresh = fresh.has(o.key);
@@ -164,6 +165,8 @@ async function exportData() {
       try {
         const handle = await window.showSaveFilePicker({
           suggestedName: name,
+          id: 'momen2m-backups', // shared with autobackup.js's folder picker
+          startIn: 'downloads',  // so both dialogs tend to converge on one real folder
           types: [{ description: 'JSON', accept: { 'application/json': ['.json'] } }],
         });
         const w = await handle.createWritable();
@@ -200,6 +203,52 @@ async function exportData() {
     console.error('export failed', err);
     U.toast(t('exportFailed'), 'bad');
     return false;
+  }
+}
+
+// "moment"/"moments" pluralizes the same way in English and French.
+const momentsLabel = (n) => n + ' moment' + (n === 1 ? '' : 's');
+
+// Shows the Cancel/Replace confirmation and, once confirmed, applies the
+// import through the usual validate + pre-import-snapshot path. `body` is
+// pre-worded by the caller since a manual pick and an auto-found file read
+// differently (the latter names the file; the user didn't just choose it).
+function confirmAndApplyImport(text, body) {
+  U.openConfirmSheet({
+    title: t('importData'),
+    body,
+    confirmLabel: t('importReplace'),
+    onConfirm: () => {
+      try {
+        importJSON(text); // re-validates and snapshots the current data first
+        setLang(state.lang);
+        U.toast(t('imported'), 'good');
+        phases.clear(); refresh();
+      } catch { U.toast(t('importFailed'), 'bad'); }
+    },
+  });
+}
+
+// Scans the remembered (or newly picked) backup folder for the newest file
+// that looks like a Momen2m export, and offers to restore it — no manual
+// browsing needed after the very first time.
+async function runAutoImport(opts) {
+  try {
+    const found = await AutoImport.findLatestBackup(opts);
+    if (!found) {
+      U.toast(t('autoImportNone'), 'bad', { action: { label: t('changeBackupFolder'), fn: () => runAutoImport({ forceNewFolder: true }) }, ms: 6000 });
+      return;
+    }
+    const label = momentsLabel(found.parsed.habits.length);
+    const when = found.parsed.lastBackupAt ? fmtAgo(found.parsed.lastBackupAt, getLang()) : null;
+    const body = when
+      ? t('autoImportFoundDated', { file: found.fileName, label, t: when })
+      : t('autoImportFound', { file: found.fileName, label });
+    confirmAndApplyImport(found.text, body);
+  } catch (err) {
+    if (err && err.name === 'AbortError') return; // user cancelled the folder picker
+    console.error('auto-import failed', err);
+    U.toast(t('autoImportFailed'), 'bad');
   }
 }
 
@@ -285,6 +334,7 @@ app.addEventListener('click', async (e) => {
     case 'notif-test': N.notify(t('nTest'), t('nTestBody'), 'test'); N.feedback('start'); break;
     case 'export': exportData(); break;
     case 'import': U.$('#importFile').click(); break;
+    case 'import-auto': runAutoImport(); break;
     case 'reset':
       U.openResetSheet(
         async () => {
@@ -364,24 +414,10 @@ app.addEventListener('change', (e) => {
         U.toast(t('importFailed'), 'bad');
         return;
       }
-      // "moment"/"moments" pluralizes the same way in English and French.
-      const label = parsed.habits.length + ' moment' + (parsed.habits.length === 1 ? '' : 's');
+      const label = momentsLabel(parsed.habits.length);
       const when = parsed.lastBackupAt ? fmtAgo(parsed.lastBackupAt, getLang()) : null;
-      U.openConfirmSheet({
-        title: t('importData'),
-        body: when ? t('importConfirmDated', { label, t: when }) : t('importConfirm', { label }),
-        confirmLabel: t('importReplace'),
-        onConfirm: () => {
-          try {
-            importJSON(text); // re-validates and snapshots the current data first
-            setLang(state.lang);
-            U.toast(t('imported'), 'good');
-            phases.clear(); refresh();
-          } catch {
-            U.toast(t('importFailed'), 'bad');
-          }
-        },
-      });
+      const body = when ? t('importConfirmDated', { label, t: when }) : t('importConfirm', { label });
+      confirmAndApplyImport(text, body);
     }).catch(() => U.toast(t('importFailed'), 'bad'));
     return;
   }
