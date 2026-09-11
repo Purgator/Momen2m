@@ -42,13 +42,13 @@ const hooks = {
   onStart(o) {
     const pts = E.BASE_PTS[o.habit.importance] || 20;
     N.notify(t('nStart', { emoji: o.habit.emoji, name: pick(o.habit.name) }),
-      t('nStartBody', { t: fmtDuration(o.end - o.start, state.lang), pts }), o.key);
-    N.feedback('start');
+      t('nStartBody', { t: fmtDuration(o.end - o.start, state.lang), pts }), o.key, o.habit.importance);
+    N.feedback('start', o.habit.importance);
   },
   onEnding(o) {
     N.notify(t('nStart', { emoji: o.habit.emoji, name: pick(o.habit.name) }),
-      t('nEndingBody', { t: fmtDuration(o.end - Date.now(), state.lang) }), o.key);
-    N.feedback('warn');
+      t('nEndingBody', { t: fmtDuration(o.end - Date.now(), state.lang) }), o.key, o.habit.importance);
+    N.feedback('warn', o.habit.importance);
   },
   onMissed(o, pen) {
     N.notify(t('nMissed', { name: pick(o.habit.name) }), t('nMissedBody'), o.key);
@@ -261,6 +261,7 @@ app.addEventListener('click', async (e) => {
   if (!btn) return;
   const a = btn.dataset.action;
   N.unlockAudio();
+  N.stopAlarm(); // any tap silences a strong alert
   const now = Date.now();
 
   switch (a) {
@@ -363,6 +364,8 @@ app.addEventListener('click', async (e) => {
       render(); break;
     }
     case 'notif-test': N.notify(t('nTest'), t('nTestBody'), 'test'); N.feedback('start'); break;
+    case 'test-sound': N.testSound(); break;
+    case 'test-vibration': N.testVibration(); break;
     case 'export': exportData(); break;
     case 'import': U.$('#importFile').click(); break;
     case 'import-auto': runAutoImport(); break;
@@ -461,9 +464,15 @@ app.addEventListener('change', (e) => {
   const key = el.dataset.setting;
   if (!key) return;
   if (key === 'lang') { state.lang = el.value; setLang(state.lang); save(); render(); return; }
-  state.settings[key] = el.type === 'checkbox' ? el.checked : Number(el.value);
+  state.settings[key] = el.type === 'checkbox' ? el.checked : STRING_SETTINGS.has(key) ? el.value : Number(el.value);
   save();
+  // Some rows depend on others (critical toggle, pattern lock): redraw them.
+  if (key === 'alertStyle' || key === 'vibSync') render();
+  // Preview as you go, so picking a tone or a volume is immediate.
+  if (key === 'soundName' || key === 'volume') { N.unlockAudio(); N.playTone(false); N.vibrate(N.vibrationPattern(false)); }
+  if (key === 'vibPattern') N.testVibration();
 });
+const STRING_SETTINGS = new Set(['alertStyle', 'soundName', 'soundOutput', 'vibPattern']);
 
 document.addEventListener('keydown', (e) => { if (e.key === 'Escape') U.closeSheet(); });
 
