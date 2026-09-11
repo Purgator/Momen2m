@@ -67,6 +67,32 @@ home-screen icon.
   next time you leave the app. *Setup → About → Check for updates* forces a check.
 - You can restart the guided setup at any time from *Setup → About*.
 
+## Never losing your setup
+
+Because Momen2m keeps everything only on your device, it goes out of its way to make sure
+a slip of the thumb — or a lost phone — doesn't cost you your setup:
+
+- **Onboarding ends with a backup step.** Once you've picked your moments, a screen invites
+  you to back them up in one tap before you start your day.
+- **Setup tells you when you're at risk.** A banner appears there whenever you've changed
+  your moments since your last backup, and a status line always shows when that was
+  ("Last backup: 3 days ago" or "Never backed up").
+- **Reset and Import can't surprise you.** Reset now offers *Back up, then erase* as the
+  main button, with *Erase without backing up* as a plain link for when you're sure.
+  Import shows what it's about to replace, with a count and the backup's own date, before
+  doing anything.
+- **A one-step undo sits behind both of them.** Right before Reset or Import changes
+  anything, Momen2m silently keeps one copy of what you had. If a tap goes wrong, *Setup →
+  Data → Restore* (or a link on the empty *Now* screen) brings it straight back.
+- **The browser is asked to protect the storage.** Momen2m calls the Storage API's
+  `persist()` on load, which on Android tells Chrome not to clear the site's data when the
+  device is low on space. It's best-effort and invisible — there's nothing to configure.
+
+None of this survives the phone itself wiping this website's data, or the app being
+uninstalled and reinstalled from scratch — no code running only in a browser tab can
+prevent that. An occasional real export (*Setup → Data → Export*), kept somewhere else,
+is the one backup that survives anything.
+
 ## How points work
 
 | Event | Light | Normal | Critical |
