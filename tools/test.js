@@ -245,8 +245,10 @@ globalThis.window = globalThis;
     assert.strictEqual(await N.notify('t', 'b', 'k', 2), true);
     assert.strictEqual(opts.silent, true, 'in-app output keeps the system notification quiet');
     assert.strictEqual(opts.requireInteraction, false);
-    assert.deepStrictEqual(opts.vibrate, [400]);
+    assert.strictEqual(opts.vibrate, undefined, 'silent notifications cannot carry a vibration pattern (Chrome rejects them)');
     S.state.settings.soundOutput = 'system';
+    await N.notify('t', 'b', 'k', 2);
+    assert.deepStrictEqual(opts.vibrate, [400], 'gentle pattern once the system sound is on');
     await N.notify('t', 'b', 'k', 3);
     assert.strictEqual(opts.silent, false, 'system output lets the phone play its notification sound');
     assert.strictEqual(opts.requireInteraction, true, 'a strong alert stays until dismissed');
@@ -257,6 +259,25 @@ globalThis.window = globalThis;
     S.state.settings.vibrate = false;
     await N.notify('t', 'b', 'k', 2);
     assert.strictEqual(opts.vibrate, undefined);
+    // Chrome refuses silent + vibrate: a silent notification carries no pattern.
+    S.state.settings.vibrate = true; S.state.settings.sound = true; S.state.settings.soundOutput = 'app';
+    await N.notify('t', 'b', 'k', 2);
+    assert.strictEqual(opts.silent, true);
+    assert.strictEqual(opts.vibrate, undefined, 'no vibration pattern on a silent notification');
+    S.state.settings.soundOutput = 'both';
+    await N.notify('t', 'b', 'k', 2);
+    assert.strictEqual(opts.silent, false);
+    assert.deepStrictEqual(opts.vibrate, [400], 'audible again: the pattern is back');
+  });
+
+  await test('v1 data migrates the silent default to audible notifications', () => {
+    localStorage.setItem('momen2m.v1', JSON.stringify({ v: 1, habits: [], settings: { soundOutput: 'app', volume: 40 } }));
+    S.importJSON(localStorage.getItem('momen2m.v1'));
+    assert.strictEqual(S.state.settings.soundOutput, 'both');
+    assert.strictEqual(S.state.settings.volume, 40, 'other settings untouched');
+    assert.strictEqual(S.state.v, 2);
+    S.importJSON(JSON.stringify({ v: 2, habits: [], settings: { soundOutput: 'app' } }));
+    assert.strictEqual(S.state.settings.soundOutput, 'app', 'a deliberate v2 choice is respected');
   });
 
   await test('import preview: added / removed / changed / points', async () => {
