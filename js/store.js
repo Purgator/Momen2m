@@ -14,6 +14,15 @@ function defaults() {
       reminderBefore: 5,   // minutes before the deadline
       sound: true,
       vibrate: true,
+      // Alerts: how a reminder sounds and feels.
+      alertStyle: 'gentle',   // 'gentle' (like a notification) | 'alarm' (repeats until tapped)
+      criticalAlarm: true,    // critical moments always use the strong style
+      soundName: 'chime',     // see TONE_NAMES in notify.js
+      volume: 70,             // 10..100
+      soundOutput: 'app',     // 'app' (media volume) | 'system' (notification sound) | 'both'
+      alarmSeconds: 15,       // how long a strong alert repeats
+      vibSync: true,          // vibration follows the tone
+      vibPattern: 'double',   // used when vibSync is off; kept even while it is on
       snoozeAllowed: true,
       snoozeMinutes: 10,
       maxSnoozes: 2,
