@@ -12,6 +12,7 @@ const stage = path.join(dist, 'Momen2m');
 fs.mkdirSync(stage, { recursive: true });
 const files = ['index.html', 'manifest.webmanifest', 'sw.js', 'version.js', 'css', 'js', 'icons', '.nojekyll', 'LICENSE'];
 for (const f of files) fs.cpSync(path.join(root, f), path.join(stage, f), { recursive: true });
-const zip = path.join(dist, 'Momen2m-' + version + '.zip');
-execFileSync('tar', ['-a', '-c', '-f', zip, '-C', dist, 'Momen2m'], { stdio: 'inherit' });
-console.log('wrote', zip);
+const zipName = 'Momen2m-' + version + '.zip';
+// Relative paths on purpose: Windows tar reads "C:..." as a remote host.
+execFileSync('tar', ['-a', '-c', '-f', zipName, 'Momen2m'], { cwd: dist, stdio: 'inherit' });
+console.log('wrote', path.join(dist, zipName));
