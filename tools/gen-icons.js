@@ -67,6 +67,18 @@ function shade(u, v, variant) {
     const d = sdRoundedBox(u, v, 1, 0.24);
     a = clamp01(0.5 - d * 90);
   }
+  if (variant === 'badge') {
+    // Status-bar badge: Android keeps only the alpha channel and paints it in
+    // one color, so this is white glyphs on a transparent background.
+    const x = u / 0.9, y = v / 0.9;
+    const dRing = Math.abs(Math.hypot(x, y) - 0.62) - 0.06;
+    const ha = -Math.PI * 0.72;
+    const dHour = sdSegment(x, y, 0, 0, Math.cos(ha) * 0.3, Math.sin(ha) * 0.3) - 0.055;
+    const dMin = sdSegment(x, y, 0, 0, 0, -0.44) - 0.055;
+    const dDot = Math.hypot(x, y + 0.62) - 0.14;
+    const alpha = clamp01(0.5 - Math.min(dRing, dHour, dMin, dDot) * 60);
+    return [255, 255, 255, alpha * 255];
+  }
   const scale = variant === 'maskable' ? 0.78 : 1; // keep the safe zone for masks
   const x = u / scale, y = v / scale;
 
@@ -117,6 +129,7 @@ const jobs = [
   ['apple-touch-icon.png', 180, 'maskable'], // iOS wants an opaque square
   ['maskable-512.png', 512, 'maskable'],
   ['favicon-32.png', 32, 'any'],
+  ['badge-96.png', 96, 'badge'],
 ];
 for (const [name, size, variant] of jobs) {
   fs.writeFileSync(path.join(OUT, name), render(size, variant));
