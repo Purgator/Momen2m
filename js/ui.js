@@ -5,7 +5,7 @@ import { state } from './store.js';
 import { PRESETS } from './presets.js';
 import { suggestEmoji } from './emoji.js';
 import { BASE_PTS, canSnooze, currentOf, levelFor, xpForLevel, todayPoints } from './engine.js';
-import { fmtClock, fmtCountdown, fmtDuration, fmtAgo, nowHM, minutesToHM, parseHM } from './time.js';
+import { fmtClock, fmtCountdown, fmtDuration, fmtAgo, fmtDateTime, fmtWhenShort, nowHM, minutesToHM, parseHM } from './time.js';
 import { permission, TONE_NAMES, PATTERN_NAMES } from './notify.js';
 
 export const $ = (sel, root = document) => root.querySelector(sel);
@@ -121,7 +121,7 @@ export function renderLive(occs, now, opts) {
   if (!state.habits.length) {
     body += `<div class="empty"><div class="emo">🌱</div><h2>${t('liveNoHabits')}</h2><p>${t('liveNoHabitsHint')}</p>
       <p style="margin-top:14px"><button class="btn primary" data-action="tab" data-view="setup">${t('tabSetup')}</button></p>
-      ${opts.recovery ? `<p style="margin-top:6px"><button class="link" data-action="restore-recovery">${t('restoreAvailable')}</button></p>` : ''}</div>`;
+      ${opts.recovery ? `<p style="margin-top:6px"><button class="link" data-action="restore-recovery">${t('restoreAvailable')} · ${fmtWhenShort(opts.recovery.at)}</button></p>` : ''}</div>`;
   } else if (cur) {
     body += currentCard(cur, now);
     const expanded = opts.expanded || new Set();
@@ -218,6 +218,9 @@ export function renderSetup(opts) {
     : `<button class="btn small primary" data-action="notif-enable">${t('notifEnable')}</button>`;
 
   const backupLine = state.lastBackupAt ? t('lastBackup', { t: fmtAgo(state.lastBackupAt, getLang()) }) : t('neverBackedUp');
+  const folderLine = opts.canAutoImport && state.backupFolder
+    ? ` · ${t('backupFolder', { name: esc(state.backupFolder) })} <button class="link" style="padding:0" data-action="change-folder">${t('changeFolder')}</button>`
+    : '';
 
   return `<div class="screen setup">
     <h1>${t('setupTitle')}</h1>
@@ -279,7 +282,7 @@ export function renderSetup(opts) {
 
     <div class="section">
       <h2>${t('dataTitle')}</h2>
-      <p class="hint" style="margin:0 0 10px">${backupLine}</p>
+      <p class="hint" style="margin:0 0 10px">${backupLine}${folderLine}</p>
       <div class="btnrow" style="margin-top:0">
         <button class="btn" data-action="export">${t('exportData')}</button>
         ${opts.canAutoImport
@@ -290,7 +293,9 @@ export function renderSetup(opts) {
       ${opts.canAutoImport ? `<p class="hint" style="margin:10px 0 0">${t('findBackupHint')}
         <button class="link" style="padding:0" data-action="import">${t('chooseFileManually')}</button></p>` : ''}
       <input type="file" accept="application/json,.json" id="importFile" hidden>
-      ${opts.recovery ? `<div class="card" style="margin-top:10px">${toggleRow(t('restoreAvailable'), fmtAgo(opts.recovery.at, getLang()), `<button class="btn small" data-action="restore-recovery">${t('restore')}</button>`)}</div>` : ''}
+      ${opts.recovery ? `<div class="card" style="margin-top:10px">${toggleRow(t('restoreAvailable'),
+        t('savedOn', { t: fmtDateTime(opts.recovery.at) }) + (t('recReason')[opts.recovery.reason] ? ' · ' + t('recReason')[opts.recovery.reason] : ''),
+        `<button class="btn small" data-action="restore-recovery">${t('restore')} · ${fmtWhenShort(opts.recovery.at)}</button>`)}</div>` : ''}
     </div>
 
     <div class="section">
@@ -531,7 +536,7 @@ export function openQuickSheet(onAdd) {
 export function openConfirmSheet({ title, body, confirmLabel, onConfirm }) {
   const el = openSheet(`
     <h2>${esc(title)}</h2>
-    <p class="hint" style="margin:10px 0 4px">${body}</p>
+    <div class="hint" style="margin:10px 0 4px">${body}</div>
     <div class="btnrow">
       <button class="btn ghost" data-cancel>${t('cancel')}</button>
       <button class="btn primary" data-confirm>${esc(confirmLabel)}</button>
@@ -599,6 +604,52 @@ export function openUpcomingSheet(o, { onDoNow, onSkip } = {}) {
 }
 
 // ---- toasts & sparkles --------------------------------------------------------
+
+// ---- import / restore preview ---------------------------------------------------
+// Turns diffStates() output into +/−/~ rows: what the incoming data adds,
+// removes and changes compared to what is on the device right now.
+const DIFF_MAX = 8;
+function diffRow(sign, cls, h, detail) {
+  return `<div class="diff-row ${cls}"><span class="sign">${sign}</span><span class="emo">${esc(h.emoji)}</span>
+    <span class="txt"><span class="name">${habitName(h)}</span>${detail ? `<span class="sub">${detail}</span>` : ''}</span></div>`;
+}
+function diffMore(n) { return n > 0 ? `<div class="diff-row more">${t('diffMore', { n })}</div>` : ''; }
+function briefOf(h) { return esc(slotsText(h)) + ' · ' + esc(daysText(h)); }
+function changeDetail(c) {
+  const parts = [];
+  for (const f of c.facets) {
+    if (f === 'name') parts.push(`${habitName(c.from)} → ${habitName(c.to)}`);
+    else if (f === 'time') parts.push(`${esc(slotsText(c.from))} → ${esc(slotsText(c.to))}`);
+    else if (f === 'days') parts.push(`${esc(daysText(c.from))} → ${esc(daysText(c.to))}`);
+    else if (f === 'importance') parts.push(`${t('importance')} ${c.from.importance} → ${c.to.importance}`);
+    else if (f === 'enabled') parts.push(c.to.enabled === false ? t('diffPaused') : t('diffResumed'));
+    else parts.push(t('diffDetails'));
+  }
+  return parts.join(' · ');
+}
+export function diffHtml(d) {
+  if (d.identical) return `<div class="diff"><div class="diff-row same">= ${t('diffNone')}</div></div>`;
+  let html = '<div class="diff">';
+  const section = (label, cls) => { html += `<div class="diff-head ${cls}">${label}</div>`; };
+  if (d.added.length) {
+    section(t('diffAdded', { n: d.added.length }), 'add');
+    for (const h of d.added.slice(0, DIFF_MAX)) html += diffRow('+', 'add', h, briefOf(h));
+    html += diffMore(d.added.length - DIFF_MAX);
+  }
+  if (d.removed.length) {
+    section(t('diffRemoved', { n: d.removed.length }), 'del');
+    for (const h of d.removed.slice(0, DIFF_MAX)) html += diffRow('−', 'del', h, briefOf(h));
+    html += diffMore(d.removed.length - DIFF_MAX);
+  }
+  if (d.changed.length) {
+    section(t('diffChanged', { n: d.changed.length }), 'chg');
+    for (const c of d.changed.slice(0, DIFF_MAX)) html += diffRow('~', 'chg', c.to, changeDetail(c));
+    html += diffMore(d.changed.length - DIFF_MAX);
+  }
+  if (d.same.length) html += `<div class="diff-row same">= ${t('diffSame', { n: d.same.length })}</div>`;
+  if (d.xp.from !== d.xp.to) html += `<div class="diff-row pts">⭐ ${t('diffPoints', { a: d.xp.from, b: d.xp.to })}</div>`;
+  return html + '</div>';
+}
 
 export function toast(text, kind = '', opts = {}) {
   const box = $('#toasts');
