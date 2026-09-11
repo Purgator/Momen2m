@@ -17,7 +17,7 @@ French, chosen automatically from your device.
 
 ## Features
 
-- **Two sides** — *Setup* to describe your moments, *Now* to live them.
+- **Three tabs** — *Setup* to describe your moments, *Now* to live them, *Progress* to see how it's going.
 - **Guided setup** in three taps: language, pick suggested moments (water, movement,
   bedtime and a dozen more), allow notifications. Add your own with a name and a time range;
   the emoji is guessed for you, and you can add a note, several times per day, repeat days
@@ -35,6 +35,15 @@ French, chosen automatically from your device.
 - **Quick tasks** for one-off things ("call the dentist, 15 minutes") from the `+` button.
 - **Points, levels and streaks.** Finishing on time pays, finishing early pays more,
   missing costs points, snoozing costs a little. A perfect day extends your streak.
+  Every number explains itself: hover it on a computer, tap it on a phone, and a short
+  sheet tells you what it means and how it is counted.
+- **A Progress tab** with your level and rank, a 7-day chart, success rate, per-moment
+  scores, 17 badges to earn (with progress towards the locked ones), tips computed from
+  your own history, and one-tap sharing: a generated progress card (image + text) for
+  the share sheet, or an invitation link for a friend.
+- **Feedback that lands.** Each completion gets points plus a word of praise, combos
+  ("3 in a row!"), a perfect-day cheer, a level-up fanfare with a burst of stars, and
+  badge unlocks announced as they happen — sound and vibration included, all optional.
 - **Notifications** when a moment starts, shortly before it ends, and when it's missed. Strong alerts stay in the tray until dismissed.
 - **Alerts your way.** Pick a tone (chime, bell, marimba, pulse, siren), a volume, and
   test it on the spot. Choose *gentle* (one short tone and buzz, like a notification) or
@@ -136,6 +145,22 @@ uninstalled and reinstalled from scratch — no code running only in a browser t
 prevent that. An occasional real export (*Setup → Data → Export*), kept somewhere else,
 is the one backup that survives anything.
 
+## Progress, badges and sharing
+
+The *Progress* tab reads the same history the *Now* screen writes; nothing extra is
+stored except the moment a badge was earned, so a badge stays yours even after old days
+are pruned. Statistics cover the last 30 days. Ranks change every two levels (Newcomer,
+Starter, Regular, Steady, Focused, Reliable, Unstoppable, Legend).
+
+Badges: first step, 10 / 50 / 100 / 500 done, early bird (10 early finishes), perfect day,
+3 / 7 / 30-day streaks, level 5 and 10, dawn and night owl (5 finishes before 7 am / after
+10 pm), all-rounder (5 different moments), comeback (a miss followed by a perfect day),
+ambassador (share once).
+
+Sharing uses the system share sheet where there is one (phones), with a 1200×630 PNG card
+drawn on the device; elsewhere the text is copied to the clipboard and the card downloaded.
+Nothing is sent anywhere by Momen2m itself.
+
 ## How points work
 
 | Event | Light | Normal | Critical |
@@ -164,6 +189,8 @@ js/app.js             controller: tick loop, event delegation, install and updat
 js/ui.js              rendering (template strings), bottom sheets, toasts
 js/engine.js          occurrences, statuses, misses, scoring, streaks
 js/store.js           localStorage persistence, export/import
+js/game.js            gamification read side: levels, ranks, stats, badges, tips
+js/share.js           progress card (canvas) + share sheet / clipboard fallback
 js/diff.js            what an import or restore would add / remove / change
 js/autobackup.js      remembered backup folder: direct export, newest-backup scan
 js/fsstore.js         persists the folder handle in IndexedDB
@@ -194,7 +221,8 @@ npm test
 
 Simulated-time tests for the engine: start/end/miss transitions, snooze limits, scoring,
 undo, streaks, midnight-crossing windows and one-off tasks, plus backup safety (recovery
-snapshots, import preview, export stamping) and notification options.
+snapshots, import preview, export stamping), gamification (levels, stats, badges, tips,
+combos) and notification options.
 
 ### Release a new version
 
