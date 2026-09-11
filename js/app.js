@@ -9,7 +9,7 @@ import * as E from './engine.js';
 import * as N from './notify.js';
 import * as U from './ui.js';
 import { initUpdates, applyUpdate, checkForUpdate } from './update.js';
-import { dayKey, addDays, at, nowHM, minutesToHM, parseHM, fmtDuration, fmtAgo } from './time.js';
+import { dayKey, addDays, at, nowHM, minutesToHM, parseHM, fmtDuration, fmtAgo, fmtClock } from './time.js';
 import * as AutoImport from './autobackup.js';
 
 // Ask the browser not to garbage-collect this origin's storage under pressure.
@@ -42,12 +42,12 @@ const hooks = {
   onStart(o) {
     const pts = E.BASE_PTS[o.habit.importance] || 20;
     N.notify(t('nStart', { emoji: o.habit.emoji, name: pick(o.habit.name) }),
-      t('nStartBody', { t: fmtDuration(o.end - o.start, state.lang), pts }), o.key, o.habit.importance);
+      t('nStartBody', { t: fmtDuration(o.end - o.start, state.lang), pts }), o.key, o.habit.importance, notifActions(o));
     N.feedback('start', o.habit.importance);
   },
   onEnding(o) {
     N.notify(t('nStart', { emoji: o.habit.emoji, name: pick(o.habit.name) }),
-      t('nEndingBody', { t: fmtDuration(o.end - Date.now(), state.lang) }), o.key, o.habit.importance);
+      t('nEndingBody', { t: fmtDuration(o.end - Date.now(), state.lang) }), o.key, o.habit.importance, notifActions(o));
     N.feedback('warn', o.habit.importance);
   },
   onMissed(o, pen) {
@@ -154,6 +154,41 @@ function finishSetup() {
 }
 
 function refresh() { dirty = true; if (view === 'live') frame(); else render(); }
+
+// Buttons shown on a reminder notification (Android). Snooze only when allowed.
+function notifActions(o) {
+  const a = [{ action: 'done', title: '✓ ' + t('done') }];
+  if (E.canSnooze(o) === 'ok') a.push({ action: 'snooze', title: '💤 ' + t('snoozeMin', { n: state.settings.snoozeMinutes }) });
+  return a;
+}
+
+function doDone(o, now, at) {
+  const r = E.complete(o, now); if (!r) return false;
+  if (at) U.sparkles(at.x, at.y);
+  N.feedback('done'); N.dismiss(o.key);
+  U.toast(r.early ? t('toastEarly', { n: r.pts }) : t('toastDone', { n: r.pts }), 'good');
+  if (r.perfect) setTimeout(() => U.toast('🎉 ' + t('toastPerfectDay', { n: state.game.streak + 1 }), 'good', { ms: 3500 }), 700);
+  refresh();
+  return true;
+}
+
+function doSnooze(o, now) {
+  const r = E.snooze(o, now); if (!r) return false;
+  N.feedback('tap'); N.dismiss(o.key);
+  U.toast('💤 ' + t('snoozedUntil', { t: fmtClock(r.start) }) + ' · ' + r.pts);
+  refresh();
+  return true;
+}
+
+// A Done / Snooze tapped on the notification itself (via sw.js), possibly
+// long after it was shown: settle the world first, then act if still open.
+function handleNotifAction(action, key) {
+  frame();
+  const o = occs.find((x) => x.key === key);
+  if (!o || o.status !== 'open') return;
+  if (action === 'done') doDone(o, Date.now());
+  else if (action === 'snooze') doSnooze(o, Date.now());
+}
 
 // Exporting from an installed PWA window gives no download-shelf feedback with the
 // classic <a download> trick, so try the two mechanisms built for that: a native
@@ -269,20 +304,14 @@ app.addEventListener('click', async (e) => {
 
     case 'done': {
       const o = findOcc(btn.dataset.key); if (!o) break;
-      const r = E.complete(o, now); if (!r) break;
       const b = btn.getBoundingClientRect();
-      U.sparkles(b.left + b.width / 2, b.top + b.height / 2);
-      N.feedback('done'); N.dismiss(o.key);
-      U.toast(r.early ? t('toastEarly', { n: r.pts }) : t('toastDone', { n: r.pts }), 'good');
-      if (r.perfect) setTimeout(() => U.toast('🎉 ' + t('toastPerfectDay', { n: state.game.streak + 1 }), 'good', { ms: 3500 }), 700);
-      refresh(); break;
+      doDone(o, now, { x: b.left + b.width / 2, y: b.top + b.height / 2 });
+      break;
     }
     case 'snooze': {
       const o = findOcc(btn.dataset.key); if (!o) break;
-      const r = E.snooze(o, now); if (!r) { shakeEl(btn); break; }
-      N.feedback('tap'); N.dismiss(o.key);
-      U.toast('💤 ' + t('toastSnooze', { n: r.pts }));
-      refresh(); break;
+      if (!doSnooze(o, now)) shakeEl(btn);
+      break;
     }
     case 'skip': {
       const o = findOcc(btn.dataset.key); if (!o) break;
@@ -310,12 +339,7 @@ app.addEventListener('click', async (e) => {
     case 'upcoming-detail': {
       const o = findOcc(btn.dataset.key); if (!o) break;
       U.openUpcomingSheet(o, {
-        onDoNow: () => {
-          const r = E.complete(o, now); if (!r) return;
-          N.feedback('done'); N.dismiss(o.key);
-          U.toast(r.early ? t('toastEarly', { n: r.pts }) : t('toastDone', { n: r.pts }), 'good');
-          refresh();
-        },
+        onDoNow: () => { doDone(o, now); },
         onSkip: () => {
           const r = E.skip(o, now); if (!r) return;
           N.dismiss(o.key);
@@ -476,6 +500,14 @@ const STRING_SETTINGS = new Set(['alertStyle', 'soundName', 'soundOutput', 'vibP
 
 document.addEventListener('keydown', (e) => { if (e.key === 'Escape') U.closeSheet(); });
 
+// ---- notification buttons -----------------------------------------------------------------
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.addEventListener('message', (e) => {
+    const d = e.data || {};
+    if (d.type === 'NOTIF_ACTION' && d.action && d.key) handleNotifAction(d.action, d.key);
+  });
+}
+
 // ---- install & updates ------------------------------------------------------------------
 addEventListener('beforeinstallprompt', (e) => { e.preventDefault(); installPrompt = e; if (view !== 'live') render(); });
 addEventListener('appinstalled', () => { installPrompt = null; if (view !== 'live') render(); });
@@ -488,7 +520,12 @@ initUpdates(() => {
 
 // ---- boot -------------------------------------------------------------------------------
 if (view === 'live') startTicker(); else render();
-if (new URLSearchParams(location.search).has('quick') && state.onboarded) {
+const params = new URLSearchParams(location.search);
+if (params.has('quick') && state.onboarded) {
   history.replaceState(null, '', location.pathname);
   setTimeout(() => U.$('.fab') && U.$('.fab').click(), 300);
+}
+if (params.get('notif') && params.get('key') && state.onboarded) {
+  history.replaceState(null, '', location.pathname);
+  setTimeout(() => handleNotifAction(params.get('notif'), params.get('key')), 200);
 }
