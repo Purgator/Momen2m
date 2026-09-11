@@ -27,19 +27,23 @@ export async function requestPermission() {
 
 // Shows a system notification. Prefers the service worker (required on Android and iOS).
 // `importance` decides whether this one counts as strong (alarm) or gentle.
-export async function notify(title, body, tag, importance) {
+// `actions` (array of { action, title }) adds buttons handled by sw.js.
+export async function notify(title, body, tag, importance, actions) {
   if (!state.settings.notifications || permission() !== 'granted') return false;
   const s = state.settings;
   const strong = isStrong(importance);
   const options = {
     body, tag,
+    data: { key: tag },
     icon: 'icons/icon-192.png',
-    badge: 'icons/icon-192.png',
+    badge: 'icons/badge-96.png', // monochrome: Android paints its alpha channel only
+    timestamp: Date.now(),
     renotify: true,
     requireInteraction: strong, // an alarm should stay until dismissed
     silent: s.soundOutput === 'app' || !s.sound, // system sound only when asked for
     vibrate: s.vibrate ? vibrationPattern(strong) : undefined,
   };
+  if (actions && actions.length && swReg) options.actions = actions; // buttons need the SW path
   try {
     if (swReg) { await swReg.showNotification(title, options); return true; }
   } catch { /* fall through */ }
