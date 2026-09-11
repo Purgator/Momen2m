@@ -12,6 +12,8 @@ import { initUpdates, applyUpdate, checkForUpdate } from './update.js';
 import { dayKey, addDays, at, nowHM, minutesToHM, parseHM, fmtDuration, fmtClock, fmtDateTime, fileStamp } from './time.js';
 import * as AutoImport from './autobackup.js';
 import { diffStates } from './diff.js';
+import * as G from './game.js';
+import { drawShareCard, share } from './share.js';
 
 // Ask the browser not to garbage-collect this origin's storage under pressure.
 // Silent and best-effort: it cannot be forced, and some browsers ignore it.
@@ -68,6 +70,11 @@ function render(now = Date.now()) {
       version: VERSION, updateReady, canInstall: !!installPrompt, isIosBrowser,
       needsBackup: needsBackup(), recovery: getRecoverySnapshot(), canAutoImport: AutoImport.supported,
     });
+  } else if (view === 'progress') {
+    occs = E.buildOccurrences(now);
+    const stats = G.computeStats(now, occs);
+    G.unlockBadges(stats, now); // persist anything already earned (e.g. history from before badges existed), quietly
+    app.innerHTML = U.renderProgress(stats, now);
   } else {
     for (const o of occs) o.fresh = fresh.has(o.key);
     fresh.clear();
@@ -164,13 +171,85 @@ function notifActions(o) {
 }
 
 function doDone(o, now, at) {
+  const levelBefore = E.levelFor(state.game.xp);
   const r = E.complete(o, now); if (!r) return false;
   if (at) U.sparkles(at.x, at.y);
   N.feedback('done'); N.dismiss(o.key);
-  U.toast(r.early ? t('toastEarly', { n: r.pts }) : t('toastDone', { n: r.pts }), 'good');
-  if (r.perfect) setTimeout(() => U.toast('🎉 ' + t('toastPerfectDay', { n: state.game.streak + 1 }), 'good', { ms: 3500 }), 700);
   refresh();
+  // Feedback ladder: points (+ praise), combo, perfect day, level up, badges.
+  const praise = t('praise');
+  const line = (r.early ? t('toastEarly', { n: r.pts }) : t('toastDone', { n: r.pts })) + ' · ' + praise[state.game.done % praise.length];
+  U.toast(line, 'good');
+  let delay = 700;
+  const combo = G.todayCombo(occs, now);
+  if (combo >= 2 && !r.perfect) { setTimeout(() => U.toast('🔥 ' + t('toastCombo', { n: combo })), delay); delay += 900; }
+  if (r.perfect) { setTimeout(() => U.toast('🎉 ' + t('toastPerfectDay', { n: state.game.streak + 1 }), 'good', { ms: 3500 }), delay); delay += 900; }
+  const levelAfter = E.levelFor(state.game.xp);
+  if (levelAfter > levelBefore) {
+    const ranks = t('rankNames');
+    const rank = ranks[G.levelInfo(state.game.xp, ranks.length).rankIdx];
+    setTimeout(() => {
+      N.feedback('levelup'); U.celebrate(['⭐', '🌟', '✨', '💫']);
+      U.toast('⬆️ ' + t('toastLevelUp', { n: levelAfter, rank }), 'good', { ms: 4500, action: { label: t('see'), fn: () => showProgress() } });
+    }, delay);
+    delay += 1200;
+  }
+  celebrateBadges(delay);
   return true;
+}
+
+// Persists any newly earned badge and announces it. Safe to call often.
+function celebrateBadges(delay = 0) {
+  const fresh = G.unlockBadges(G.computeStats(Date.now(), occs));
+  fresh.forEach((b, i) => setTimeout(() => {
+    N.feedback('badge'); U.celebrate([b.emoji, '🏅', '✨']);
+    U.toast(b.emoji + ' ' + t('toastBadge', { name: t('badgeNames')[b.id] }), 'good', { ms: 4500, action: { label: t('see'), fn: () => showProgress() } });
+  }, delay + i * 1300));
+  return fresh.length;
+}
+
+function showProgress() { view = 'progress'; dirty = true; render(); scrollTo(0, 0); }
+
+// ---- sharing -------------------------------------------------------------------
+const APP_URL = 'https://purgator.github.io/Momen2m/';
+
+async function shareProgress(badge) {
+  const now = Date.now();
+  const s = G.computeStats(now, occs);
+  const ranks = t('rankNames');
+  const rank = ranks[s.level.rankIdx];
+  const title = badge ? badge.emoji + ' ' + t('badgeNames')[badge.id] : t('level', { n: s.level.level }) + ' · ' + rank;
+  const text = badge
+    ? t('shareBadgeText', { name: t('badgeNames')[badge.id], level: s.level.level, rank })
+    : t('shareText', { level: s.level.level, rank, streak: s.streak, done: s.lifetime.done, rate: s.period.rate === null ? '–' : Math.round(s.period.rate * 100) + '%' });
+  let canvas = null;
+  try {
+    const today = dayKey(new Date(now));
+    canvas = drawShareCard(null, {
+      title, subtitle: badge ? t('badgeDescs')[badge.id] : t('shareSubtitle', { done: s.lifetime.done }),
+      stats: [
+        { value: '🔥 ' + s.streak, label: t('streakWord') },
+        { value: '✅ ' + s.lifetime.done, label: t('doneWord') },
+        { value: '🎯 ' + (s.period.rate === null ? '–' : Math.round(s.period.rate * 100) + '%'), label: t('successRate') },
+        { value: '⚡ ' + s.lifetime.early, label: t('earlyWord') },
+      ],
+      week: s.week.map((d) => ({ value: d.pts, label: t('dayLetters')[new Date(d.day + 'T12:00').getDay()], today: d.day === today })),
+      footer: APP_URL.replace('https://', ''),
+      dark: !matchMedia('(prefers-color-scheme: light)').matches,
+    });
+  } catch (err) { console.warn('share card failed', err); }
+  const res = await share({ text, url: APP_URL, canvas, fileName: badge ? 'momen2m-badge-' + badge.id + '.png' : 'momen2m-progress.png' });
+  if (res === 'cancelled' || res === false) { if (res === false) U.toast(t('shareFailed'), 'bad'); return; }
+  state.game.shares = (state.game.shares || 0) + 1; save();
+  U.toast(t(res === 'shared' ? 'shared' : res === 'copied' ? 'sharedCopied' : 'sharedDownloaded'), 'good', { ms: 3500 });
+  celebrateBadges(600);
+  if (view === 'progress') render();
+}
+
+async function shareApp() {
+  const res = await share({ text: t('inviteText'), url: APP_URL });
+  if (res === 'shared' || res === 'copied') U.toast(t(res === 'shared' ? 'shared' : 'sharedCopied'), 'good');
+  else if (res === false) U.toast(t('shareFailed'), 'bad');
 }
 
 function doSnooze(o, now) {
@@ -330,6 +409,15 @@ app.addEventListener('click', async (e) => {
 
   switch (a) {
     case 'tab': view = btn.dataset.view; dirty = true; refresh(); scrollTo(0, 0); break;
+    case 'explain': U.openExplainSheet(btn.dataset.topic, G.computeStats(now, occs), occs); N.feedback('tap'); break;
+    case 'badge': {
+      const b = G.BADGES.find((x) => x.id === btn.dataset.id); if (!b) break;
+      const p = G.badgeProgress(b, G.computeStats(now, occs));
+      U.openBadgeSheet(b, p, { onShare: () => shareProgress(b) });
+      break;
+    }
+    case 'share-progress': shareProgress(); break;
+    case 'share-app': shareApp(); break;
 
     case 'done': {
       const o = findOcc(btn.dataset.key); if (!o) break;
@@ -550,6 +638,18 @@ initUpdates(() => {
 
 // ---- boot -------------------------------------------------------------------------------
 if (view === 'live') startTicker(); else render();
+
+// Badges: the first run after they were introduced persists everything already
+// earned quietly (no toast barrage over old history); later boots announce what
+// settled overnight, e.g. a streak badge earned while the app was closed.
+if (state.onboarded) {
+  if (!state.game.badgesInit) {
+    G.unlockBadges(G.computeStats(Date.now(), occs.length ? occs : E.buildOccurrences(Date.now())));
+    state.game.badgesInit = true; save();
+  } else {
+    setTimeout(() => celebrateBadges(), 1200);
+  }
+}
 const params = new URLSearchParams(location.search);
 if (params.has('quick') && state.onboarded) {
   history.replaceState(null, '', location.pathname);
