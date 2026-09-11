@@ -20,6 +20,8 @@ const ASSETS = [
   './js/presets.js',
   './js/notify.js',
   './js/update.js',
+  './js/fsstore.js',
+  './js/autobackup.js',
   './icons/icon-192.png',
   './icons/icon-512.png',
   './icons/maskable-512.png',
