@@ -2,6 +2,7 @@
 import { detectLang } from './i18n.js';
 
 const KEY = 'momen2m.v1';
+const RECOVERY_KEY = 'momen2m.v1.recovery';
 
 function defaults() {
   return {
@@ -21,6 +22,20 @@ function defaults() {
     days: {},               // dayKey -> occKey -> record
     game: { xp: 0, streak: 0, bestStreak: 0, lastEvaluated: null, done: 0, missed: 0 },
     lastSeen: Date.now(),
+    habitsVersion: 0,        // bumped on every habit add/edit/delete/toggle
+    backedUpAtVersion: -1,   // habitsVersion at the moment of the last successful backup
+    lastBackupAt: 0,         // ms epoch of the last successful export, 0 = never
+  };
+}
+
+// Fills in anything missing from a raw (loaded, imported or restored) blob with
+// defaults, so an older backup or a partial file never crashes the app.
+function mergeWithDefaults(raw) {
+  const d = defaults();
+  return {
+    ...d, ...raw,
+    settings: { ...d.settings, ...(raw.settings || {}) },
+    game: { ...d.game, ...(raw.game || {}) },
   };
 }
 
@@ -28,9 +43,7 @@ function load() {
   try {
     const raw = localStorage.getItem(KEY);
     if (!raw) return defaults();
-    const s = JSON.parse(raw);
-    const d = defaults();
-    return { ...d, ...s, settings: { ...d.settings, ...(s.settings || {}) }, game: { ...d.game, ...(s.game || {}) } };
+    return mergeWithDefaults(JSON.parse(raw));
   } catch {
     return defaults();
   }
@@ -53,7 +66,44 @@ export function uid() {
   return Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
 }
 
+// A one-slot local safety net taken right before anything destructive (reset,
+// import, restore). It cannot survive the browser wiping this origin's storage
+// entirely, but it turns a fat-fingered tap or the wrong file into a one-tap
+// "Restore" instead of a real loss.
+export function snapshotRecovery(reason) {
+  try {
+    localStorage.setItem(RECOVERY_KEY, JSON.stringify({ at: Date.now(), reason, data: state }));
+  } catch { /* best-effort: storage full is not worth failing the action for */ }
+}
+
+export function getRecoverySnapshot() {
+  try {
+    const raw = localStorage.getItem(RECOVERY_KEY);
+    if (!raw) return null;
+    const snap = JSON.parse(raw);
+    if (!snap || !snap.data || !Array.isArray(snap.data.habits)) return null;
+    return snap;
+  } catch {
+    return null;
+  }
+}
+
+export function touchHabits() {
+  state.habitsVersion = (state.habitsVersion || 0) + 1;
+}
+
+export function needsBackup() {
+  return state.habits.length > 0 && (state.habitsVersion || 0) !== (state.backedUpAtVersion ?? -1);
+}
+
+export function markBackedUp() {
+  state.lastBackupAt = Date.now();
+  state.backedUpAtVersion = state.habitsVersion || 0;
+  save();
+}
+
 export function resetAll() {
+  snapshotRecovery('reset');
   const lang = state.lang;
   state = defaults();
   state.lang = lang;
@@ -67,8 +117,13 @@ export function exportJSON() {
 export function importJSON(text) {
   const s = JSON.parse(text);
   if (!s || !Array.isArray(s.habits)) throw new Error('bad');
-  const d = defaults();
-  state = { ...d, ...s, settings: { ...d.settings, ...(s.settings || {}) }, game: { ...d.game, ...(s.game || {}) } };
+  snapshotRecovery('import');
+  state = mergeWithDefaults(s);
+  flush();
+}
+
+export function restoreSnapshot(data) {
+  state = mergeWithDefaults(data);
   flush();
 }
 

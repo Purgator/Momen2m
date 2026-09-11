@@ -64,3 +64,15 @@ export function fmtDuration(ms, lang) {
   const h = Math.floor(m / 60), r = m % 60;
   return r ? h + ' h ' + pad(r) : h + ' h';
 }
+
+// Relative time such as "today", "3 days ago" or "2 weeks ago", localized via
+// Intl (well supported on every platform this app targets). `ts` is 0/falsy
+// for "never" — callers check that themselves.
+export function fmtAgo(ts, lang) {
+  const days = Math.floor((Date.now() - ts) / 86400000);
+  const rtf = new Intl.RelativeTimeFormat(lang, { numeric: 'auto' });
+  if (days <= 0) return rtf.format(0, 'day');
+  if (days < 7) return rtf.format(-days, 'day');
+  if (days < 30) return rtf.format(-Math.round(days / 7), 'week');
+  return rtf.format(-Math.round(days / 30), 'month');
+}
