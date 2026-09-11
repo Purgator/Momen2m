@@ -7,7 +7,8 @@
     "start": "node tools/serve.js",
     "icons": "node tools/gen-icons.js",
     "bump": "node tools/bump.js",
-    "package": "node tools/package.js"
+    "package": "node tools/package.js",
+    "test": "node --no-warnings tools/test.js"
   },
   "license": "MIT"
 }

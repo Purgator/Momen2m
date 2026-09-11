@@ -1,0 +1,6 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    { "name": "momen2m", "runtimeExecutable": "node", "runtimeArgs": ["tools/serve.js", "8093"], "port": 8093 }
+  ]
+}
