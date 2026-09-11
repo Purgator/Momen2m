@@ -13,7 +13,8 @@ globalThis.window = globalThis;
 (async () => {
   const path = require('path');
   const url = (f) => 'file://' + path.join(__dirname, '..', 'js', f).replace(/\\/g, '/');
-  const { state } = await import(url('store.js'));
+  const S = await import(url('store.js'));
+  const { state } = S;
   const E = await import(url('engine.js'));
   const T = await import(url('time.js'));
   const { suggestEmoji } = await import(url('emoji.js'));
@@ -160,6 +161,52 @@ globalThis.window = globalThis;
     assert.strictEqual(E.levelFor(60), 2);
     assert.strictEqual(E.levelFor(240), 3);
     assert.strictEqual(E.xpForLevel(3), 240);
+  });
+
+  // The remaining tests reassign S.state (reset/import/restore), so from here
+  // on they read S.state directly rather than the destructured local above.
+  test('needsBackup tracks habit changes against the last backup', () => {
+    S.state.habits = [];
+    S.state.habitsVersion = 0; S.state.backedUpAtVersion = -1; S.state.lastBackupAt = 0;
+    assert.strictEqual(S.needsBackup(), false, 'no habits yet, nothing to back up');
+    S.state.habits.push({ id: 'a' });
+    S.touchHabits();
+    assert.strictEqual(S.needsBackup(), true);
+    S.markBackedUp();
+    assert.strictEqual(S.needsBackup(), false);
+    assert.ok(S.state.lastBackupAt > 0);
+    S.touchHabits();
+    assert.strictEqual(S.needsBackup(), true, 'a later edit needs a new backup');
+  });
+
+  test('resetAll snapshots the previous setup before wiping it', () => {
+    S.state.habits = [{ id: 'x', name: 'Test' }];
+    S.state.lang = 'fr';
+    S.resetAll();
+    assert.deepStrictEqual(S.state.habits, []);
+    assert.strictEqual(S.state.lang, 'fr', 'language survives a reset');
+    const snap = S.getRecoverySnapshot();
+    assert.strictEqual(snap.reason, 'reset');
+    assert.strictEqual(snap.data.habits[0].id, 'x');
+  });
+
+  test('importJSON validates before touching anything, and snapshots on success', () => {
+    S.state.habits = [{ id: 'keep' }];
+    assert.throws(() => S.importJSON('not json'));
+    assert.strictEqual(S.state.habits[0].id, 'keep', 'untouched after a garbage import');
+    assert.throws(() => S.importJSON(JSON.stringify({ nope: true })));
+    assert.strictEqual(S.state.habits[0].id, 'keep', 'untouched after a shape that fails validation');
+    S.importJSON(JSON.stringify({ habits: [{ id: 'incoming' }], lang: 'en' }));
+    assert.strictEqual(S.state.habits[0].id, 'incoming');
+    const snap = S.getRecoverySnapshot();
+    assert.strictEqual(snap.reason, 'import');
+    assert.strictEqual(snap.data.habits[0].id, 'keep', 'the pre-import data was saved for undo');
+  });
+
+  test('restoreSnapshot brings back a previous setup', () => {
+    const snap = S.getRecoverySnapshot(); // left over from the import test: { habits: [{ id: 'keep' }] }
+    S.restoreSnapshot(snap.data);
+    assert.strictEqual(S.state.habits[0].id, 'keep');
   });
 
   console.log(`\n${passed} tests passed`);
