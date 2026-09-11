@@ -81,6 +81,16 @@ a slip of the thumb — or a lost phone — doesn't cost you your setup:
   main button, with *Erase without backing up* as a plain link for when you're sure.
   Import shows what it's about to replace, with a count and the backup's own date, before
   doing anything.
+- **Import can find your backup itself.** Where the browser supports it (desktop Chrome
+  and Edge today), *Setup → Data* offers *Find my backup* instead of a plain file picker.
+  The first time, you point it at the one folder where you keep backups — Momen2m
+  remembers that folder and, every time after, scans it for the most recently modified
+  file that actually looks like a Momen2m export (even renamed), one level of subfolders
+  included, and offers to restore it in one tap. No website can search a whole device —
+  no browser allows that — so this only ever looks inside the one folder you chose, never
+  anywhere else. *Choose a file instead* stays one tap away for a one-off restore or on
+  browsers where this isn't available (Safari, Firefox, iOS, some Android versions), where
+  it's the only option, same as before.
 - **A one-step undo sits behind both of them.** Right before Reset or Import changes
   anything, Momen2m silently keeps one copy of what you had. If a tap goes wrong, *Setup →
   Data → Restore* (or a link on the empty *Now* screen) brings it straight back.
