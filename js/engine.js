@@ -36,7 +36,8 @@ function occurrencesOfDay(day) {
       const rec = record(day, key, false);
       list.push({
         key: day + '|' + key, day, occ: key, habit: h, slot: i,
-        start, originalEnd, end: rec && rec.deadline ? rec.deadline : originalEnd,
+        start: rec && rec.start ? rec.start : start,
+        originalEnd, end: rec && rec.deadline ? rec.deadline : originalEnd,
         status: rec ? rec.status : 'open', snoozes: rec ? rec.snoozes : 0, pts: rec ? rec.pts || 0 : 0,
         at: rec ? rec.at : 0,
       });
@@ -176,17 +177,23 @@ export function canSnooze(o) {
   return 'ok';
 }
 
+// Snoozing pushes the whole remaining window back by the snooze length: the
+// moment leaves the screen, sits in "Coming up", and pops up again (with a
+// fresh start notification) when the snooze is over.
 export function snooze(o, now) {
   if (canSnooze(o) !== 'ok') return null;
   const rec = record(o.day, o.occ, true);
   if (rec.status !== 'open') return null;
+  const shift = state.settings.snoozeMinutes * 60000;
   rec.snoozes++;
-  rec.deadline = Math.max(o.end, now) + state.settings.snoozeMinutes * 60000;
+  rec.start = now + shift;
+  rec.deadline = Math.max(o.end, now) + shift;
+  rec.nStart = false;
   rec.nEnd = false;
   rec.pts = (rec.pts || 0) - SNOOZE_PENALTY;
   applyXp(-SNOOZE_PENALTY);
   save();
-  return { pts: -SNOOZE_PENALTY, deadline: rec.deadline };
+  return { pts: -SNOOZE_PENALTY, start: rec.start, deadline: rec.deadline };
 }
 
 export function skip(o, now) {
