@@ -316,7 +316,8 @@ function openSheet(html) {
   sheetEl.innerHTML = `<div class="grab"></div>${html}`;
   document.body.append(backdropEl, sheetEl);
   backdropEl.addEventListener('click', closeSheet);
-  requestAnimationFrame(() => { backdropEl.classList.add('open'); sheetEl.classList.add('open'); });
+  const b = backdropEl, sh = sheetEl;
+  requestAnimationFrame(() => { b.classList.add('open'); sh.classList.add('open'); });
   return sheetEl;
 }
 
