@@ -14,8 +14,7 @@ const files = ['index.html', 'manifest.webmanifest', 'sw.js', 'version.js', 'css
 for (const f of files) fs.cpSync(path.join(root, f), path.join(stage, f), { recursive: true });
 // Self-hosted copies get an empty relay config (no 404, no relay). Deployment-specific
 // values never ship in the zip: see relay.config.example.js.
-fs.writeFileSync(path.join(stage, 'relay.config.js'), '// No push relay configured for this copy. See relay.config.example.js.
-');
+fs.writeFileSync(path.join(stage, 'relay.config.js'), '// No push relay configured for this copy. See relay.config.example.js.\n');
 const zipName = 'Momen2m-' + version + '.zip';
 // Relative paths on purpose: Windows tar reads "C:..." as a remote host.
 execFileSync('tar', ['-a', '-c', '-f', zipName, 'Momen2m'], { cwd: dist, stdio: 'inherit' });
