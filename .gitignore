@@ -3,3 +3,9 @@ dist/
 *.zip
 .DS_Store
 Thumbs.db
+
+# Deployment-specific: where this copy of the app sends its push schedule (see relay.config.example.js)
+relay.config.js
+relay/.wrangler/
+relay/.dev.vars
+relay/node_modules/

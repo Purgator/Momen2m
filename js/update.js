@@ -2,6 +2,7 @@
 // A new version is fetched in the background; it is applied silently when the
 // app goes to the background, or immediately when the user taps "Update".
 import { setRegistration } from './notify.js';
+import { setRegistration as setPushRegistration } from './push.js';
 
 let reg = null;
 let applying = false;
@@ -39,6 +40,7 @@ export function initUpdates(onReady) {
   navigator.serviceWorker.register('./sw.js').then((r) => {
     reg = r;
     setRegistration(r);
+    setPushRegistration(r);
     lastCheck = Date.now();
     if (r.waiting && navigator.serviceWorker.controller) announce(r.waiting);
     r.addEventListener('updatefound', () => {

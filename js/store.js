@@ -41,6 +41,7 @@ function defaults() {
     backedUpAtVersion: -1,   // habitsVersion at the moment of the last successful backup
     lastBackupAt: 0,         // ms epoch of the last successful export, 0 = never
     backupFolder: '',        // name of the remembered backup folder (handle lives in IndexedDB)
+    push: { enabled: false, deviceId: '', lastSync: 0, lastHash: '', lastError: '', pending: 0 }, // background reminders via the relay
   };
 }
 
@@ -52,6 +53,7 @@ function mergeWithDefaults(raw) {
     ...d, ...raw,
     settings: { ...d.settings, ...(raw.settings || {}) },
     game: { ...d.game, ...(raw.game || {}) },
+    push: { ...d.push, ...(raw.push || {}) },
   };
   // v1 -> v2: "in-app only" made every system notification silent, which Android
   // shows minimised (no pop-up, no vibration). Reminders must pop up: switch the

@@ -392,5 +392,42 @@ globalThis.window = globalThis;
     assert.strictEqual(S.state.days[today]['meds#0'].early, false);
   });
 
+  await test('push plan mirrors the in-app reminders for the coming week', async () => {
+    const { buildPlan, PLAN_DAYS } = await import(url('plan.js'));
+    const now = D(0, '12:00');
+    S.state.habits = [
+      habit('meds', '11:00', '13:00', { createdAt: D(-1, '00:00'), importance: 3 }),   // running now: start is past, ending + missed ahead
+      habit('walk', '18:00', '19:00', { createdAt: D(-1, '00:00') }),                 // later today
+      habit('nap', '15:00', '15:08', { createdAt: D(-1, '00:00') }),                  // too short for a "before the end" warning
+    ];
+    S.state.days = {};
+    Object.assign(S.state.settings, { notifications: true, reminderBefore: 5, sound: true, vibrate: true, soundOutput: 'app', alertStyle: 'gentle', criticalAlarm: true, snoozeAllowed: true, snoozeMinutes: 10, maxSnoozes: 2 });
+    const plan = buildPlan(now);
+    const todays = plan.filter((p) => p.tag.startsWith(today));
+    assert.deepStrictEqual(todays.map((p) => p.kind + ':' + p.tag.split('|')[1] + '@' + T.fmtClock(p.at)),
+      ['ending:meds#0@12:55', 'missed:meds#0@13:00', 'start:nap#0@15:00', 'missed:nap#0@15:08', 'start:walk#0@18:00', 'ending:walk#0@18:55', 'missed:walk#0@19:00']);
+    const medsEnding = todays[0];
+    assert.strictEqual(medsEnding.strong, true, 'critical moment is a strong alert');
+    assert.strictEqual(medsEnding.silent, false, 'closed app cannot play in-app sound: system sound is used');
+    assert.deepStrictEqual(medsEnding.vibrate, N.vibrationPattern(true), 'strong pattern of the chosen tone');
+    assert.deepStrictEqual(medsEnding.actions.map((a) => a.action), ['done', 'snooze']);
+    assert.strictEqual(todays[1].actions.length, 0, 'a missed notification has no buttons');
+    assert.ok(plan.every((p) => p.at > now), 'nothing already due is planned');
+    const days = new Set(plan.map((p) => p.tag.split('|')[0]));
+    assert.strictEqual(days.size, PLAN_DAYS, 'today plus the next six days');
+    assert.ok(plan.every((p, i) => i === 0 || plan[i - 1].at <= p.at), 'sorted by time');
+    S.state.settings.notifications = false;
+    assert.deepStrictEqual(buildPlan(now), [], 'notifications off: empty plan');
+    S.state.settings.notifications = true;
+    // A done moment leaves the plan; a snoozed one moves.
+    const walk = E.buildOccurrences(now).find((o) => o.habit.id === 'walk');
+    E.complete(walk, now);
+    assert.ok(!buildPlan(now).some((p) => p.tag === walk.key));
+    const meds = E.buildOccurrences(now).find((o) => o.habit.id === 'meds');
+    E.snooze(meds, now);
+    const moved = buildPlan(now).filter((p) => p.tag === meds.key).map((p) => p.kind + '@' + T.fmtClock(p.at));
+    assert.deepStrictEqual(moved, ['start@12:10', 'ending@13:05', 'missed@13:10']);
+  });
+
   console.log(`\n${passed} tests passed`);
 })().catch((e) => { console.error(e); process.exit(1); });

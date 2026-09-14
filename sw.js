@@ -1,6 +1,8 @@
 // Momen2m service worker: offline app shell + versioned cache + notification clicks.
 // VERSION is bumped by tools/bump.js; a changed file is what triggers an update.
 const VERSION = '1.7.1';
+// Optional push relay settings (relay.config.js is deployment-specific and may be empty/missing).
+try { importScripts('relay.config.js'); } catch { /* no relay for this copy */ }
 const CACHE = 'momen2m-' + VERSION;
 // On localhost, always try the network first so developers see their edits immediately.
 const DEV = ['localhost', '127.0.0.1'].includes(self.location.hostname);
@@ -22,6 +24,9 @@ const ASSETS = [
   './js/update.js',
   './js/fsstore.js',
   './js/autobackup.js',
+  './js/plan.js',
+  './js/push.js',
+  './relay.config.js',
   './js/diff.js',
   './js/game.js',
   './js/share.js',
@@ -93,3 +98,62 @@ self.addEventListener('notificationclick', (event) => {
     })
   );
 });
+
+// ---- background reminders (Web Push via the relay in relay/) ----------------------
+// The relay sends the exact notification the app would have shown. If the app is
+// on screen right now it will show it itself, so only tell it to refresh.
+self.addEventListener('push', (event) => {
+  let p = null;
+  try { p = event.data ? event.data.json() : null; } catch { p = null; }
+  if (!p || !p.title) return;
+  event.waitUntil((async () => {
+    const wins = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+    const visible = wins.some((c) => c.visibilityState === 'visible');
+    for (const c of wins) c.postMessage({ type: 'PUSH', key: p.key || p.tag || '' });
+    if (visible) return;
+    const options = {
+      body: p.body || '', tag: p.tag || undefined, data: { key: p.key || p.tag || '' },
+      icon: 'icons/icon-192.png', badge: 'icons/badge-96.png', timestamp: Date.now(), renotify: true,
+      requireInteraction: !!p.strong, silent: !!p.silent,
+    };
+    if (!p.silent && Array.isArray(p.vibrate) && p.vibrate.length) options.vibrate = p.vibrate;
+    if (Array.isArray(p.actions) && p.actions.length) options.actions = p.actions;
+    await self.registration.showNotification(p.title, options);
+  })());
+});
+
+// The push service rotated our subscription: tell the relay, keep the plan.
+self.addEventListener('pushsubscriptionchange', (event) => {
+  event.waitUntil((async () => {
+    const cfg = self.MOMEN2M_RELAY;
+    if (!cfg || !cfg.url) return;
+    const info = await idbGet('momen2m-fs', 'handles', 'push').catch(() => null);
+    if (!info || !info.deviceId) return;
+    const sub = (event.newSubscription) || await self.registration.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: b64uToBytes(cfg.publicKey) });
+    await fetch(cfg.url.replace(/\/+$/, '') + '/v1/device/' + encodeURIComponent(info.deviceId) + '/subscription', {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ subscription: sub.toJSON() }),
+    });
+  })());
+});
+
+function b64uToBytes(str) {
+  const s = str.replace(/-/g, '+').replace(/_/g, '/');
+  const raw = atob(s + '='.repeat((4 - (s.length % 4)) % 4));
+  const out = new Uint8Array(raw.length);
+  for (let i = 0; i < raw.length; i++) out[i] = raw.charCodeAt(i);
+  return out;
+}
+
+function idbGet(dbName, store, key) {
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.open(dbName, 1);
+    req.onupgradeneeded = () => req.result.createObjectStore(store);
+    req.onerror = () => reject(req.error);
+    req.onsuccess = () => {
+      const db = req.result;
+      const get = db.transaction(store, 'readonly').objectStore(store).get(key);
+      get.onsuccess = () => resolve(get.result || null);
+      get.onerror = () => reject(get.error);
+    };
+  });
+}
