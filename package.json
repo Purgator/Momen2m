@@ -1,6 +1,6 @@
 {
   "name": "momen2m",
-  "version": "1.8.1",
+  "version": "1.8.2",
   "private": true,
   "description": "Momen2m — a lightweight PWA life organizer: habits that pop up when it's time, with a countdown and points.",
   "scripts": {
