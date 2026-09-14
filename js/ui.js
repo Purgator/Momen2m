@@ -350,6 +350,21 @@ export function celebrate(emojis) {
 
 // ---- setup --------------------------------------------------------------------
 
+// Background reminders through the relay: one switch plus an honest status line.
+function pushRow(p, perm) {
+  const canUse = perm === 'granted' && !p.caveat;
+  let sub;
+  if (p.caveat === 'iosBrowser') sub = t('pushIosHint');
+  else if (perm !== 'granted') sub = t('pushNeedsPermission');
+  else if (!p.enabled) sub = t('pushOffHint');
+  else if (p.lastError) sub = '⚠️ ' + t('pushError');
+  else if (p.lastSync) sub = t('pushSynced', { t: fmtWhenShort(p.lastSync), n: p.pending || 0 });
+  else sub = t('pushSyncing');
+  const control = `<label class="switch" data-stop><input type="checkbox" data-action="push-toggle" ${p.enabled ? 'checked' : ''} ${canUse ? '' : 'disabled'}><span></span></label>`;
+  return toggleRow('📡 ' + t('pushTitle'), sub, control) +
+    (p.enabled ? `<div class="row" style="justify-content:flex-end;padding:0 0 8px"><button class="btn small" data-action="push-sync">${t('pushSyncNow')}</button></div>` : '');
+}
+
 function toggleRow(label, sub, control) {
   return `<div class="toggle"><div><div class="t">${label}</div>${sub ? `<div class="s">${sub}</div>` : ''}</div>${control}</div>`;
 }
@@ -405,7 +420,8 @@ export function renderSetup(opts) {
         ${toggleRow(t('notifications'), perm === 'granted' ? t('notifOn') : perm === 'denied' ? t('notifBlocked') : t('notifOff'), notifControl)}
         ${toggleRow(t('reminderBefore'), '', sel('reminderBefore', [[0, '–'], [2, t('minutes', { n: 2 })], [5, t('minutes', { n: 5 })], [10, t('minutes', { n: 10 })], [15, t('minutes', { n: 15 })]], s.reminderBefore))}
       </div>
-      <p class="hint" style="margin-top:10px">${t('notifBackgroundNote')}</p>
+      ${opts.push ? pushRow(opts.push, perm) : ''}
+      <p class="hint" style="margin-top:10px">${opts.push ? t('notifBackgroundNotePush') : t('notifBackgroundNote')}</p>
     </div>
 
     <div class="section">

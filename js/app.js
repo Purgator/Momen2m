@@ -14,6 +14,7 @@ import * as AutoImport from './autobackup.js';
 import { diffStates } from './diff.js';
 import * as G from './game.js';
 import { drawShareCard, share } from './share.js';
+import * as Push from './push.js';
 
 // Ask the browser not to garbage-collect this origin's storage under pressure.
 // Silent and best-effort: it cannot be forced, and some browsers ignore it.
@@ -69,6 +70,7 @@ function render(now = Date.now()) {
     app.innerHTML = U.renderSetup({
       version: VERSION, updateReady, canInstall: !!installPrompt, isIosBrowser,
       needsBackup: needsBackup(), recovery: getRecoverySnapshot(), canAutoImport: AutoImport.supported,
+      push: Push.supported() ? { ...Push.info(), caveat: Push.caveat() } : null,
     });
   } else if (view === 'progress') {
     occs = E.buildOccurrences(now);
@@ -107,6 +109,7 @@ function frame() {
     }
   }
   for (const k of Array.from(phases.keys())) if (!seen.has(k)) { phases.delete(k); expanded.delete(k); fresh.delete(k); phaseChanged = true; }
+  if (changed) Push.syncSoon();
   if (view !== 'live') return;
   if (dirty || changed || phaseChanged || dayKey(new Date(now)) !== renderedDay) render(now);
   else U.updateCountdowns(occs, now);
@@ -136,7 +139,7 @@ function scheduleWake() {
   wake = setTimeout(() => { frame(); scheduleWake(); }, Math.min(next - now + 300, 2 ** 31 - 1));
 }
 document.addEventListener('visibilitychange', () => {
-  if (document.hidden) { stopTicker(); scheduleWake(); } else { startTicker(); }
+  if (document.hidden) { stopTicker(); scheduleWake(); Push.sync(false, true); } else { startTicker(); }
 });
 
 // ---- helpers -----------------------------------------------------------------------
@@ -161,7 +164,7 @@ function finishSetup() {
   save();
 }
 
-function refresh() { dirty = true; if (view === 'live') frame(); else render(); }
+function refresh() { dirty = true; if (view === 'live') frame(); else render(); Push.syncSoon(); }
 
 // Buttons shown on a reminder notification (Android). Snooze only when allowed.
 function notifActions(o) {
@@ -505,6 +508,7 @@ app.addEventListener('click', async (e) => {
       render(); break;
     }
     case 'notif-test': N.notify(t('nTest'), t('nTestBody'), 'test'); N.feedback('start'); break;
+    case 'push-sync': Push.sync(true).then((ok) => { U.toast(ok ? t('pushSyncedNow') : t('pushFailed'), ok ? 'good' : 'bad'); render(); }); break;
     case 'test-sound': N.testSound(); break;
     case 'test-vibration': N.testVibration(); break;
     case 'export': exportData(); break;
@@ -597,6 +601,17 @@ app.addEventListener('change', (e) => {
     }).catch(() => U.toast(t('importFailed'), 'bad'));
     return;
   }
+  if (el.dataset.action === 'push-toggle') {
+    const on = el.checked;
+    el.disabled = true;
+    (on ? Push.enable() : Push.disable()).then(() => {
+      U.toast(on ? t('pushEnabled') : t('pushDisabled'), on ? 'good' : '');
+    }).catch((err) => {
+      console.error('push toggle failed', err);
+      U.toast(t(String(err && err.message) === 'permission' ? 'pushNeedsPermission' : 'pushFailed'), 'bad', { ms: 6000 });
+    }).finally(() => render());
+    return;
+  }
   if (el.dataset.action === 'toggle') {
     const h = findHabit(el.dataset.id); if (!h) return;
     h.enabled = el.checked; touchHabits(); save();
@@ -621,6 +636,7 @@ document.addEventListener('keydown', (e) => { if (e.key === 'Escape') U.closeShe
 // ---- notification buttons -----------------------------------------------------------------
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.addEventListener('message', (e) => {
+    if (e.data && e.data.type === 'PUSH') { if (view === 'live') frame(); else if (view === 'progress') render(); return; }
     const d = e.data || {};
     if (d.type === 'NOTIF_ACTION' && d.action && d.key) handleNotifAction(d.action, d.key);
   });
