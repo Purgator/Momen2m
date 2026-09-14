@@ -92,13 +92,20 @@ export async function sync(force = false, keepalive = false) {
     const plan = buildPlan(now);
     const hash = hashOf(JSON.stringify(plan));
     if (!force && hash === state.push.lastHash && now - state.push.lastSync < RESYNC_EVERY) return true;
-    const sub = await subscription(true);
-    const res = await fetch(base(), {
-      method: 'POST', keepalive,
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ subscription: sub.toJSON(), schedule: plan }),
-    });
-    if (!res.ok) throw new Error('relay ' + res.status);
+    // Each step names itself so a failure on the phone can be told apart:
+    // "subscribe: …" (browser/push service), "network" (relay unreachable, ad
+    // blocker, offline), "relay 4xx/5xx" (relay refused).
+    let sub;
+    try { sub = await subscription(true); } catch (err) { throw new Error('subscribe: ' + (err && err.message || err)); }
+    let res;
+    try {
+      res = await fetch(base(), {
+        method: 'POST', keepalive,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ subscription: sub.toJSON(), schedule: plan }),
+      });
+    } catch (err) { throw new Error('network: ' + (err && err.message || err)); }
+    if (!res.ok) throw new Error('relay ' + res.status + ': ' + (await res.text().catch(() => '')).slice(0, 80));
     const data = await res.json().catch(() => ({}));
     state.push.lastSync = now;
     state.push.lastHash = hash;
