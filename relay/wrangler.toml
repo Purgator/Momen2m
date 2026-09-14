@@ -1,0 +1,22 @@
+# Momen2m push relay. Deploy with:  cd relay && npx wrangler deploy
+# Secrets (never in this file):     npx wrangler secret put VAPID_PRIVATE_KEY
+name = "momen2m-relay"
+main = "src/index.js"
+compatibility_date = "2025-06-01"
+
+# Public values. Set VAPID_PUBLIC_KEY to the value printed by `node tools/vapid.js`,
+# VAPID_SUBJECT to a mailto: or https: contact the push services can reach you at,
+# and ALLOWED_ORIGINS to the site(s) allowed to use this relay (comma-separated).
+[vars]
+VAPID_PUBLIC_KEY = ""
+VAPID_SUBJECT = "mailto:you@example.com"
+ALLOWED_ORIGINS = "https://purgator.github.io"
+
+[[durable_objects.bindings]]
+name = "DEVICE"
+class_name = "Device"
+
+# SQLite-backed Durable Objects are available on the free plan.
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["Device"]

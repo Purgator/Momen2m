@@ -1,0 +1,12 @@
+{
+  "name": "momen2m-relay",
+  "private": true,
+  "type": "module",
+  "description": "Momen2m push relay: a Cloudflare Worker that sends Web Push reminders at the right time.",
+  "scripts": {
+    "deploy": "wrangler deploy",
+    "dev": "wrangler dev",
+    "vapid": "node tools/vapid.js",
+    "test": "node test.js"
+  }
+}
