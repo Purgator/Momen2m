@@ -1,0 +1,54 @@
+# Deploys the app to GitHub Pages and writes relay.config.js from repository
+# secrets, so the relay's URL and public key never live in the repo.
+#
+# Settings → Secrets and variables → Actions → New repository secret:
+#   RELAY_URL          https://momen2m-relay.<your-subdomain>.workers.dev
+#   VAPID_PUBLIC_KEY   the public key printed by `node relay/tools/vapid.js`
+# Without them the deployed app simply has no background reminders.
+name: Deploy to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run tests
+        run: node --no-warnings tools/test.js && node relay/test.js
+      - name: Write relay.config.js from secrets
+        env:
+          RELAY_URL: ${{ secrets.RELAY_URL }}
+          VAPID_PUBLIC_KEY: ${{ secrets.VAPID_PUBLIC_KEY }}
+        run: |
+          if [ -n "$RELAY_URL" ] && [ -n "$VAPID_PUBLIC_KEY" ]; then
+            printf "self.MOMEN2M_RELAY = { url: '%s', publicKey: '%s' };\n" "$RELAY_URL" "$VAPID_PUBLIC_KEY" > relay.config.js
+            echo "relay configured"
+          else
+            echo "// No push relay configured for this deployment." > relay.config.js
+            echo "no relay secrets: deploying without background reminders"
+          fi
+      - name: Stage site
+        run: |
+          mkdir -p _site
+          cp -r index.html manifest.webmanifest sw.js version.js relay.config.js css js icons .nojekyll LICENSE _site/
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+      - id: deployment
+        uses: actions/deploy-pages@v4
