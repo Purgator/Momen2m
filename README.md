@@ -78,13 +78,14 @@ home-screen icon.
 
 ### Good to know
 
-- **Reminders are reliable while Momen2m is on screen.** Web apps cannot wake a phone
-  up on their own, and phones pause a web app a few minutes after you switch away from it
-  (Android is strict about this: the page is frozen, its timers stop). A reminder due
-  during that pause shows up when you come back. Nothing is lost: missed moments are
-  marked and points settled. For a day of reminders, keep Momen2m open — on a stand, or
-  simply as the app you return to. Reminders that wake the phone need a push server; see
-  *Why there is no push server* below.
+- **Background reminders.** On the official app, *Setup → Notifications → Background
+  reminders* makes the phone wake Momen2m at each reminder time even when it is closed,
+  through the same push channel native apps use. Only the week's reminder times and
+  titles are sent to a small relay run by the maintainer (see *Background reminders* under
+  *For developers*). Switched off, or on a copy without a relay, reminders fire only
+  while Momen2m is on screen: phones pause a web app a few minutes after you switch away,
+  and a reminder due during that pause shows up when you come back. Nothing is lost
+  either way: missed moments are marked and points settled.
 - **Everything stays on your phone.** There is no server and no account. Use
   *Setup → Data → Export* to save a backup file, and *Import* to restore it on another device.
 - **Updates are automatic.** A new version is fetched in the background and applied the
@@ -251,19 +252,49 @@ to any static web server. The only requirement is **HTTPS** (service workers and
 notifications refuse to run over plain HTTP, except on `localhost`). All paths are relative,
 so it works from a sub-folder too.
 
-### Why there is no push server
+### Background reminders (the push relay)
 
-Scheduled notifications while the app is closed or paused need a Web Push server: the
-phone's push service (Google's or Apple's) is the only thing allowed to wake a web app,
-and it only relays messages sent by a server at the right moment. Momen2m is deliberately
-serverless and keeps all data on the device, so it reminds you while it is on screen and
-settles up when you come back.
+A closed or paused web app can only be woken by the phone's push service (FCM on
+Android, APNs on iPhone), and that service only relays messages a server sends. So
+background reminders need one small server: the relay in `relay/`, a Cloudflare Worker
+(free plan is enough) with one Durable Object per installed app. The app uploads its plan
+for the coming week — absolute times, titles, bodies, tags, nothing else — whenever the
+plan changes; the Durable Object sets an alarm at the next time, sends an encrypted Web
+Push (RFC 8291/8292, implemented with WebCrypto, no dependencies) and arms the next one.
+`sw.js` shows the notification, with Done/Snooze buttons on Android. Relay code, tests
+and the key generator live in `relay/`; `npm test` runs its tests too.
 
-What background reminders would take, for the record: a tiny relay (a Cloudflare Worker
-with a scheduled alarm fits) holding each device's push subscription plus the day's
-reminder times and titles, sending a push at each time; `sw.js` would gain a `push`
-handler showing the notification. It stays optional — the app must keep working with no
-relay configured — and it is the one feature that sends anything off the device.
+**The app never asks end users to configure anything.** Where to send the plan is a
+deployment setting, kept out of the repository:
+
+- Locally: copy `relay.config.example.js` to `relay.config.js` (gitignored) and fill in
+  your Worker URL and VAPID public key. `npm start` and the app pick it up; the zip built
+  by `npm run package` ships an empty config instead, so self-hosted copies stay
+  relay-free unless their operator adds one.
+- On GitHub Pages: the site is deployed by `.github/workflows/pages.yml`, which writes
+  `relay.config.js` from two repository secrets, `RELAY_URL` and `VAPID_PUBLIC_KEY`.
+  Without the secrets the workflow deploys the app without background reminders.
+
+Setting it up once (about ten minutes):
+
+1. `node relay/tools/vapid.js` prints a key pair. Keep the private key private.
+2. In `relay/wrangler.toml`, set `VAPID_PUBLIC_KEY`, `VAPID_SUBJECT` (a mailto: the push
+   services can contact) and `ALLOWED_ORIGINS` (your site's origin).
+3. `cd relay && npx wrangler login && npx wrangler secret put VAPID_PRIVATE_KEY && npx wrangler deploy`.
+   Wrangler prints the Worker URL. `GET <url>/v1/health` should answer `"configured": true`.
+4. Add `RELAY_URL` and `VAPID_PUBLIC_KEY` as repository secrets; push to `main` (or run
+   the workflow) to redeploy Pages. Locally, write the same two values to `relay.config.js`.
+5. In the installed app: *Setup → Notifications → Background reminders*.
+
+Where this is reliable, and where it is not: on a stock Android phone with Play Services
+and the app installed from Chrome, and on an iPhone on iOS 16.4+ with the app added to
+the Home Screen, delivery is the platform's own push path — typically seconds, app
+closed, screen off. It cannot beat the phone: no Play Services means no FCM; Chrome set to
+"Restricted" battery use can delay pushes; iOS Focus modes hide notifications as for any
+app; iPhone shows no action buttons. A subscription the push service rotates is
+re-registered by the service worker and on every app launch. If the app is not opened
+for eight days the relay stops sending, so a stale plan never nags. If the relay is
+unreachable the app says so in Setup and keeps reminding on screen as before.
 
 ## License
 
