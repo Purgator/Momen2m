@@ -1,7 +1,7 @@
 // Rendering. Pure functions from state to HTML strings, plus a few DOM helpers
 // (bottom sheet, toasts, sparkles). Behaviour lives in app.js via data-action.
 import { t, pick, getLang } from './i18n.js';
-import { state } from './store.js';
+import { state, save } from './store.js';
 import { PRESETS } from './presets.js';
 import { suggestEmoji } from './emoji.js';
 import { BASE_PTS, SNOOZE_PENALTY, canSnooze, currentOf, todayPoints } from './engine.js';
