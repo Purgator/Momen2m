@@ -470,13 +470,15 @@ app.addEventListener('click', async (e) => {
       break;
     }
     case 'quick':
-      U.openQuickSheet(({ name, emoji, minutes, importance }) => {
-        const start = nowHM(new Date(now));
+      U.openQuickSheet(({ name, emoji, minutes, importance, start, tomorrow }) => {
+        const day = dayKey(new Date(now));
         state.habits.push({
-          id: uid(), preset: null, name, emoji, desc: '', slots: [{ start, end: minutesToHM(parseHM(start) + minutes) }],
-          days: [], importance, snooze: true, enabled: true, once: dayKey(new Date(now)), createdAt: now,
+          id: uid(), preset: null, name, emoji, desc: '', slots: [{ start, end: minutesToHM((parseHM(start) + minutes) % 1440) }],
+          days: [], importance, snooze: true, enabled: true, once: tomorrow ? addDays(day, 1) : day, createdAt: now,
         });
         save(); N.feedback('tap'); refresh();
+        if (tomorrow) U.toast('📅 ' + t('quickAddedTomorrow', { t: fmtClock(at(addDays(day, 1), start)) }));
+        else if (parseHM(start) > parseHM(nowHM(new Date(now)))) U.toast('⏰ ' + t('quickAddedLater', { t: fmtClock(at(day, start)) }));
       });
       break;
 
