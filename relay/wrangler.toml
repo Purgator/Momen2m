@@ -3,13 +3,16 @@
 name = "momen2m-relay"
 main = "src/index.js"
 compatibility_date = "2025-06-01"
+workers_dev = true
+preview_urls = false
 
 # Public values. Set VAPID_PUBLIC_KEY to the value printed by `node tools/vapid.js`,
-# VAPID_SUBJECT to a mailto: or https: contact the push services can reach you at,
+# VAPID_SUBJECT to a mailto: or https: contact for the push services (the repo URL keeps
+# your email out of this public file),
 # and ALLOWED_ORIGINS to the site(s) allowed to use this relay (comma-separated).
 [vars]
-VAPID_PUBLIC_KEY = ""
-VAPID_SUBJECT = "mailto:you@example.com"
+VAPID_PUBLIC_KEY = "BHJhKdwi3sAmrTOYA0TwiTypvoVfaj1XWpmenZDsJs2ybECfAemmFh03aQxGHsqEm-NlWCWASgODO7s7aGC7DhU"
+VAPID_SUBJECT = "https://github.com/Purgator/Momen2m"
 ALLOWED_ORIGINS = "https://purgator.github.io"
 
 [[durable_objects.bindings]]

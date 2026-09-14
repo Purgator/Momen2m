@@ -55,6 +55,7 @@ await test('schedule normalisation sorts, trims and rejects junk', () => {
   assert.strictEqual(sched[0].key, 'a', 'key defaults to the tag');
   assert.strictEqual(sched[1].actions.length, 2, 'at most two buttons');
   assert.throws(() => normaliseSchedule([{ at: 'soon', title: 'x', tag: 'x' }]));
+  assert.throws(() => normaliseSchedule([{ at: Date.now() + 61 * 86400000, title: 'x', tag: 'x' }]), /bad time/);
   assert.throws(() => normaliseSchedule([{ at: 1, tag: 'x' }]), /title/);
   assert.throws(() => normaliseSchedule(new Array(401).fill({ at: 1, title: 'x', tag: 'x' })), /too many/);
   assert.throws(() => validateSubscription({ endpoint: 'http://insecure', keys: { p256dh: 'a', auth: 'b' } }));
