@@ -54,6 +54,7 @@ await test('schedule normalisation sorts, trims and rejects junk', () => {
   assert.strictEqual(sched[0].kind, 'start', 'unknown kind falls back to start');
   assert.strictEqual(sched[0].key, 'a', 'key defaults to the tag');
   assert.strictEqual(sched[1].actions.length, 2, 'at most two buttons');
+  assert.deepStrictEqual(normaliseSchedule([{ at: 1, title: 'v', tag: 'v', vibrate: [80, 60, 80, -5, 9999] }])[0].vibrate, [80, 60, 80, 0, 2000], 'vibration pattern passes through, clamped');
   assert.throws(() => normaliseSchedule([{ at: 'soon', title: 'x', tag: 'x' }]));
   assert.throws(() => normaliseSchedule([{ at: Date.now() + 61 * 86400000, title: 'x', tag: 'x' }]), /bad time/);
   assert.throws(() => normaliseSchedule([{ at: 1, tag: 'x' }]), /title/);
