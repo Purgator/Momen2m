@@ -20,12 +20,13 @@ export default {
     const origin = request.headers.get('Origin') || '';
     const cors = corsHeaders(origin, env);
     if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: cors });
-    if (!originAllowed(origin, env)) return json({ ok: false, error: 'origin' }, 403, cors);
-
     try {
+      // Health is open to anyone (a browser tab or curl sends no Origin header);
+      // everything else must come from an allowed site.
       if (url.pathname === '/v1/health') {
         return json({ ok: true, publicKey: env.VAPID_PUBLIC_KEY || null, configured: !!(env.VAPID_PUBLIC_KEY && env.VAPID_PRIVATE_KEY) }, 200, cors);
       }
+      if (!originAllowed(origin, env)) return json({ ok: false, error: 'origin' }, 403, cors);
       const m = url.pathname.match(/^\/v1\/device\/([^/]+)(\/subscription)?$/);
       if (!m) return json({ ok: false, error: 'not found' }, 404, cors);
       const id = m[1];
