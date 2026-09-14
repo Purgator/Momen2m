@@ -5,16 +5,17 @@ export const MAX_ITEMS = 400;          // a week of moments for a busy schedule
 export const MAX_BODY_BYTES = 64 * 1024;
 export const STALE_AFTER = 8 * 86400000; // stop pushing if the app hasn't synced for this long
 export const LATE_GRACE = 15 * 60000;    // an alarm that fires this late still sends (relay hiccup)
+export const MAX_AHEAD = 60 * 86400000;  // the app plans a week; anything further is a bug or abuse
 
 // Validates and normalises what the app uploads. Throws on anything off.
-export function normaliseSchedule(items) {
+export function normaliseSchedule(items, now = Date.now()) {
   if (!Array.isArray(items)) throw new Error('schedule must be an array');
   if (items.length > MAX_ITEMS) throw new Error('too many items');
   const out = [];
   for (const it of items) {
     if (!it || typeof it !== 'object') throw new Error('bad item');
     const at = Number(it.at);
-    if (!Number.isFinite(at) || at <= 0) throw new Error('bad time');
+    if (!Number.isFinite(at) || at <= 0 || at > now + MAX_AHEAD) throw new Error('bad time');
     const title = String(it.title || '').slice(0, 120);
     const body = String(it.body || '').slice(0, 300);
     const tag = String(it.tag || '').slice(0, 120);
