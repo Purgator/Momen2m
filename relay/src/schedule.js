@@ -1,8 +1,8 @@
 // Pure scheduling helpers for the Device durable object, kept apart so they
 // can be unit-tested under Node without the Workers runtime.
 
-export const MAX_ITEMS = 400;          // a week of moments for a busy schedule
-export const MAX_BODY_BYTES = 64 * 1024;
+export const MAX_ITEMS = 600;          // a week of moments for a busy schedule (3 notifications each)
+export const MAX_BODY_BYTES = 1024 * 1024; // 400 items are ~130 KB; leave ample room
 export const STALE_AFTER = 8 * 86400000; // stop pushing if the app hasn't synced for this long
 export const LATE_GRACE = 15 * 60000;    // an alarm that fires this late still sends (relay hiccup)
 export const MAX_AHEAD = 60 * 86400000;  // the app plans a week; anything further is a bug or abuse

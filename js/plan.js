@@ -10,7 +10,7 @@ import { isStrong, vibrationPattern } from './notify.js';
 import { dayKey, addDays, fmtDuration } from './time.js';
 
 export const PLAN_DAYS = 7;
-export const PLAN_MAX = 400;
+export const PLAN_MAX = 600;
 
 export function buildPlan(now, days = PLAN_DAYS) {
   const s = state.settings;
@@ -23,7 +23,7 @@ export function buildPlan(now, days = PLAN_DAYS) {
     if (at <= now + 2000) return; // the app handles anything already due
     const strong = isStrong(o.habit.importance);
     items.push({
-      at, kind, tag: o.key, key: o.key, title, body, strong, silent,
+      at, kind, tag: o.key, title, body, strong, silent, // key defaults to tag on the relay
       vibrate: s.vibrate && !silent ? vibrationPattern(strong) : [],
       actions: actions || [],
     });
