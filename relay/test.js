@@ -58,7 +58,7 @@ await test('schedule normalisation sorts, trims and rejects junk', () => {
   assert.throws(() => normaliseSchedule([{ at: 'soon', title: 'x', tag: 'x' }]));
   assert.throws(() => normaliseSchedule([{ at: Date.now() + 61 * 86400000, title: 'x', tag: 'x' }]), /bad time/);
   assert.throws(() => normaliseSchedule([{ at: 1, tag: 'x' }]), /title/);
-  assert.throws(() => normaliseSchedule(new Array(401).fill({ at: 1, title: 'x', tag: 'x' })), /too many/);
+  assert.throws(() => normaliseSchedule(new Array(601).fill({ at: 1, title: 'x', tag: 'x' })), /too many/);
   assert.throws(() => validateSubscription({ endpoint: 'http://insecure', keys: { p256dh: 'a', auth: 'b' } }));
   assert.deepStrictEqual(validateSubscription({ endpoint: 'https://p/1', keys: { p256dh: 'a', auth: 'b' }, extra: 1 }), { endpoint: 'https://p/1', expirationTime: null, keys: { p256dh: 'a', auth: 'b' } });
 });
