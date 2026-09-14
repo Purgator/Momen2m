@@ -429,5 +429,21 @@ globalThis.window = globalThis;
     assert.deepStrictEqual(moved, ['start@12:10', 'ending@13:05', 'missed@13:10']);
   });
 
+  await test('one-off moments can start later today or tomorrow', () => {
+    const now = D(0, '14:00');
+    S.state.habits = [
+      habit('later', '16:00', '16:30', { days: [], once: today, createdAt: now }),
+      habit('tmrw', '07:00', '07:30', { days: [], once: T.addDays(today, 1), createdAt: now }),
+    ];
+    S.state.days = {};
+    let occs = E.buildOccurrences(now);
+    assert.deepStrictEqual(occs.map((o) => o.habit.id + ':' + o.phase), ['later:upcoming'], 'tomorrow is not on today\'s screen yet');
+    occs = E.buildOccurrences(D(0, '16:05'));
+    assert.deepStrictEqual(occs.map((o) => o.habit.id + ':' + o.phase), ['later:active']);
+    occs = E.buildOccurrences(D(1, '07:10'));
+    assert.deepStrictEqual(occs.filter((o) => o.habit.id === 'tmrw').map((o) => o.phase), ['active'], 'tomorrow\'s one-off shows up tomorrow');
+    assert.ok(!occs.some((o) => o.habit.id === 'later' && o.phase !== 'past'), 'yesterday\'s one-off does not come back');
+  });
+
   console.log(`\n${passed} tests passed`);
 })().catch((e) => { console.error(e); process.exit(1); });

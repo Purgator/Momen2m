@@ -6,7 +6,7 @@ import { PRESETS } from './presets.js';
 import { suggestEmoji } from './emoji.js';
 import { BASE_PTS, SNOOZE_PENALTY, canSnooze, currentOf, todayPoints } from './engine.js';
 import { levelInfo, rankLadder, BADGES, badgeProgress, tips as gameTips } from './game.js';
-import { fmtClock, fmtCountdown, fmtDuration, fmtAgo, fmtDate, fmtDateTime, fmtWhenShort, nowHM, minutesToHM, parseHM, dayKey, weekday } from './time.js';
+import { fmtClock, fmtCountdown, fmtDuration, fmtAgo, fmtDate, fmtDateTime, fmtWhenShort, nowHM, minutesToHM, parseHM, dayKey, weekday, at } from './time.js';
 import { permission, TONE_NAMES, PATTERN_NAMES } from './notify.js';
 
 export const $ = (sel, root = document) => root.querySelector(sel);
@@ -357,7 +357,7 @@ function pushRow(p, perm) {
   if (p.caveat === 'iosBrowser') sub = t('pushIosHint');
   else if (perm !== 'granted') sub = t('pushNeedsPermission');
   else if (!p.enabled) sub = t('pushOffHint');
-  else if (p.lastError) sub = '⚠️ ' + t('pushError');
+  else if (p.lastError) sub = '⚠️ ' + t('pushError') + ' <span class="muted" style="font-size:12px">(' + esc(p.lastError) + ')</span>';
   else if (p.lastSync) sub = t('pushSynced', { t: fmtWhenShort(p.lastSync), n: p.pending || 0 });
   else sub = t('pushSyncing');
   const control = `<label class="switch" data-stop><input type="checkbox" data-action="push-toggle" ${p.enabled ? 'checked' : ''} ${canUse ? '' : 'disabled'}><span></span></label>`;
@@ -552,7 +552,21 @@ function openSheet(html) {
 
 const dayNames = () => t('days');
 
-function slotRow(s, i) {
+// Minutes between start and end, across midnight if needed (a 0-length slot counts as a full day).
+export function durationOf(s) {
+  return ((parseHM(s.end) - parseHM(s.start)) % 1440 + 1440) % 1440 || 1440;
+}
+
+// One time slot, either "start → end" or "start + duration". Both read back as
+// {start, end}: the stored model never changes, only the way it is typed.
+function slotRow(s, i, mode = state.settings.slotMode) {
+  if (mode === 'dur') {
+    return `<div class="slot dur" data-slot="${i}">
+      <input class="input" type="time" value="${s.start}" data-f="start" required>
+      <div class="durctl"><input class="input" type="number" inputmode="numeric" min="1" max="1440" step="5" value="${durationOf(s)}" data-f="dur" required><span class="unit">min</span></div>
+      <button class="iconbtn" data-rm="${i}" aria-label="${t('delete')}">✕</button>
+    </div>`;
+  }
   return `<div class="slot" data-slot="${i}">
     <input class="input" type="time" value="${s.start}" data-f="start" required>
     <span class="arrow">→</span>
@@ -582,7 +596,12 @@ export function openHabitSheet(habit, onSave, onDelete) {
       <div class="row"><input class="input emoji-in" data-f="emoji" value="${esc(h.emoji || suggestEmoji(h.name))}" maxlength="4" aria-label="${t('emoji')}">
       <input class="input" data-f="name" value="${esc(h.name)}" placeholder="${t('namePlaceholder')}" autocomplete="off" enterkeyhint="next"></div></div>
     <div class="field"><label>${t('description')}</label><input class="input" data-f="desc" value="${esc(h.desc || '')}" placeholder="${t('descriptionPlaceholder')}" autocomplete="off"></div>
-    <div class="field"><label>${t('timeRange')}</label><div data-slots>${h.slots.map(slotRow).join('')}</div>
+    <div class="field"><div class="fieldhead"><label>${t('timeRange')}</label>
+        <div class="seg mini" data-slotmode>
+          <button data-mode="dur" class="${state.settings.slotMode === 'dur' ? 'on' : ''}">${t('slotModeDur')}</button>
+          <button data-mode="end" class="${state.settings.slotMode !== 'dur' ? 'on' : ''}">${t('slotModeEnd')}</button>
+        </div></div>
+      <div data-slots>${h.slots.map((s, i) => slotRow(s, i)).join('')}</div>
       <button class="link" data-add-slot>+ ${t('addTime')}</button></div>
     ${h.once ? '' : `<div class="field"><label>${t('repeat')}</label>
       <div class="seg" data-repeat>
@@ -610,13 +629,30 @@ export function openHabitSheet(habit, onSave, onDelete) {
   emojiIn.addEventListener('input', () => { autoEmoji = !emojiIn.value.trim(); if (autoEmoji) emojiIn.value = suggestEmoji(nameIn.value); });
 
   const slotsEl = $('[data-slots]', el);
-  const readSlots = () => $$('.slot', slotsEl).map((r) => ({ start: $('[data-f="start"]', r).value, end: $('[data-f="end"]', r).value }));
+  const readSlots = () => $$('.slot', slotsEl).map((r) => {
+    const start = $('[data-f="start"]', r).value || '09:00';
+    const durIn = $('[data-f="dur"]', r);
+    if (durIn) {
+      const mins = Math.min(1440, Math.max(1, Math.round(Number(durIn.value) || 30)));
+      return { start, end: minutesToHM((parseHM(start) + mins) % 1440) };
+    }
+    return { start, end: $('[data-f="end"]', r).value || start };
+  });
+  const renderSlots = (cur) => { slotsEl.innerHTML = cur.map((s, i) => slotRow(s, i)).join(''); };
+  $('[data-slotmode]', el).addEventListener('click', (e) => {
+    const b = e.target.closest('[data-mode]'); if (!b) return;
+    const cur = readSlots(); // keep what was typed, re-express it in the other form
+    state.settings.slotMode = b.dataset.mode; save();
+    $$('button', e.currentTarget).forEach((x) => x.classList.toggle('on', x === b));
+    renderSlots(cur);
+  });
   $('[data-add-slot]', el).addEventListener('click', () => {
     const cur = readSlots();
     const last = cur[cur.length - 1];
+    const len = last ? durationOf(last) : 60;
     const startMin = last ? parseHM(last.end) + 60 : parseHM(nowHM());
-    cur.push({ start: minutesToHM(startMin), end: minutesToHM(startMin + 60) });
-    slotsEl.innerHTML = cur.map(slotRow).join('');
+    cur.push({ start: minutesToHM(startMin % 1440), end: minutesToHM((startMin + len) % 1440) });
+    renderSlots(cur);
   });
   slotsEl.addEventListener('click', (e) => {
     const rm = e.target.closest('[data-rm]');
@@ -624,7 +660,7 @@ export function openHabitSheet(habit, onSave, onDelete) {
     const cur = readSlots();
     if (cur.length <= 1) return;
     cur.splice(Number(rm.dataset.rm), 1);
-    slotsEl.innerHTML = cur.map(slotRow).join('');
+    renderSlots(cur);
   });
 
   const rep = $('[data-repeat]', el), daysEl = $('[data-days]', el);
@@ -673,13 +709,24 @@ export function openHabitSheet(habit, onSave, onDelete) {
 // One-off task. onAdd({ name, emoji, minutes, importance })
 export function openQuickSheet(onAdd) {
   let minutes = 30, importance = 2;
+  let startOffset = 0;      // minutes from now (chips), or
+  let startHM = null;       // an explicit clock time ("At…")
+  const lang = getLang();
   const el = openSheet(`
     <h2>⚡ ${t('quickTaskTitle')}</h2>
     <div class="field"><label>${t('quickTaskName')}</label>
       <div class="row"><input class="input emoji-in" data-f="emoji" value="✅" maxlength="4" aria-label="${t('emoji')}">
       <input class="input" data-f="name" placeholder="${t('namePlaceholder')}" autocomplete="off" enterkeyhint="done"></div></div>
+    <div class="field"><label>${t('quickWhen')}</label>
+      <div class="chips" data-when>
+        <button class="chip on" data-off="0">${t('now')}</button>
+        ${[15, 30, 60, 120].map((m) => `<button class="chip" data-off="${m}">+${fmtDuration(m * 60000, lang)}</button>`).join('')}
+        <button class="chip" data-at>⏰ ${t('atTime')}</button>
+      </div>
+      <input class="input" type="time" data-f="startat" style="margin-top:8px;display:none">
+      <p class="hint" data-summary style="margin-top:8px"></p></div>
     <div class="field"><label>${t('quickTaskDuration')}</label>
-      <div class="chips" data-dur>${[10, 15, 30, 45, 60, 120].map((m) => `<button class="chip ${m === minutes ? 'on' : ''}" data-min="${m}">${fmtDuration(m * 60000, getLang())}</button>`).join('')}</div></div>
+      <div class="chips" data-dur>${[10, 15, 30, 45, 60, 120].map((m) => `<button class="chip ${m === minutes ? 'on' : ''}" data-min="${m}">${fmtDuration(m * 60000, lang)}</button>`).join('')}</div></div>
     <div class="field"><label>${t('importance')}</label>
       <div class="seg" data-imp>${[1, 2, 3].map((i) => `<button data-imp="${i}" class="${importance === i ? 'on' : ''}">${[null, t('impLow'), t('impNormal'), t('impHigh')][i]}</button>`).join('')}</div></div>
     <div class="btnrow"><button class="btn ghost" data-cancel>${t('cancel')}</button><button class="btn primary" data-save>${t('quickAdd')}</button></div>`);
@@ -687,11 +734,46 @@ export function openQuickSheet(onAdd) {
   let autoEmoji = true;
   nameIn.addEventListener('input', () => { if (autoEmoji) emojiIn.value = suggestEmoji(nameIn.value); });
   emojiIn.addEventListener('input', () => { autoEmoji = !emojiIn.value.trim(); });
+  // Resolves the chosen start into {start, tomorrow}: an explicit time already
+  // behind us means tomorrow; "+N min" is relative to the moment of the tap.
+  const resolveStart = () => {
+    const nowMin = parseHM(nowHM());
+    if (startHM) return { start: startHM, tomorrow: parseHM(startHM) < nowMin };
+    return { start: minutesToHM((nowMin + startOffset) % 1440), tomorrow: nowMin + startOffset >= 1440 };
+  };
+  const summary = $('[data-summary]', el);
+  const updateSummary = () => {
+    const { start, tomorrow } = resolveStart();
+    const end = minutesToHM((parseHM(start) + minutes) % 1440);
+    const fmt = (hm) => fmtClock(at(dayKey(), hm), lang);
+    summary.textContent = tomorrow ? t('quickSummaryTomorrow', { t1: fmt(start), t2: fmt(end) })
+      : startOffset === 0 && !startHM ? t('quickSummaryNow', { t2: fmt(end) })
+      : t('quickSummaryAt', { t1: fmt(start), t2: fmt(end) });
+  };
+  const startIn = $('[data-f="startat"]', el);
+  $('[data-when]', el).addEventListener('click', (e) => {
+    const c = e.target.closest('.chip'); if (!c) return;
+    $$('.chip', e.currentTarget).forEach((x) => x.classList.toggle('on', x === c));
+    if (c.hasAttribute('data-at')) {
+      startIn.style.display = '';
+      if (!startIn.value) startIn.value = minutesToHM((parseHM(nowHM()) + 60) % 1440);
+      startHM = startIn.value;
+      startIn.focus();
+    } else {
+      startIn.style.display = 'none';
+      startHM = null;
+      startOffset = Number(c.dataset.off);
+    }
+    updateSummary();
+  });
+  startIn.addEventListener('input', () => { if (startIn.value) { startHM = startIn.value; updateSummary(); } });
   $('[data-dur]', el).addEventListener('click', (e) => {
     const c = e.target.closest('[data-min]'); if (!c) return;
     minutes = Number(c.dataset.min);
     $$('.chip', e.currentTarget).forEach((x) => x.classList.toggle('on', x === c));
+    updateSummary();
   });
+  updateSummary();
   $('[data-imp]', el).addEventListener('click', (e) => {
     const b = e.target.closest('[data-imp]'); if (!b || !b.dataset.imp) return;
     importance = Number(b.dataset.imp);
@@ -701,7 +783,7 @@ export function openQuickSheet(onAdd) {
     const name = nameIn.value.trim();
     if (!name) { nameIn.classList.add('shake'); setTimeout(() => nameIn.classList.remove('shake'), 500); return; }
     closeSheet();
-    onAdd({ name, emoji: emojiIn.value.trim() || suggestEmoji(name), minutes, importance });
+    onAdd({ name, emoji: emojiIn.value.trim() || suggestEmoji(name), minutes, importance, ...resolveStart() });
   };
   $('[data-cancel]', el).addEventListener('click', closeSheet);
   $('[data-save]', el).addEventListener('click', submit);

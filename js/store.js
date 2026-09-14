@@ -23,6 +23,7 @@ function defaults() {
       alarmSeconds: 15,       // how long a strong alert repeats
       vibSync: true,          // vibration follows the tone
       vibPattern: 'double',   // used when vibSync is off; kept even while it is on
+      slotMode: 'dur',        // time editor: 'dur' (start + duration) | 'end' (start → end)
       snoozeAllowed: true,
       snoozeMinutes: 10,
       maxSnoozes: 2,

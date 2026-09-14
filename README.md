@@ -32,7 +32,11 @@ French, chosen automatically from your device.
 - **Tap any moment for more.** A finished one shows a recap (what happened, when, how many
   points) with Undo if it just happened. An upcoming one offers *Do it now* or *Skip* —
   no need to wait for its time to come around.
-- **Quick tasks** for one-off things ("call the dentist, 15 minutes") from the `+` button.
+- **Quick tasks** for one-off things ("call the dentist, 15 minutes") from the `+` button:
+  starting now, in 15 min to 2 h, or at a chosen time (a time already behind you means
+  tomorrow), with a duration. The sheet says exactly when it starts and ends.
+- **Times as a start plus a duration.** The moment editor types each time slot as a start
+  and a length in minutes; switch to start → end whenever you prefer, values carry over.
 - **Points, levels and streaks.** Finishing on time pays, finishing early pays more,
   missing costs points, snoozing costs a little. A perfect day extends your streak.
   Every number explains itself: hover it on a computer, tap it on a phone, and a short
