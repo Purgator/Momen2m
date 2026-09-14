@@ -8,7 +8,7 @@
     "icons": "node tools/gen-icons.js",
     "bump": "node tools/bump.js",
     "package": "node tools/package.js",
-    "test": "node --no-warnings tools/test.js"
+    "test": "node --no-warnings tools/test.js && node relay/test.js"
   },
   "license": "MIT"
 }
