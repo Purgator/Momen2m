@@ -26,6 +26,7 @@ export function normaliseSchedule(items, now = Date.now()) {
       kind: ['start', 'ending', 'missed'].includes(it.kind) ? it.kind : 'start',
       strong: !!it.strong,
       silent: !!it.silent,
+      vibrate: Array.isArray(it.vibrate) ? it.vibrate.slice(0, 12).map((n) => Math.max(0, Math.min(2000, Number(n) || 0))) : [],
       actions: Array.isArray(it.actions) ? it.actions.slice(0, 2).map((a) => ({ action: String(a.action).slice(0, 20), title: String(a.title).slice(0, 40) })) : [],
     });
   }
