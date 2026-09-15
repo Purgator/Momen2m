@@ -271,6 +271,21 @@ input[type="time"] { font-variant-numeric: tabular-nums; }
 .dots i.on { background: var(--accent); }
 .ob .foot { display: flex; gap: 10px; }
 .ob .foot .btn { flex: 1; }
+.ob .card { margin-top: 16px; }
+.ob .skip { text-align: center; margin-top: 18px; }
+.ob .times { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 14px; }
+.ob .times .field { margin-top: 0; }
+.ob .times .input { width: 100%; }
+.ob .toggle .s { font-variant-numeric: tabular-nums; }
+.qitem { border-bottom: 1px solid var(--line); }
+.qitem:last-child { border-bottom: 0; }
+.qrow { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 0; }
+.qrow .q { display: flex; align-items: center; gap: 10px; font-size: 15px; font-weight: 600; color: var(--text); flex: 1; min-width: 0; }
+.qrow .q > span { font-size: 22px; flex: none; }
+.qrow .seg { flex: none; min-width: 118px; }
+.stepper { display: flex; align-items: center; gap: 10px; padding: 0 0 12px 32px; color: var(--muted); font-size: 14px; font-weight: 600; }
+.stepper button { width: 36px; height: 36px; border-radius: 50%; border: 1px solid var(--line); background: var(--card2); color: var(--text); font-size: 18px; font-weight: 700; cursor: pointer; }
+.stepper b { min-width: 22px; text-align: center; color: var(--text); font-size: 17px; }
 .note { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 12px 14px; font-size: 14px; color: var(--muted); margin-top: 14px; }
 
 /* ---- toasts -------------------------------------------------------------- */
