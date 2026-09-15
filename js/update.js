@@ -31,7 +31,19 @@ export async function checkForUpdate(force) {
   if (!force && now - lastCheck < CHECK_EVERY) return hasUpdate();
   lastCheck = now;
   try { await reg.update(); } catch { /* offline */ }
-  return hasUpdate();
+  if (hasUpdate()) return true;
+  const nw = reg.installing;
+  if (!nw) return false;
+  // A byte diff was found and the new worker is now installing (fetching and
+  // caching assets), which can outlast reg.update() itself. Wait for it to
+  // settle so the caller gets the real answer instead of a premature "no
+  // update" a moment before the actual one arrives.
+  return new Promise((resolve) => {
+    const done = () => { clearTimeout(timer); nw.removeEventListener('statechange', onChange); resolve(hasUpdate()); };
+    const timer = setTimeout(done, 15000);
+    function onChange() { if (nw.state === 'installed' || nw.state === 'redundant') done(); }
+    nw.addEventListener('statechange', onChange);
+  });
 }
 
 export function initUpdates(onReady) {
