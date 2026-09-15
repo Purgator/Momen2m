@@ -4,12 +4,14 @@
 // the full history stays on GitHub regardless.
 export const CHANGELOG = {
   en: {
+    '1.9.0': 'Checking for updates shows a spinner and no longer says "up to date" right before a real update appears. After an update, this popup tells you what changed — switch it off in Setup › About if you prefer a quiet note.',
     '1.8.4': 'Background reminders can now hold a full week of data without being rejected.',
     '1.8.3': 'Fixed the time-slot mode switch not saving.',
     '1.8.2': 'One-off moments for later today or tomorrow, time slots as start + duration, and clearer background-reminder status.',
     '1.8.1': 'Background reminders are more reliable, with clearer errors when something goes wrong.',
   },
   fr: {
+    '1.9.0': 'La vérification des mises à jour affiche un indicateur de chargement et ne dit plus « à jour » juste avant qu’une vraie mise à jour apparaisse. Après une mise à jour, cette fenêtre résume les nouveautés — désactive-la dans Réglages › À propos si tu préfères une note discrète.',
     '1.8.4': 'Les rappels en arrière-plan peuvent désormais contenir une semaine complète de données sans être rejetés.',
     '1.8.3': "Correction du réglage de mode des créneaux horaires qui ne s'enregistrait pas.",
     '1.8.2': "Moments ponctuels plus tard aujourd'hui ou demain, créneaux horaires en heure de début + durée, et état des rappels en arrière-plan plus clair.",
