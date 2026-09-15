@@ -4,6 +4,7 @@
 // the full history stays on GitHub regardless.
 export const CHANGELOG = {
   en: {
+    '1.10.0': 'New guided setup: tell it when you get up and go to bed, whether you have working hours, and answer a few yes/no questions (with a times-a-day count) — it proposes your first moments, timed to your day. Everything is skippable, a backup can be loaded from the first screen, and re-running it from Setup keeps your points and history.',
     '1.9.0': 'Checking for updates shows a spinner and no longer says "up to date" right before a real update appears. After an update, this popup tells you what changed — switch it off in Setup › About if you prefer a quiet note.',
     '1.8.4': 'Background reminders can now hold a full week of data without being rejected.',
     '1.8.3': 'Fixed the time-slot mode switch not saving.',
@@ -11,6 +12,7 @@ export const CHANGELOG = {
     '1.8.1': 'Background reminders are more reliable, with clearer errors when something goes wrong.',
   },
   fr: {
+    '1.10.0': 'Nouvelle configuration guidée : indique quand tu te lèves et te couches, si tu as des horaires de travail, et réponds à quelques questions oui/non (avec un nombre de fois par jour) — elle propose tes premiers moments, calés sur ta journée. Tout peut être passé, une sauvegarde se charge dès le premier écran, et la relancer depuis Réglages garde tes points et ton historique.',
     '1.9.0': 'La vérification des mises à jour affiche un indicateur de chargement et ne dit plus « à jour » juste avant qu’une vraie mise à jour apparaisse. Après une mise à jour, cette fenêtre résume les nouveautés — désactive-la dans Réglages › À propos si tu préfères une note discrète.',
     '1.8.4': 'Les rappels en arrière-plan peuvent désormais contenir une semaine complète de données sans être rejetés.',
     '1.8.3': "Correction du réglage de mode des créneaux horaires qui ne s'enregistrait pas.",
