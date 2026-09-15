@@ -27,6 +27,7 @@ function defaults() {
       snoozeAllowed: true,
       snoozeMinutes: 10,
       maxSnoozes: 2,
+      updateSummaries: true, // show a "what's new" popup right after the app updates
     },
     habits: [],
     days: {},               // dayKey -> occKey -> record
@@ -38,6 +39,7 @@ function defaults() {
       badgesInit: false, // set once badges already earned from old history were persisted quietly
     },
     lastSeen: Date.now(),
+    lastSeenVersion: '',     // app version at last boot, used to spot a just-applied update
     habitsVersion: 0,        // bumped on every habit add/edit/delete/toggle
     backedUpAtVersion: -1,   // habitsVersion at the moment of the last successful backup
     lastBackupAt: 0,         // ms epoch of the last successful export, 0 = never

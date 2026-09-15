@@ -9,6 +9,7 @@ import * as E from './engine.js';
 import * as N from './notify.js';
 import * as U from './ui.js';
 import { initUpdates, applyUpdate, checkForUpdate } from './update.js';
+import { CHANGELOG } from './changelog.js';
 import { dayKey, addDays, at, nowHM, minutesToHM, parseHM, fmtDuration, fmtClock, fmtDateTime, fileStamp } from './time.js';
 import * as AutoImport from './autobackup.js';
 import { diffStates } from './diff.js';
@@ -37,6 +38,7 @@ let lastCurrentKey = '';
 let dirty = true;
 let installPrompt = null;
 let updateReady = false;
+let checkingUpdate = false;
 const ob = { step: 0, selected: new Set(PRESETS.filter((p) => p.basic).map((p) => p.id)) };
 
 setLang(state.lang);
@@ -68,7 +70,7 @@ function render(now = Date.now()) {
     app.innerHTML = U.renderOnboarding(ob.step, { selected: ob.selected, isIosBrowser, canInstall: !!installPrompt, standalone });
   } else if (view === 'setup') {
     app.innerHTML = U.renderSetup({
-      version: VERSION, updateReady, canInstall: !!installPrompt, isIosBrowser,
+      version: VERSION, updateReady, checkingUpdate, canInstall: !!installPrompt, isIosBrowser,
       needsBackup: needsBackup(), recovery: getRecoverySnapshot(), canAutoImport: AutoImport.supported,
       push: Push.supported() ? { ...Push.info(), caveat: Push.caveat() } : null,
     });
@@ -548,8 +550,18 @@ app.addEventListener('click', async (e) => {
       break;
     }
     case 'check-update':
-      btn.disabled = true;
-      checkForUpdate(true).then((has) => { updateReady = has; U.toast(has ? t('updateAvailable') : t('upToDate'), has ? '' : 'good'); render(); });
+      if (checkingUpdate) break;
+      checkingUpdate = true;
+      render();
+      checkForUpdate(true).then((has) => {
+        checkingUpdate = false;
+        updateReady = has;
+        // A real update was found: the same background listener that would
+        // announce it in the live view already showed the "update ready"
+        // toast with its own action button, so don't repeat it here.
+        if (!has) U.toast(t('upToDate'), 'good');
+        render();
+      });
       break;
     case 'apply-update': if (!applyUpdate()) location.reload(); break;
     case 'install':
@@ -656,6 +668,17 @@ initUpdates(() => {
 
 // ---- boot -------------------------------------------------------------------------------
 if (view === 'live') startTicker(); else render();
+
+// This boot landed on a different version than the last one (the service
+// worker applied an update, in the background or via "Update now", and
+// reloaded): say so once, then forget the old version.
+if (state.lastSeenVersion && state.lastSeenVersion !== VERSION) {
+  const note = (CHANGELOG[getLang()] || CHANGELOG.en)[VERSION] || CHANGELOG.en[VERSION];
+  if (state.settings.updateSummaries) setTimeout(() => U.openUpdateSheet(VERSION, note), 300);
+  else U.toast(t('updatedTo', { v: VERSION }), 'good');
+}
+state.lastSeenVersion = VERSION;
+save();
 
 // Badges: the first run after they were introduced persists everything already
 // earned quietly (no toast barrage over old history); later boots announce what

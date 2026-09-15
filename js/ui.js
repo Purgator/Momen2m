@@ -478,14 +478,16 @@ export function renderSetup(opts) {
     <div class="section">
       <h2>${t('about')}</h2>
       <div class="card">
-        ${toggleRow(t('version', { v: esc(opts.version) }), opts.updateReady ? t('updateAvailable') : '', opts.updateReady
+        ${toggleRow(t('version', { v: esc(opts.version) }), opts.checkingUpdate ? t('checkingUpdate') : opts.updateReady ? t('updateAvailable') : '', opts.updateReady
           ? `<button class="btn small primary" data-action="apply-update">${t('updateNow')}</button>`
-          : `<button class="btn small" data-action="check-update">${t('checkUpdate')}</button>`)}
+          : `<button class="btn small" data-action="check-update" ${opts.checkingUpdate ? 'disabled' : ''}>${opts.checkingUpdate ? '<span class="spinner"></span>' : ''}${t('checkUpdate')}</button>`)}
+        ${toggleRow(t('updateSummaries'), t('updateSummariesHint'), sw('updateSummaries', s.updateSummaries))}
         ${opts.canInstall ? toggleRow(t('install'), '', `<button class="btn small primary" data-action="install">${t('install')}</button>`) : ''}
         ${opts.isIosBrowser ? `<p class="hint" style="padding:10px 0">${t('obIosInstall')}</p>` : ''}
         <div class="toggle"><button class="link" data-action="restart-ob">${t('onboardingRestart')}</button></div>
       </div>
       <p class="hint center" style="margin-top:14px"><a class="muted" href="https://github.com/Purgator/Momen2m" target="_blank" rel="noopener">github.com/Purgator/Momen2m</a></p>
+      <p class="hint center" style="margin-top:6px">${t('releaseNotesNote')} <a class="muted" href="https://github.com/Purgator/Momen2m/releases" target="_blank" rel="noopener">${t('releaseNotesLink')}</a></p>
     </div>
   </div>
   ${tabbar('setup')}`;
@@ -802,6 +804,16 @@ export function openConfirmSheet({ title, body, confirmLabel, onConfirm }) {
     </div>`);
   $('[data-cancel]', el).addEventListener('click', closeSheet);
   $('[data-confirm]', el).addEventListener('click', () => { closeSheet(); onConfirm(); });
+}
+
+// Shown once right after the app applies an update (a fresh reload landed on
+// a newer version). `note` is the changelog line for that version, if any.
+export function openUpdateSheet(version, note) {
+  const el = openSheet(`
+    <h2>🎉 ${t('updatedTitle', { v: esc(version) })}</h2>
+    <p class="hint" style="margin-top:6px">${esc(note || t('updatedGeneric'))}</p>
+    <div class="btnrow"><button class="btn primary wide" data-close>${t('close')}</button></div>`);
+  $('[data-close]', el).addEventListener('click', closeSheet);
 }
 
 // Reset needs a stronger, more deliberate choice than a single OK button: the
