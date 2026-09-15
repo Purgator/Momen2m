@@ -445,5 +445,35 @@ globalThis.window = globalThis;
     assert.ok(!occs.some((o) => o.habit.id === 'later' && o.phase !== 'past'), 'yesterday\'s one-off does not come back');
   });
 
+  await test('first-run setup: rhythm shifts, counts spread, work hours place lunch', async () => {
+    const SU = await import(url('setup.js'));
+    const byId = (a) => Object.fromEntries(SU.proposeMoments(a).map((x) => [x.preset.id, x]));
+    const a = SU.defaultAnswers();
+    let m = byId(a);
+    assert.deepStrictEqual(Object.keys(m).filter((k) => m[k].proposed).sort(), ['sleep', 'wake'], 'nothing answered: only wake and bed');
+    assert.deepStrictEqual(m.wake.slots, [{ start: '07:00', end: '07:30' }]);
+    assert.deepStrictEqual(m.sleep.slots, [{ start: '22:30', end: '23:15' }]);
+    assert.strictEqual(m.teeth.slots.length, 2, 'default teeth count is morning + evening');
+    a.wake = '06:00'; a.bed = '23:30';
+    a.q.water = { v: 'no', n: 4 }; a.q.meds = { v: 'yes', n: 1 }; a.q.move = { v: 'yes', n: 0 };
+    m = byId(a);
+    assert.ok(m.water.proposed && m.meds.proposed && !m.exercise.proposed, '"no" adds water, "yes" adds meds, "yes" to moving adds nothing');
+    assert.strictEqual(m.water.slots.length, 4);
+    assert.strictEqual(m.water.slots[0].start, '07:00', 'first glass an hour after waking');
+    assert.strictEqual(m.water.slots[3].end, '21:30', 'last glass two hours before bed');
+    assert.deepStrictEqual(m.meds.slots, [{ start: '14:15', end: '15:15' }], 'a single dose sits mid-day');
+    assert.strictEqual(m.breakfast.slots[0].start, '06:30', 'morning presets follow the wake time');
+    assert.strictEqual(m.screens.slots[0].start, '22:45', 'evening presets follow the bed time');
+    a.work = true; a.workStart = '10:00'; a.workEnd = '19:00';
+    m = byId(a);
+    assert.deepStrictEqual(m.lunch.slots, [{ start: '13:00', end: '14:30' }], 'lunch three hours into the work day');
+    assert.strictEqual(m.exercise.slots[0].start, '19:15', 'move right after work');
+    a.bed = '00:30';
+    m = byId(a);
+    assert.deepStrictEqual(m.sleep.slots, [{ start: '00:30', end: '01:15' }], 'bed after midnight still counts as after wake');
+    assert.strictEqual(SU.clampCount(SU.QUESTIONS[0], 99), 8);
+    assert.strictEqual(SU.clampCount(SU.QUESTIONS[0], 0), 1);
+  });
+
   console.log(`\n${passed} tests passed`);
 })().catch((e) => { console.error(e); process.exit(1); });

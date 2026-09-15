@@ -3,6 +3,7 @@
 import { t, pick, getLang } from './i18n.js';
 import { state, save } from './store.js';
 import { PRESETS } from './presets.js';
+import { QUESTIONS, isTriggered } from './setup.js';
 import { suggestEmoji } from './emoji.js';
 import { BASE_PTS, SNOOZE_PENALTY, canSnooze, currentOf, todayPoints } from './engine.js';
 import { levelInfo, rankLadder, BADGES, badgeProgress, tips as gameTips } from './game.js';
@@ -484,7 +485,7 @@ export function renderSetup(opts) {
         ${toggleRow(t('updateSummaries'), t('updateSummariesHint'), sw('updateSummaries', s.updateSummaries))}
         ${opts.canInstall ? toggleRow(t('install'), '', `<button class="btn small primary" data-action="install">${t('install')}</button>`) : ''}
         ${opts.isIosBrowser ? `<p class="hint" style="padding:10px 0">${t('obIosInstall')}</p>` : ''}
-        <div class="toggle"><button class="link" data-action="restart-ob">${t('onboardingRestart')}</button></div>
+        <div class="toggle"><div><div class="t"><button class="link" style="padding:0" data-action="restart-ob">${t('onboardingRestart')}</button></div><div class="s">${t('obRestartHint')}</div></div></div>
       </div>
       <p class="hint center" style="margin-top:14px"><a class="muted" href="https://github.com/Purgator/Momen2m" target="_blank" rel="noopener">github.com/Purgator/Momen2m</a></p>
       <p class="hint center" style="margin-top:6px">${t('releaseNotesNote')} <a class="muted" href="https://github.com/Purgator/Momen2m/releases" target="_blank" rel="noopener">${t('releaseNotesLink')}</a></p>
@@ -495,23 +496,63 @@ export function renderSetup(opts) {
 
 // ---- onboarding ---------------------------------------------------------------
 
-const OB_STEPS = 4;
+const OB_STEPS = 6;
+
+function obTime(key, label, value) {
+  return `<div class="field"><label class="lbl">${label}</label><input class="input" type="time" data-ob="${key}" value="${value}"></div>`;
+}
+function yesNo(action, attrs, v) {
+  return `<div class="seg mini">${['yes', 'no'].map((x) => `<button data-action="${action}" ${attrs} data-v="${x}" class="${v === x ? 'on' : ''}">${t(x === 'yes' ? 'obYes' : 'obNo')}</button>`).join('')}</div>`;
+}
 export function renderOnboarding(step, data) {
   const dots = `<div class="dots">${Array.from({ length: OB_STEPS }, (_, i) => `<i class="${i === step ? 'on' : ''}"></i>`).join('')}</div>`;
-  let body = '', foot = '';
+  const a = data.a;
+  const skip = `<p class="skip"><button class="link" data-action="ob-skip">${t('obSkip')}</button></p>`;
+  const nav = `<button class="btn ghost big" data-action="ob-back">${t('obBack')}</button><button class="btn primary big" data-action="ob-next">${t('obNext')}</button>`;
+  let body = '', foot = nav;
   if (step === 0) {
     body = `<img class="logo" src="icons/icon-192.png" alt="">
       <h1>${t('obWelcomeTitle')}</h1>
       <p>${t('obWelcomeText')}</p>
       <div class="field"><span class="lbl">${t('obLanguage')}</span>
         <div class="seg"><button data-action="ob-lang" data-lang="en" class="${state.lang === 'en' ? 'on' : ''}">English</button><button data-action="ob-lang" data-lang="fr" class="${state.lang === 'fr' ? 'on' : ''}">Français</button></div>
+      </div>
+      <div class="note" style="margin-top:22px"><b>${t('obLoadTitle')}</b><br>${t('obLoadText')}
+        <div class="btnrow" style="margin-top:12px">
+          ${data.canAutoImport ? `<button class="btn small" data-action="import-auto">🔎 ${t('findBackup')}</button>` : ''}
+          <button class="btn small" data-action="import">📂 ${t('obLoadFile')}</button>
+        </div>
+        <input type="file" accept="application/json,.json" id="importFile" hidden>
       </div>`;
     foot = `<button class="btn primary big" data-action="ob-next">${t('obNext')}</button>`;
   } else if (step === 1) {
-    body = `<h1>${t('obPickTitle')}</h1><p>${t('obPickText')}</p>
-      <div class="chips">${PRESETS.map((p) => `<button class="chip ${data.selected.has(p.id) ? 'on' : ''}" data-action="ob-preset" data-preset="${p.id}">${p.emoji} ${esc(pick(p.name))}</button>`).join('')}</div>`;
-    foot = `<button class="btn ghost big" data-action="ob-back">${t('obBack')}</button><button class="btn primary big" data-action="ob-next">${t('obNext')}</button>`;
+    const work = a.work === true ? 'yes' : a.work === false ? 'no' : '';
+    body = `<h1>${t('obRhythmTitle')}</h1><p>${t('obRhythmText')}</p>
+      <div class="times">${obTime('wake', '⏰ ' + t('obWake'), a.wake)}${obTime('bed', '😴 ' + t('obBed'), a.bed)}</div>
+      <div class="qrow" style="margin-top:10px"><div class="q"><span>💼</span>${t('obWorkQ')}</div>${yesNo('ob-work', '', work)}</div>
+      ${a.work ? `<div class="times" style="margin-top:0">${obTime('workStart', t('obWorkStart'), a.workStart)}${obTime('workEnd', t('obWorkEnd'), a.workEnd)}</div>` : ''}
+      ${skip}`;
   } else if (step === 2) {
+    body = `<h1>${t('obQuestionsTitle')}</h1><p>${t('obQuestionsText')}</p>
+      <div class="card" style="padding:0 14px">${QUESTIONS.map((q) => {
+        const ans = a.q[q.id];
+        const stepper = isTriggered(q, ans) && q.count
+          ? `<div class="stepper"><button data-action="ob-count" data-q="${q.id}" data-d="-1" aria-label="−">−</button><b>${ans.n}</b><button data-action="ob-count" data-q="${q.id}" data-d="1" aria-label="+">+</button><span>${t('obTimesADay')}</span></div>`
+          : '';
+        return `<div class="qitem"><div class="qrow"><div class="q"><span>${q.emoji}</span>${t('obQ_' + q.id)}</div>${yesNo('ob-answer', `data-q="${q.id}"`, ans.v || '')}</div>${stepper}</div>`;
+      }).join('')}</div>
+      ${skip}`;
+  } else if (step === 3) {
+    const proposed = data.proposals.filter((x) => x.proposed);
+    const rest = data.proposals.filter((x) => !x.proposed);
+    const rows = proposed.map((x) => `<div class="toggle"><div><div class="t">${x.preset.emoji} ${esc(pick(x.preset.name))}</div><div class="s">${x.slots.map((s) => s.start).join(' · ')}</div></div>
+      <label class="switch"><input type="checkbox" data-ob-pick="${x.preset.id}" ${data.selected.has(x.preset.id) ? 'checked' : ''}><span></span></label></div>`).join('');
+    body = `<h1>${t('obReviewTitle')}</h1><p>${data.selected.size ? t('obReviewText') : t('obReviewEmpty')}</p>
+      ${rows ? `<div class="card">${rows}</div>` : ''}
+      <p class="hint" style="margin:18px 0 0">${t('obMore')}</p>
+      <div class="chips" style="margin-top:8px">${rest.map((x) => `<button class="chip ${data.selected.has(x.preset.id) ? 'on' : ''}" data-action="ob-preset" data-preset="${x.preset.id}" title="${x.slots.map((s) => s.start).join(' · ')}">${x.preset.emoji} ${esc(pick(x.preset.name))}</button>`).join('')}</div>
+      ${skip}`;
+  } else if (step === 4) {
     const perm = permission();
     const status = perm === 'granted' ? `<p class="note" style="color:var(--ok)">${t('obNotifGranted')}</p>`
       : perm === 'denied' ? `<p class="note">${t('obNotifDenied')}</p>`
