@@ -1,22 +1,23 @@
-// Short, human summaries of what changed in each release. Shown once, right
-// after the app updates itself, unless the user turned that off in Setup.
-// Add an entry here (both languages) whenever a release is worth mentioning —
-// the full history stays on GitHub regardless.
+// One short line per release, shown once right after the app updates itself
+// (unless turned off in Setup). Glanceable, not exhaustive: the user will try
+// it out, and the full notes live on GitHub. Add both languages per release.
 export const CHANGELOG = {
   en: {
-    '1.10.0': 'New guided setup: tell it when you get up and go to bed, whether you have working hours, and answer a few yes/no questions (with a times-a-day count) — it proposes your first moments, timed to your day. Everything is skippable, a backup can be loaded from the first screen, and re-running it from Setup keeps your points and history.',
-    '1.9.0': 'Checking for updates shows a spinner and no longer says "up to date" right before a real update appears. After an update, this popup tells you what changed — switch it off in Setup › About if you prefer a quiet note.',
-    '1.8.4': 'Background reminders can now hold a full week of data without being rejected.',
+    '1.10.1': 'The guided setup now only suggests moments that match your answers.',
+    '1.10.0': 'New guided setup: a few questions, and your first moments are placed around your day.',
+    '1.9.0': 'Smoother update check, and this "what changed" note after each update.',
+    '1.8.4': 'Background reminders can hold a full week again.',
     '1.8.3': 'Fixed the time-slot mode switch not saving.',
-    '1.8.2': 'One-off moments for later today or tomorrow, time slots as start + duration, and clearer background-reminder status.',
-    '1.8.1': 'Background reminders are more reliable, with clearer errors when something goes wrong.',
+    '1.8.2': 'One-off moments for later today or tomorrow; time slots as start + duration.',
+    '1.8.1': 'More reliable background reminders.',
   },
   fr: {
-    '1.10.0': 'Nouvelle configuration guidée : indique quand tu te lèves et te couches, si tu as des horaires de travail, et réponds à quelques questions oui/non (avec un nombre de fois par jour) — elle propose tes premiers moments, calés sur ta journée. Tout peut être passé, une sauvegarde se charge dès le premier écran, et la relancer depuis Réglages garde tes points et ton historique.',
-    '1.9.0': 'La vérification des mises à jour affiche un indicateur de chargement et ne dit plus « à jour » juste avant qu’une vraie mise à jour apparaisse. Après une mise à jour, cette fenêtre résume les nouveautés — désactive-la dans Réglages › À propos si tu préfères une note discrète.',
-    '1.8.4': 'Les rappels en arrière-plan peuvent désormais contenir une semaine complète de données sans être rejetés.',
-    '1.8.3': "Correction du réglage de mode des créneaux horaires qui ne s'enregistrait pas.",
-    '1.8.2': "Moments ponctuels plus tard aujourd'hui ou demain, créneaux horaires en heure de début + durée, et état des rappels en arrière-plan plus clair.",
-    '1.8.1': 'Rappels en arrière-plan plus fiables, avec des erreurs plus claires en cas de problème.',
+    '1.10.1': 'La configuration guidée ne suggère plus que les moments qui correspondent à tes réponses.',
+    '1.10.0': 'Nouvelle configuration guidée : quelques questions, et tes premiers moments sont placés dans ta journée.',
+    '1.9.0': 'Vérification des mises à jour plus fluide, et cette note « nouveautés » après chaque mise à jour.',
+    '1.8.4': 'Les rappels en arrière-plan tiennent de nouveau une semaine entière.',
+    '1.8.3': 'Correction du mode des créneaux horaires qui ne s’enregistrait pas.',
+    '1.8.2': 'Moments ponctuels pour plus tard aujourd’hui ou demain ; créneaux en début + durée.',
+    '1.8.1': 'Rappels en arrière-plan plus fiables.',
   },
 };
