@@ -9,6 +9,24 @@ Every commit message starts with a [gitmoji](https://gitmoji.dev) prefix
 matching the existing `git log`. Prefer several small, logical commits over
 one giant one when a task naturally breaks into steps.
 
+## Definition of done — ship it, don't park it
+
+Work is **not finished** when it is committed on a branch. Nothing reaches
+end users until it is **on `main`, pushed, and published as a new semver
+release on GitHub** — the PWA only updates itself when `sw.js`'s `VERSION`
+changes on the deployed site. So every completed piece of development, unless
+the user explicitly says to hold it, ends with the full release flow below,
+in the same session, without waiting to be asked. Leaving it uncommitted,
+on a side branch, or bumped-but-unreleased is the failure mode to avoid.
+
+Semver for the bump: **patch** (x.y.Z) for bug fixes only, **minor** (x.Y.0)
+for anything user-visible that is new or changed, **major** (X.0.0) for a
+breaking change to stored data / backups / the relay protocol.
+
+From a git worktree, `main` is checked out elsewhere: land the branch with
+`git push origin HEAD:main` (must fast-forward — rebase first if it doesn't),
+then push the tag. Do not `cd` to the main checkout.
+
 ## Releases
 
 Release flow, in order:
