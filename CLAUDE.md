@@ -37,6 +37,9 @@ Release flow, in order:
    `js/ui.js#openUpdateSheet`); a release with no changelog entry falls back
    to a generic "includes fixes and improvements" line, which is a
    regression in the update UX, not an acceptable default.
+   **Keep it to one short sentence the user grasps in a blink** — what
+   changed, not how or why. No feature tours: they will try it out. The
+   GitHub release notes follow the same rule (a few short bullets at most).
 2. `node tools/bump.js X.Y.Z` — updates `version.js`, `sw.js`, `package.json`.
 3. Commit, tag `vX.Y.Z`, push (GitHub Pages deploys from `main`).
 4. `npm run package`, then `gh release create`.
