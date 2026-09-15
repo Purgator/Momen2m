@@ -41,12 +41,12 @@ let installPrompt = null;
 let updateReady = false;
 let checkingUpdate = false;
 // First-run questionnaire state: answers, the proposals computed from them,
-// which presets are picked, and the habits this run created (so unpicking
-// one after a "Back" removes it again).
-const ob = { step: 0, a: defaultAnswers(), proposals: [], selected: new Set(), created: new Set() };
+// which presets are picked, and whether a re-run already saved a recovery
+// snapshot of the previous setup.
+const ob = { step: 0, a: defaultAnswers(), proposals: [], selected: new Set(), snapshotted: false };
 const OB_LAST = 5;
 function resetOb() {
-  Object.assign(ob, { step: 0, a: defaultAnswers(), proposals: [], selected: new Set(), created: new Set() });
+  Object.assign(ob, { step: 0, a: defaultAnswers(), proposals: [], selected: new Set(), snapshotted: false });
 }
 
 setLang(state.lang);
@@ -175,15 +175,16 @@ function addPreset(p, slots = p.slots.map(([start, end]) => ({ start, end }))) {
 // comes before it, has real moments to back up rather than an empty list.
 function finishSetup() {
   if (!ob.proposals.length) ob.proposals = proposeMoments(ob.a);
-  // Drop what this run added but the user has since unpicked, then add the rest.
-  state.habits = state.habits.filter((h) => !(ob.created.has(h.id) && !ob.selected.has(h.preset)));
+  // The answers define the preset moments: kept ones keep their id (so their
+  // history and points), unpicked ones go, the user's own moments are untouched.
+  // On a re-run the previous setup is recoverable from Setup > Data.
+  const dropping = state.habits.some((h) => h.preset && !ob.selected.has(h.preset));
+  if (dropping && state.onboarded && !ob.snapshotted) { snapshotRecovery('setup'); ob.snapshotted = true; }
+  if (dropping) { state.habits = state.habits.filter((h) => !h.preset || ob.selected.has(h.preset)); touchHabits(); }
   for (const x of ob.proposals) {
     if (!ob.selected.has(x.preset.id)) continue;
     const existing = state.habits.find((h) => h.preset === x.preset.id);
-    // Re-running the setup keeps the habit (and so its history and points)
-    // but moves it to the newly answered rhythm.
-    if (existing) { existing.slots = x.slots; touchHabits(); continue; }
-    ob.created.add(addPreset(x.preset, x.slots).id);
+    if (existing) { existing.slots = x.slots; touchHabits(); } else addPreset(x.preset, x.slots);
   }
   save();
 }
@@ -191,8 +192,6 @@ function finishSetup() {
 function obAdvance() {
   if (ob.step === 2) {
     ob.proposals = proposeMoments(ob.a);
-    // Moments the user already has (a re-run of the setup) show up ticked too.
-    for (const x of ob.proposals) if (state.habits.some((h) => h.preset === x.preset.id)) x.proposed = true;
     ob.selected = new Set(ob.proposals.filter((x) => x.proposed).map((x) => x.preset.id));
   }
   // Create the habits before the backup step, so "Back up now" has something to save.
