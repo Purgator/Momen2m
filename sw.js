@@ -22,6 +22,7 @@ const ASSETS = [
   './js/presets.js',
   './js/notify.js',
   './js/update.js',
+  './js/changelog.js',
   './js/fsstore.js',
   './js/autobackup.js',
   './js/plan.js',
