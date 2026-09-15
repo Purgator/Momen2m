@@ -10,6 +10,7 @@ import * as N from './notify.js';
 import * as U from './ui.js';
 import { initUpdates, applyUpdate, checkForUpdate } from './update.js';
 import { CHANGELOG } from './changelog.js';
+import { defaultAnswers, proposeMoments, QUESTIONS, clampCount } from './setup.js';
 import { dayKey, addDays, at, nowHM, minutesToHM, parseHM, fmtDuration, fmtClock, fmtDateTime, fileStamp } from './time.js';
 import * as AutoImport from './autobackup.js';
 import { diffStates } from './diff.js';
@@ -39,7 +40,14 @@ let dirty = true;
 let installPrompt = null;
 let updateReady = false;
 let checkingUpdate = false;
-const ob = { step: 0, selected: new Set(PRESETS.filter((p) => p.basic).map((p) => p.id)) };
+// First-run questionnaire state: answers, the proposals computed from them,
+// which presets are picked, and the habits this run created (so unpicking
+// one after a "Back" removes it again).
+const ob = { step: 0, a: defaultAnswers(), proposals: [], selected: new Set(), created: new Set() };
+const OB_LAST = 5;
+function resetOb() {
+  Object.assign(ob, { step: 0, a: defaultAnswers(), proposals: [], selected: new Set(), created: new Set() });
+}
 
 setLang(state.lang);
 
@@ -67,7 +75,10 @@ const hooks = {
 function render(now = Date.now()) {
   dirty = false;
   if (view === 'ob') {
-    app.innerHTML = U.renderOnboarding(ob.step, { selected: ob.selected, isIosBrowser, canInstall: !!installPrompt, standalone });
+    app.innerHTML = U.renderOnboarding(ob.step, {
+      a: ob.a, proposals: ob.proposals, selected: ob.selected,
+      isIosBrowser, canInstall: !!installPrompt, standalone, canAutoImport: AutoImport.supported,
+    });
   } else if (view === 'setup') {
     app.innerHTML = U.renderSetup({
       version: VERSION, updateReady, checkingUpdate, canInstall: !!installPrompt, isIosBrowser,
@@ -149,21 +160,44 @@ const findOcc = (key) => occs.find((o) => o.key === key);
 const findHabit = (id) => state.habits.find((h) => h.id === id);
 const shakeEl = (el) => { el.classList.add('shake'); setTimeout(() => el.classList.remove('shake'), 500); };
 
-function addPreset(p) {
-  state.habits.push({
-    id: uid(), preset: p.id, name: p.name, desc: p.desc, emoji: p.emoji,
-    slots: p.slots.map(([start, end]) => ({ start, end })),
+function addPreset(p, slots = p.slots.map(([start, end]) => ({ start, end }))) {
+  const h = {
+    id: uid(), preset: p.id, name: p.name, desc: p.desc, emoji: p.emoji, slots,
     days: [0, 1, 2, 3, 4, 5, 6], importance: p.importance, snooze: true, enabled: true, once: null, createdAt: Date.now(),
-  });
+  };
+  state.habits.push(h);
   touchHabits();
+  return h;
 }
 
 // Adds the presets picked during onboarding to real habits (idempotent: safe to
 // call more than once). Kept separate from 'ob-start' so the backup step, which
 // comes before it, has real moments to back up rather than an empty list.
 function finishSetup() {
-  for (const p of PRESETS) if (ob.selected.has(p.id) && !state.habits.some((h) => h.preset === p.id)) addPreset(p);
+  if (!ob.proposals.length) ob.proposals = proposeMoments(ob.a);
+  // Drop what this run added but the user has since unpicked, then add the rest.
+  state.habits = state.habits.filter((h) => !(ob.created.has(h.id) && !ob.selected.has(h.preset)));
+  for (const x of ob.proposals) {
+    if (!ob.selected.has(x.preset.id)) continue;
+    const existing = state.habits.find((h) => h.preset === x.preset.id);
+    // Re-running the setup keeps the habit (and so its history and points)
+    // but moves it to the newly answered rhythm.
+    if (existing) { existing.slots = x.slots; touchHabits(); continue; }
+    ob.created.add(addPreset(x.preset, x.slots).id);
+  }
   save();
+}
+
+function obAdvance() {
+  if (ob.step === 2) {
+    ob.proposals = proposeMoments(ob.a);
+    // Moments the user already has (a re-run of the setup) show up ticked too.
+    for (const x of ob.proposals) if (state.habits.some((h) => h.preset === x.preset.id)) x.proposed = true;
+    ob.selected = new Set(ob.proposals.filter((x) => x.proposed).map((x) => x.preset.id));
+  }
+  // Create the habits before the backup step, so "Back up now" has something to save.
+  if (ob.step === 4) finishSetup();
+  ob.step = Math.min(OB_LAST, ob.step + 1); render(); scrollTo(0, 0);
 }
 
 function refresh() { dirty = true; if (view === 'live') frame(); else render(); Push.syncSoon(); }
@@ -356,7 +390,9 @@ function confirmAndApplyImport(text, body, parsed) {
         importJSON(text); // re-validates and snapshots the current data first
         setLang(state.lang);
         U.toast(t('imported'), 'good');
-        phases.clear(); refresh();
+        phases.clear();
+        // A backup loaded from the welcome screen skips the rest of the setup.
+        if (view === 'ob' && state.onboarded) { view = 'live'; dirty = true; startTicker(); } else refresh();
       } catch { U.toast(t('importFailed'), 'bad'); }
     },
   });
@@ -524,9 +560,9 @@ app.addEventListener('click', async (e) => {
         async () => {
           const ok = await exportData();
           if (!ok) { U.toast(t('resetCancelled')); return; }
-          resetAll(); setLang(state.lang); ob.step = 0; view = 'ob'; render();
+          resetAll(); setLang(state.lang); resetOb(); view = 'ob'; render();
         },
-        () => { resetAll(); setLang(state.lang); ob.step = 0; view = 'ob'; render(); },
+        () => { resetAll(); setLang(state.lang); resetOb(); view = 'ob'; render(); },
       );
       break;
     case 'restore-recovery': {
@@ -567,7 +603,7 @@ app.addEventListener('click', async (e) => {
     case 'install':
       if (installPrompt) { installPrompt.prompt(); installPrompt.userChoice.then(() => { installPrompt = null; render(); }); }
       break;
-    case 'restart-ob': ob.step = 0; view = 'ob'; render(); scrollTo(0, 0); break;
+    case 'restart-ob': resetOb(); view = 'ob'; render(); scrollTo(0, 0); break;
 
     // onboarding
     case 'ob-lang': state.lang = btn.dataset.lang; setLang(state.lang); save(); render(); break;
@@ -577,12 +613,27 @@ app.addEventListener('click', async (e) => {
       btn.classList.toggle('on', ob.selected.has(id));
       break;
     }
-    case 'ob-next':
-      // Turn the picked presets into real habits before the backup step, so
-      // "Back up now" there actually has something to back up.
-      if (ob.step === 2) finishSetup();
-      ob.step = Math.min(3, ob.step + 1); render(); scrollTo(0, 0);
+    case 'ob-work': ob.a.work = btn.dataset.v === 'yes'; render(); break;
+    case 'ob-answer': {
+      const q = ob.a.q[btn.dataset.q];
+      q.v = q.v === btn.dataset.v ? null : btn.dataset.v; // tap again to clear
+      render();
       break;
+    }
+    case 'ob-count': {
+      const def = QUESTIONS.find((x) => x.id === btn.dataset.q);
+      const q = ob.a.q[def.id];
+      q.n = clampCount(def, q.n + Number(btn.dataset.d));
+      render();
+      break;
+    }
+    case 'ob-skip':
+      if (ob.step === 1) Object.assign(ob.a, { wake: '07:00', bed: '22:30', work: null });
+      if (ob.step === 2) for (const q of Object.values(ob.a.q)) q.v = null;
+      if (ob.step === 3) ob.selected.clear();
+      obAdvance();
+      break;
+    case 'ob-next': obAdvance(); break;
     case 'ob-back': ob.step = Math.max(0, ob.step - 1); render(); scrollTo(0, 0); break;
     case 'ob-start':
       finishSetup();
@@ -595,6 +646,11 @@ app.addEventListener('click', async (e) => {
 
 app.addEventListener('change', (e) => {
   const el = e.target;
+  if (el.dataset.ob) { ob.a[el.dataset.ob] = el.value; return; }
+  if (el.dataset.obPick) {
+    if (el.checked) ob.selected.add(el.dataset.obPick); else ob.selected.delete(el.dataset.obPick);
+    return;
+  }
   if (el.id === 'importFile') {
     const f = el.files && el.files[0];
     el.value = ''; // let the same file be picked again later

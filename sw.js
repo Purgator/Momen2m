@@ -23,6 +23,7 @@ const ASSETS = [
   './js/notify.js',
   './js/update.js',
   './js/changelog.js',
+  './js/setup.js',
   './js/fsstore.js',
   './js/autobackup.js',
   './js/plan.js',
