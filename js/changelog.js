@@ -3,6 +3,10 @@
 // exhaustive (the detailed notes live on the GitHub release). Both languages.
 export const CHANGELOG = {
   en: {
+    '1.13.0': [
+      '⭐ Save a one-time moment as premade and add it again in one tap; manage them in Setup.',
+      '🔒 Two moments can no longer share the same emoji and name — except a repeating one and a one-time one, which now count as one in Progress.',
+    ],
     '1.12.0': [
       '💾 Backups overwrite one file by default; dated files are a tick away next to the button.',
       '↩️ A just-added one-off moment can be undone for 10 seconds, at no cost.',
@@ -21,6 +25,10 @@ export const CHANGELOG = {
     '1.8.1': ['🔔 More reliable background reminders.'],
   },
   fr: {
+    '1.13.0': [
+      '⭐ Enregistre un moment ponctuel comme prédéfini et rajoute-le en un geste ; gère-les dans Réglages.',
+      '🔒 Deux moments ne peuvent plus partager le même emoji et nom — sauf un récurrent et un ponctuel, désormais comptés ensemble dans Progrès.',
+    ],
     '1.12.0': [
       '💾 Les sauvegardes écrasent un seul fichier par défaut ; les fichiers datés sont à une case du bouton.',
       '↩️ Un moment ponctuel tout juste ajouté peut être annulé pendant 10 secondes, sans coût.',
