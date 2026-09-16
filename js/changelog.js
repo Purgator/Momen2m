@@ -3,6 +3,7 @@
 // exhaustive (the detailed notes live on the GitHub release). Both languages.
 export const CHANGELOG = {
   en: {
+    '1.16.2': ['👉 Swipe left or right on the badges to change page.'],
     '1.16.1': ['💨 The "Quick hands" badge is now called "Flash" in French.'],
     '1.16.0': [
       '⚡ After three misses in a row, a 12-hour boost: every point earned is worth +50%.',
@@ -43,6 +44,7 @@ export const CHANGELOG = {
     '1.8.1': ['🔔 More reliable background reminders.'],
   },
   fr: {
+    '1.16.2': ['👉 Glisse à gauche ou à droite sur les badges pour changer de page.'],
     '1.16.1': ['💨 Le badge « Mains rapides » devient « Flash ».'],
     '1.16.0': [
       '⚡ Après trois ratés d’affilée, un boost de 12 h : chaque point gagné vaut +50 %.',
