@@ -161,6 +161,15 @@ const findOcc = (key) => occs.find((o) => o.key === key);
 const findHabit = (id) => state.habits.find((h) => h.id === id);
 const shakeEl = (el) => { el.classList.add('shake'); setTimeout(() => el.classList.remove('shake'), 500); };
 
+// Premade one-time moments: same emoji + name replaces the earlier one, so
+// re-saving a template tunes it instead of piling up copies.
+function saveTemplateFrom({ name, emoji, minutes, importance }) {
+  const key = G.momentKey({ name, emoji });
+  state.templates = state.templates.filter((x) => G.momentKey(x) !== key);
+  state.templates.push({ id: uid(), name, emoji, minutes, importance });
+  save();
+}
+
 function addPreset(p, slots = p.slots.map(([start, end]) => ({ start, end }))) {
   const h = {
     id: uid(), preset: p.id, name: p.name, desc: p.desc, emoji: p.emoji, slots,
@@ -509,13 +518,16 @@ app.addEventListener('click', async (e) => {
       break;
     }
     case 'quick':
-      U.openQuickSheet(({ name, emoji, minutes, importance, start, tomorrow }) => {
+      U.openQuickSheet(({ name, emoji, minutes, importance, start, tomorrow, saveTemplate }) => {
         const day = dayKey(new Date(now));
         const id = uid();
-        state.habits.push({
+        const h = {
           id, preset: null, name, emoji, desc: '', slots: [{ start, end: minutesToHM((parseHM(start) + minutes) % 1440) }],
           days: [], importance, snooze: true, enabled: true, once: tomorrow ? addDays(day, 1) : day, createdAt: now,
-        });
+        };
+        if (G.nameConflict(h)) { U.toast(t('nameTaken'), 'bad'); return false; }
+        if (saveTemplate) saveTemplateFrom({ name, emoji, minutes, importance });
+        state.habits.push(h);
         save(); N.feedback('tap'); refresh();
         const text = tomorrow ? '📅 ' + t('quickAddedTomorrow', { t: fmtClock(at(addDays(day, 1), start)) })
           : parseHM(start) > parseHM(nowHM(new Date(now))) ? '⏰ ' + t('quickAddedLater', { t: fmtClock(at(day, start)) })
@@ -526,12 +538,14 @@ app.addEventListener('click', async (e) => {
           for (const d of Object.values(state.days)) for (const k of Object.keys(d)) if (k.startsWith(id + '#')) delete d[k];
           phases.clear(); save(); refresh();
         } } });
-      });
+      }, { templates: state.templates, onSaveTemplate: (d) => { saveTemplateFrom(d); U.toast(t('templateSaved'), 'good'); } });
       break;
 
     case 'add':
       U.openHabitSheet(null, (h) => {
-        state.habits.push({ id: uid(), preset: null, once: null, createdAt: Date.now(), ...h });
+        const nh = { id: uid(), preset: null, once: null, createdAt: Date.now(), ...h };
+        if (G.nameConflict(nh)) { U.toast(t('nameTaken'), 'bad'); return false; }
+        state.habits.push(nh);
         touchHabits(); save(); refresh();
       });
       break;
@@ -541,11 +555,16 @@ app.addEventListener('click', async (e) => {
         // Keep translatable preset texts when the user did not change them.
         if (typeof h.name === 'object' && data.name === pick(h.name)) data.name = h.name;
         if (typeof h.desc === 'object' && data.desc === pick(h.desc)) data.desc = h.desc;
+        if (G.nameConflict({ ...h, ...data })) { U.toast(t('nameTaken'), 'bad'); return false; }
         Object.assign(h, data); touchHabits(); save(); refresh();
       },
         () => { state.habits = state.habits.filter((x) => x !== h); touchHabits(); save(); refresh(); });
       break;
     }
+    case 'tpl-del':
+      state.templates = state.templates.filter((x) => x.id !== btn.dataset.id);
+      save(); render();
+      break;
     case 'preset': {
       const p = PRESETS.find((x) => x.id === btn.dataset.preset);
       if (p && !state.habits.some((h) => h.preset === p.id)) { addPreset(p); save(); N.feedback('tap'); refresh(); }
