@@ -3,6 +3,14 @@
 // exhaustive (the detailed notes live on the GitHub release). Both languages.
 export const CHANGELOG = {
   en: {
+    '1.15.0': [
+      '📋 New Moments tab: your moments, suggestions and premades live there; Setup keeps the settings.',
+      '📅 One-time moments set for tomorrow now show under "Coming up".',
+      '🩹 Missed a moment? "Done late" within a day lifts the penalty for a quarter of the points.',
+      '🏅 Ten new badges, on pages.',
+      '🕰️ Tips can now suggest moving a moment to the time you actually do it — only once the pattern is clear.',
+      '💙 A word of encouragement after three misses in a row.',
+    ],
     '1.14.0': [
       '✏️ Premade moments can now be edited or created straight from Setup, not only saved from quick-add.',
       '➕💾 The Add button shows a save icon too when "Save as premade" is ticked, making clear it does both.',
@@ -29,6 +37,14 @@ export const CHANGELOG = {
     '1.8.1': ['🔔 More reliable background reminders.'],
   },
   fr: {
+    '1.15.0': [
+      '📋 Nouvel onglet Moments : tes moments, suggestions et prédéfinis y vivent ; Réglages garde les réglages.',
+      '📅 Les moments ponctuels prévus demain apparaissent sous « À venir ».',
+      '🩹 Moment raté ? « Fait en retard » dans la journée lève la pénalité pour un quart des points.',
+      '🏅 Dix nouveaux badges, par pages.',
+      '🕰️ Les conseils peuvent proposer de déplacer un moment à l’heure où tu le fais vraiment — seulement quand le schéma est net.',
+      '💙 Un mot d’encouragement après trois ratés d’affilée.',
+    ],
     '1.14.0': [
       '✏️ Les moments prédéfinis peuvent maintenant être modifiés ou créés depuis Réglages, pas seulement enregistrés depuis l’ajout rapide.',
       '➕💾 Le bouton Ajouter montre aussi une icône d’enregistrement quand « Enregistrer comme prédéfini » est cochée.',

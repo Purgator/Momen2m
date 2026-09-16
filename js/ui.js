@@ -6,7 +6,7 @@ import { PRESETS } from './presets.js';
 import { QUESTIONS, isTriggered, reviewStatus } from './setup.js';
 import { suggestEmoji } from './emoji.js';
 import { BASE_PTS, SNOOZE_PENALTY, canSnooze, currentOf, todayPoints } from './engine.js';
-import { levelInfo, rankLadder, BADGES, badgeProgress, tips as gameTips } from './game.js';
+import { levelInfo, rankLadder, BADGES, BADGE_PAGE, badgeProgress, tips as gameTips } from './game.js';
 import { fmtClock, fmtCountdown, fmtDuration, fmtAgo, fmtDate, fmtDateTime, fmtWhenShort, nowHM, minutesToHM, parseHM, dayKey, weekday, at } from './time.js';
 import { permission, TONE_NAMES, PATTERN_NAMES } from './notify.js';
 
@@ -23,6 +23,7 @@ export function tabbar(view) {
   return `<nav class="tabbar">
     <button class="tab ${view === 'live' ? 'on' : ''}" data-action="tab" data-view="live"><span class="ico">⏱️</span>${t('tabNow')}</button>
     <button class="tab ${view === 'progress' ? 'on' : ''}" data-action="tab" data-view="progress"><span class="ico">🏆</span>${t('tabProgress')}</button>
+    <button class="tab ${view === 'moments' ? 'on' : ''}" data-action="tab" data-view="moments"><span class="ico">📋</span>${t('tabMoments')}</button>
     <button class="tab ${view === 'setup' ? 'on' : ''}" data-action="tab" data-view="setup"><span class="ico">🎛️</span>${t('tabSetup')}</button>
   </nav>`;
 }
@@ -122,7 +123,7 @@ export function renderLive(occs, now, opts) {
   }
   if (!state.habits.length) {
     body += `<div class="empty"><div class="emo">🌱</div><h2>${t('liveNoHabits')}</h2><p>${t('liveNoHabitsHint')}</p>
-      <p style="margin-top:14px"><button class="btn primary" data-action="tab" data-view="setup">${t('tabSetup')}</button></p>
+      <p style="margin-top:14px"><button class="btn primary" data-action="tab" data-view="moments">${t('tabMoments')}</button></p>
       ${opts.recovery ? `<p style="margin-top:6px"><button class="link" data-action="restore-recovery">${t('restoreAvailable')} · ${fmtWhenShort(opts.recovery.at)}</button></p>` : ''}</div>`;
   } else if (cur) {
     body += currentCard(cur, now);
@@ -143,6 +144,18 @@ export function renderLive(occs, now, opts) {
     body += `<div class="group-title">${t('upcoming')}</div>`;
     for (const o of upcoming.slice(0, 6)) {
       body += occRow(o, 'upcoming', `<div class="side">${o.snoozes ? '💤 ' : ''}<span data-in="${esc(o.key)}">${t('in', { t: fmtDuration(o.start - now, lang) })}</span></div>`, '', 'upcoming-detail');
+    }
+  }
+  // One-time moments set for tomorrow have no other place to show up; a tap opens them for editing.
+  const tomorrow = opts.tomorrow || [];
+  if (tomorrow.length) {
+    body += `<div class="group-title">${t('tomorrow')}</div>`;
+    for (const h of tomorrow) {
+      body += `<div class="occ upcoming tomorrow" data-action="edit" data-id="${esc(h.id)}">
+        <div class="emo">${esc(h.emoji)}</div>
+        <div><div class="name">${habitName(h)}</div><div class="when">${slotsText(h)}</div></div>
+        <div class="side">📅 ${t('tomorrow')}</div>
+      </div>`;
     }
   }
   body += `</div>`;
@@ -218,7 +231,9 @@ function badgeTile(b, p) {
   </button>`;
 }
 
-export function renderProgress(s, now) {
+export function renderProgress(s, now, page = 0) {
+  const pages = Math.ceil(BADGES.length / BADGE_PAGE);
+  page = Math.max(0, Math.min(pages - 1, page));
   const ranks = t('rankNames');
   const li = s.level;
   const rank = ranks[li.rankIdx];
@@ -256,7 +271,12 @@ export function renderProgress(s, now) {
 
     <div class="section">
       <h2>${t('badges')} <span class="hint">${nEarned}/${BADGES.length}</span></h2>
-      <div class="badges">${earned.map(([b, p]) => badgeTile(b, p)).join('')}</div>
+      <div class="badges">${earned.slice(page * BADGE_PAGE, (page + 1) * BADGE_PAGE).map(([b, p]) => badgeTile(b, p)).join('')}</div>
+      ${pages > 1 ? `<div class="pager">
+        <button class="iconbtn" data-action="badge-page" data-d="-1" ${page === 0 ? 'disabled' : ''} aria-label="${t('obBack')}">‹</button>
+        <div class="dots">${Array.from({ length: pages }, (_, i) => `<i class="${i === page ? 'on' : ''}"></i>`).join('')}</div>
+        <button class="iconbtn" data-action="badge-page" data-d="1" ${page >= pages - 1 ? 'disabled' : ''} aria-label="${t('obNext')}">›</button>
+      </div>` : ''}
     </div>
 
     ${perHabit.length ? `<div class="section">
@@ -376,9 +396,10 @@ function sel(setting, options, value, disabled = false) {
   return `<select data-setting="${setting}" ${disabled ? 'disabled' : ''}>${options.map(([v, l]) => `<option value="${v}" ${String(v) === String(value) ? 'selected' : ''}>${l}</option>`).join('')}</select>`;
 }
 
-export function renderSetup(opts) {
-  const s = state.settings;
-  const perm = permission();
+// The Moments tab: what the user has set up (repeating moments, suggestions,
+// premade one-time moments). Everything about *how the app behaves* stays in
+// Setup, so each tab has one job.
+export function renderMoments(opts = {}) {
   const habits = state.habits.filter((h) => !h.once);
   const added = new Set(habits.map((h) => h.preset).filter(Boolean));
   const list = habits.length
@@ -388,6 +409,40 @@ export function renderSetup(opts) {
         <label class="switch" data-stop><input type="checkbox" data-action="toggle" data-id="${esc(h.id)}" ${h.enabled !== false ? 'checked' : ''}><span></span></label>
       </div>`).join('')
     : `<p class="hint">${t('liveNoHabitsHint')}</p>`;
+
+  return `<div class="screen setup">
+    <h1>${t('tabMoments')}</h1>
+    ${opts.needsBackup ? `<div class="banner"><span>🛟 ${t('backupNeeded')}</span><button class="btn small primary" data-action="export">${t('backupNow')}</button></div>` : ''}
+
+    <div class="section">
+      <h2>${t('myMoments')} <button class="btn small primary" data-action="add">+ ${t('addMoment')}</button></h2>
+      <div class="list">${list}</div>
+    </div>
+
+    <div class="section">
+      <h2>${t('presets')}</h2>
+      <p class="hint" style="margin-bottom:10px">${t('presetsHint')}</p>
+      <div class="chips">${PRESETS.map((p) => `<button class="chip ${added.has(p.id) ? 'dim' : ''}" data-action="preset" data-preset="${p.id}" ${added.has(p.id) ? 'disabled' : ''}>${p.emoji} ${esc(pick(p.name))}</button>`).join('')}</div>
+    </div>
+
+    <div class="section">
+      <h2>${t('templates')}</h2>
+      <p class="hint" style="margin:0 0 10px">${t('templatesHint')}</p>
+      ${state.templates.length ? `<div class="list">${state.templates.map((x) => `<div class="item" data-action="tpl-edit" data-id="${esc(x.id)}">
+        <div class="emo">${esc(x.emoji)}</div>
+        <div><div class="name">${esc(x.name)}</div><div class="sub">${fmtDuration(x.minutes * 60000, getLang())} · ${[null, t('impLow'), t('impNormal'), t('impHigh')][x.importance]}</div></div>
+        <button class="iconbtn" data-stop data-action="tpl-del" data-id="${esc(x.id)}" aria-label="${t('delete')}">✕</button>
+      </div>`).join('')}</div>`
+        : `<p class="hint">${t('templatesEmpty')}</p>`}
+      <div class="toggle"><button class="link" data-action="tpl-add">➕ ${t('templateAdd')}</button></div>
+    </div>
+  </div>
+  ${tabbar('moments')}`;
+}
+
+export function renderSetup(opts) {
+  const s = state.settings;
+  const perm = permission();
 
   const notifControl = perm === 'granted'
     ? `<button class="btn small" data-action="notif-test">${t('notifTest')}</button>`
@@ -402,17 +457,6 @@ export function renderSetup(opts) {
   return `<div class="screen setup">
     <h1>${t('setupTitle')}</h1>
     ${opts.needsBackup ? `<div class="banner"><span>🛟 ${t('backupNeeded')}</span><button class="btn small primary" data-action="export">${t('backupNow')}</button></div>` : ''}
-
-    <div class="section">
-      <h2>${t('myMoments')} <button class="btn small primary" data-action="add">+ ${t('addMoment')}</button></h2>
-      <div class="list">${list}</div>
-    </div>
-
-    <div class="section">
-      <h2>${t('presets')}</h2>
-      <p class="hint" style="margin-bottom:10px">${t('presetsHint')}</p>
-      <div class="chips">${PRESETS.map((p) => `<button class="chip ${added.has(p.id) ? 'dim' : ''}" data-action="preset" data-preset="${p.id}" ${added.has(p.id) ? 'disabled' : ''}>${p.emoji} ${esc(pick(p.name))}</button>`).join('')}</div>
-    </div>
 
     <div class="section">
       <h2>${t('settings')}</h2>
@@ -447,18 +491,6 @@ export function renderSetup(opts) {
         <div class="toggle"><button class="btn small" data-action="test-vibration">📳 ${t('testVibration')}</button></div>
       </div>
       <p class="hint" style="margin-top:10px">${t('alertsNote')}</p>
-    </div>
-
-    <div class="section">
-      <h2>${t('templates')}</h2>
-      <p class="hint" style="margin:0 0 10px">${t('templatesHint')}</p>
-      ${state.templates.length ? `<div class="list">${state.templates.map((x) => `<div class="item" data-action="tpl-edit" data-id="${esc(x.id)}">
-        <div class="emo">${esc(x.emoji)}</div>
-        <div><div class="name">${esc(x.name)}</div><div class="sub">${fmtDuration(x.minutes * 60000, getLang())} · ${[null, t('impLow'), t('impNormal'), t('impHigh')][x.importance]}</div></div>
-        <button class="iconbtn" data-stop data-action="tpl-del" data-id="${esc(x.id)}" aria-label="${t('delete')}">✕</button>
-      </div>`).join('')}</div>`
-        : `<p class="hint">${t('templatesEmpty')}</p>`}
-      <div class="toggle"><button class="link" data-action="tpl-add">➕ ${t('templateAdd')}</button></div>
     </div>
 
     <div class="section">
@@ -988,12 +1020,16 @@ export function openResetSheet(onBackupThenErase, onEraseOnly) {
 
 // Read-only recap for a done/missed/skipped moment, with Undo when it's still
 // fresh enough to matter (mirrors the inline Undo already on the row itself).
-export function openRecapSheet(o, { onUndo } = {}) {
+// `onLate` is passed only while a missed moment can still be completed late
+// (see engine.canCompleteLate): the button lifts the penalty for a quarter
+// of the points, so a bad day is recoverable without being free.
+export function openRecapSheet(o, { onUndo, onLate, latePts } = {}) {
   const desc = habitDesc(o.habit);
   const lang = getLang();
-  const statusWord = o.status === 'done' ? t('completed') : o.status === 'missed' ? t('missed') : t('skipped');
+  const statusWord = o.status === 'done' ? (o.late ? t('completedLate') : t('completed')) : o.status === 'missed' ? t('missed') : t('skipped');
   const ptsText = (o.pts > 0 ? '+' : '') + o.pts + ' pts';
   const canUndo = !!onUndo && (o.status === 'done' || o.status === 'skipped') && Date.now() - o.at < 5 * 60000;
+  const canLate = !!onLate;
   const el = openSheet(`
     <h2>${esc(o.habit.emoji)} ${habitName(o.habit)}</h2>
     ${desc ? `<p class="hint" style="margin-top:2px">${desc}</p>` : ''}
@@ -1001,12 +1037,15 @@ export function openRecapSheet(o, { onUndo } = {}) {
       ${toggleRow(t('timeRange'), '', `<span>${slotOf(o)}</span>`)}
       ${toggleRow(statusWord, o.at ? fmtClock(o.at, lang) : '', `<span style="font-weight:700">${ptsText}</span>`)}
     </div>
+    ${canLate ? `<p class="hint" style="margin-top:10px">${t('doneLateHint', { pts: latePts })}</p>` : ''}
     <div class="btnrow">
       ${canUndo ? `<button class="btn" data-undo>${t('undo')}</button>` : ''}
-      <button class="btn ${canUndo ? '' : 'primary wide'}" data-close>${t('close')}</button>
+      ${canLate ? `<button class="btn ok" data-late>✅ ${t('doneLate')}</button>` : ''}
+      <button class="btn ${canUndo || canLate ? '' : 'primary wide'}" data-close>${t('close')}</button>
     </div>`);
   $('[data-close]', el).addEventListener('click', closeSheet);
   if (canUndo) $('[data-undo]', el).addEventListener('click', () => { closeSheet(); onUndo(); });
+  if (canLate) $('[data-late]', el).addEventListener('click', () => { closeSheet(); onLate(); });
 }
 
 // Lets an upcoming moment be resolved ahead of its scheduled time, without
