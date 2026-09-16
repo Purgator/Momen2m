@@ -316,7 +316,9 @@ function handleNotifAction(action, key) {
 async function exportData() {
   const when = Date.now();
   const text = exportJSON(when);
-  const name = 'momen2m-' + fileStamp(new Date(when)) + '.json';
+  // One overwritten file by default: no pile of backups to sort through when
+  // restoring. Dated files are opt-in (Setup > Data).
+  const name = state.settings.backupSingleFile ? 'momen2m-backup.json' : 'momen2m-' + fileStamp(new Date(when)) + '.json';
   const done = (where, quiet) => {
     markBackedUp(when);
     if (!quiet) U.toast(where ? t('exportedTo', { where }) : t('exported'), 'good', { ms: 5000 });
@@ -509,13 +511,21 @@ app.addEventListener('click', async (e) => {
     case 'quick':
       U.openQuickSheet(({ name, emoji, minutes, importance, start, tomorrow }) => {
         const day = dayKey(new Date(now));
+        const id = uid();
         state.habits.push({
-          id: uid(), preset: null, name, emoji, desc: '', slots: [{ start, end: minutesToHM((parseHM(start) + minutes) % 1440) }],
+          id, preset: null, name, emoji, desc: '', slots: [{ start, end: minutesToHM((parseHM(start) + minutes) % 1440) }],
           days: [], importance, snooze: true, enabled: true, once: tomorrow ? addDays(day, 1) : day, createdAt: now,
         });
         save(); N.feedback('tap'); refresh();
-        if (tomorrow) U.toast('📅 ' + t('quickAddedTomorrow', { t: fmtClock(at(addDays(day, 1), start)) }));
-        else if (parseHM(start) > parseHM(nowHM(new Date(now)))) U.toast('⏰ ' + t('quickAddedLater', { t: fmtClock(at(day, start)) }));
+        const text = tomorrow ? '📅 ' + t('quickAddedTomorrow', { t: fmtClock(at(addDays(day, 1), start)) })
+          : parseHM(start) > parseHM(nowHM(new Date(now))) ? '⏰ ' + t('quickAddedLater', { t: fmtClock(at(day, start)) })
+          : '✅ ' + t('quickAdded');
+        // Ten seconds to take it back at no cost: the moment simply never existed.
+        U.toast(text, '', { ms: 10000, action: { label: t('undo'), fn: () => {
+          state.habits = state.habits.filter((h) => h.id !== id);
+          for (const d of Object.values(state.days)) for (const k of Object.keys(d)) if (k.startsWith(id + '#')) delete d[k];
+          phases.clear(); save(); refresh();
+        } } });
       });
       break;
 
