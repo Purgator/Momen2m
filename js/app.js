@@ -234,7 +234,7 @@ function doDone(o, now, at) {
   refresh();
   // Feedback ladder: points (+ praise), combo, perfect day, level up, badges.
   const praise = t('praise');
-  const line = (r.early ? t('toastEarly', { n: r.pts }) : t('toastDone', { n: r.pts })) + ' · ' + praise[state.game.done % praise.length];
+  const line = (r.boost ? '⚡ ' : '') + (r.early ? t('toastEarly', { n: r.pts }) : t('toastDone', { n: r.pts })) + ' · ' + praise[state.game.done % praise.length];
   U.toast(line, 'good');
   let delay = 700;
   const combo = G.todayCombo(occs, now);
@@ -267,7 +267,8 @@ function celebrateBadges(delay = 0) {
 function showProgress() { view = 'progress'; dirty = true; render(); scrollTo(0, 0); }
 
 // Three misses in a row today (nothing done in between) is a rough patch, not
-// a character flaw: one warm nudge per day, with "Done late" as a way back.
+// a character flaw: one warm nudge per day, plus a 12 h +50 % points boost so
+// that getting back on track pays off right away.
 function encourageIfRoughPatch(now) {
   const today = dayKey(new Date(now));
   if (state.game.lastEncouraged === today) return;
@@ -277,8 +278,10 @@ function encourageIfRoughPatch(now) {
   if (run < 3) return;
   const msgs = t('encouragements');
   const msg = msgs[(state.game.missed || run) % msgs.length];
-  state.game.lastEncouraged = today; save();
-  setTimeout(() => U.toast('💙 ' + msg, '', { ms: 9000 }), 1200);
+  state.game.lastEncouraged = today;
+  const until = E.grantBoost(now);
+  setTimeout(() => U.toast('💙 ' + msg + ' ' + t('boostGranted', { until: fmtClock(until) }), '', { ms: 10000 }), 1200);
+  dirty = true;
 }
 
 // ---- sharing -------------------------------------------------------------------
@@ -527,7 +530,7 @@ app.addEventListener('click', async (e) => {
       const o = findOcc(btn.dataset.key); if (!o) break;
       U.openRecapSheet(o, {
         onUndo: () => { if (E.undo(o)) { N.feedback('tap'); refresh(); } },
-        latePts: Math.round((E.BASE_PTS[o.habit.importance] || 20) / 4),
+        latePts: E.latePts(o, now),
         onLate: E.canCompleteLate(o, now) ? () => {
           const r = E.completeLate(o, now);
           if (!r) return;

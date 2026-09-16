@@ -37,9 +37,10 @@ function defaults() {
       xp: 0, streak: 0, bestStreak: 0, lastEvaluated: null, done: 0, missed: 0,
       early: 0,     // completions in the first half of the window
       shares: 0,    // times progress was shared
-      recovered: 0, // missed moments completed late (a quarter of the points back)
+      recovered: 0, // missed moments completed late (the miss stays, a quarter of the points back)
       onceDone: 0,  // one-time moments completed
       lastEncouraged: '', // dayKey of the last "rough patch" encouragement
+      boostUntil: 0,      // ms epoch until which every gain is worth +50 % (granted with the encouragement)
       badges: {},   // badge id -> ms epoch when unlocked (kept even if history is pruned)
       badgesInit: false, // set once badges already earned from old history were persisted quietly
     },
