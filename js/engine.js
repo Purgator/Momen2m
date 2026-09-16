@@ -39,7 +39,7 @@ export function occurrencesOfDay(day) {
         start: rec && rec.start ? rec.start : start,
         originalEnd, end: rec && rec.deadline ? rec.deadline : originalEnd,
         status: rec ? rec.status : 'open', snoozes: rec ? rec.snoozes : 0, pts: rec ? rec.pts || 0 : 0,
-        at: rec ? rec.at : 0,
+        at: rec ? rec.at : 0, late: !!(rec && rec.late),
       });
     });
   }
@@ -167,9 +167,40 @@ export function complete(o, now) {
   applyXp(pts);
   state.game.done++;
   if (early) state.game.early = (state.game.early || 0) + 1;
+  if (o.habit.once) state.game.onceDone = (state.game.onceDone || 0) + 1;
   const perfect = dayComplete(o.day) === true;
   save();
   return { pts, early, perfect };
+}
+
+export const LATE_WINDOW = 24 * 60 * 60 * 1000;
+
+export function canCompleteLate(o, now) {
+  return o.status === 'missed' && now - o.end <= LATE_WINDOW;
+}
+
+// A missed moment done within a day still counts: the penalty is lifted and
+// a quarter of the base points is earned, so it ends slightly positive
+// instead of at -base. Snooze penalties stay.
+export function completeLate(o, now) {
+  const rec = record(o.day, o.occ, false);
+  if (!rec || !canCompleteLate({ ...o, status: rec.status }, now)) return null;
+  const base = BASE_PTS[o.habit.importance] || 20;
+  const snoozePts = -rec.snoozes * SNOOZE_PENALTY;
+  const target = snoozePts + Math.round(base / 4);
+  const delta = target - (rec.pts || 0);
+  rec.status = 'done';
+  rec.late = true;
+  rec.early = false;
+  rec.pts = target;
+  rec.at = now;
+  applyXp(delta);
+  state.game.done++;
+  state.game.missed = Math.max(0, (state.game.missed || 0) - 1);
+  state.game.recovered = (state.game.recovered || 0) + 1;
+  if (o.habit.once) state.game.onceDone = (state.game.onceDone || 0) + 1;
+  save();
+  return { pts: delta };
 }
 
 export function canSnooze(o) {

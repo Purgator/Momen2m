@@ -54,7 +54,7 @@ export function computeStats(now, todayOccs = []) {
   const habits = new Map(state.habits.map((h) => [h.id, h]));
   const perHabit = new Map(); // keyed by momentKey: a recurring and a one-time "Read" count as one
   const history = [];
-  let done = 0, missed = 0, skipped = 0, early = 0, snoozes = 0, dawn = 0, night = 0;
+  let done = 0, missed = 0, skipped = 0, early = 0, snoozes = 0, dawn = 0, night = 0, weekend = 0;
   const distinct = new Set();
   let bestDay = null;
 
@@ -70,6 +70,7 @@ export function computeStats(now, todayOccs = []) {
         d.done++;
         if (r.early) early++;
         if (r.at) { const h = new Date(r.at).getHours(); if (h < 7) dawn++; if (h >= 22 || h < 4) night++; }
+        if ([0, 6].includes(new Date(day + 'T12:00').getDay())) weekend++;
         distinct.add(habitIdOf(key));
       } else if (r.status === 'missed') d.missed++;
       else if (r.status === 'skipped') d.skipped++;
@@ -105,10 +106,10 @@ export function computeStats(now, todayOccs = []) {
 
   return {
     level: levelInfo(g.xp),
-    lifetime: { done: g.done || 0, missed: g.missed || 0, early: g.early || 0, shares: g.shares || 0 },
+    lifetime: { done: g.done || 0, missed: g.missed || 0, early: g.early || 0, shares: g.shares || 0, recovered: g.recovered || 0, onceDone: g.onceDone || 0 },
     streak: g.streak || 0, bestStreak: g.bestStreak || 0,
     history, week: history.slice(-7),
-    period: { done, missed, skipped, resolved, rate: resolved ? done / resolved : null, early, snoozes, bestDay, dawn, night, distinct: distinct.size, comeback },
+    period: { done, missed, skipped, resolved, rate: resolved ? done / resolved : null, early, snoozes, bestDay, dawn, night, weekend, distinct: distinct.size, comeback },
     perHabit: perHabitList,
     today: { total: todays.length, done: todayDone, resolved: todayResolved, left: todays.length - todayResolved, pts: todayPoints(now) },
   };
@@ -135,7 +136,18 @@ export const BADGES = [
   { id: 'variety', emoji: '🎨', goal: (s) => [s.period.distinct, 5] },
   { id: 'comeback', emoji: '💪', goal: (s) => [s.period.comeback ? 1 : 0, 1] },
   { id: 'sharer', emoji: '📣', goal: (s) => [s.lifetime.shares, 1] },
+  { id: 'twohundred', emoji: '🎖️', goal: (s) => [s.lifetime.done, 200] },
+  { id: 'thousand', emoji: '🏛️', goal: (s) => [s.lifetime.done, 1000] },
+  { id: 'streak14', emoji: '📅', goal: (s) => [s.bestStreak, 14] },
+  { id: 'streak100', emoji: '🌈', goal: (s) => [s.bestStreak, 100] },
+  { id: 'level20', emoji: '🚀', goal: (s) => [s.level.level, 20] },
+  { id: 'early50', emoji: '🐦', goal: (s) => [s.lifetime.early, 50] },
+  { id: 'recovered', emoji: '🩹', goal: (s) => [s.lifetime.recovered, 5] },
+  { id: 'oneoff', emoji: '⚡', goal: (s) => [s.lifetime.onceDone, 10] },
+  { id: 'weekend', emoji: '🛋️', goal: (s) => [s.period.weekend, 10] },
+  { id: 'nosnooze', emoji: '🧘', goal: (s) => [s.period.done >= 20 && s.period.snoozes === 0 ? 1 : 0, 1] },
 ];
+export const BADGE_PAGE = 9;
 
 export function badgeProgress(b, s) {
   const [n, of] = b.goal(s);
@@ -160,8 +172,54 @@ export function unlockBadges(s, now = Date.now()) {
 // ---- tips -----------------------------------------------------------------------
 // Up to `max` contextual tips as { key, vars }, most useful first. Keys map to
 // i18n strings; `name` vars are raw habit names (the UI localizes and escapes).
-export function tips(s, max = 3) {
+// ---- timing advice ---------------------------------------------------------------
+// Looks at *when* each repeating moment actually gets done (r.at) over the
+// last 30 days and suggests moving its window when the pattern is clear.
+// Trust before helpfulness: at least `MIN_SAMPLES` completions, and the
+// middle half of them within `MAX_SPREAD` minutes — otherwise say nothing.
+export const ADVICE_MIN_SAMPLES = 7, ADVICE_MAX_SPREAD = 45;
+
+const minutesOfDay = (ts) => { const d = new Date(ts); return d.getHours() * 60 + d.getMinutes(); };
+const r5 = (m) => Math.round(m / 5) * 5;
+const hm = (m) => { m = ((m % 1440) + 1440) % 1440; return String(Math.floor(m / 60)).padStart(2, '0') + ':' + String(m % 60).padStart(2, '0'); };
+
+export function timingAdvice(now = Date.now(), days = 30) {
+  const today = dayKey(new Date(now));
   const out = [];
+  for (const h of state.habits) {
+    if (h.once || h.enabled === false) continue;
+    (h.slots || []).forEach((slot, i) => {
+      const key = h.id + '#' + i;
+      const startMin = parseHMLocal(slot.start), endMin = parseHMLocal(slot.end);
+      const len = ((endMin - startMin) % 1440 + 1440) % 1440 || 1440;
+      const offsets = [];
+      for (let d = 0; d < days; d++) {
+        const r = (state.days[addDays(today, -d)] || {})[key];
+        if (r && r.status === 'done' && r.at && !r.late) {
+          // Minutes relative to the window start, in [-720, 720).
+          offsets.push(((minutesOfDay(r.at) - startMin + 720) % 1440 + 1440) % 1440 - 720);
+        }
+      }
+      if (offsets.length < ADVICE_MIN_SAMPLES) return;
+      offsets.sort((a, b) => a - b);
+      const q = (p) => offsets[Math.min(offsets.length - 1, Math.floor(p * offsets.length))];
+      const median = q(0.5), spread = q(0.75) - q(0.25);
+      if (spread > ADVICE_MAX_SPREAD) return;
+      const early = offsets.filter((o) => o < 0).length / offsets.length;
+      const late = offsets.filter((o) => o > len * 0.75).length / offsets.length;
+      const vars = { name: h.name, emoji: h.emoji, from: slot.start, at: hm(startMin + median), n: offsets.length };
+      // Done before the window opens, most of the time: start it where they actually do it.
+      if (early >= 0.7) out.push({ key: 'adviceEarlier', vars: { ...vars, to: hm(r5(startMin + median - 10)) }, habitId: h.id, slot: i });
+      // Squeezed into the last quarter: give it a later start (same length).
+      else if (late >= 0.7) out.push({ key: 'adviceLater', vars: { ...vars, to: hm(r5(startMin + median - Math.round(len / 2))) }, habitId: h.id, slot: i });
+    });
+  }
+  return out;
+}
+function parseHMLocal(s) { const [a, b] = s.split(':').map(Number); return a * 60 + (b || 0); }
+
+export function tips(s, max = 3) {
+  const out = [...timingAdvice()];
   const perm = permission();
   if (perm === 'default') out.push({ key: 'tipNotif' });
   if (needsBackup()) out.push({ key: 'tipBackup' });
