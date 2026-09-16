@@ -362,6 +362,7 @@ input[type="time"] { font-variant-numeric: tabular-nums; }
 
 /* offline / update banner */
 .banner { background: var(--card); border: 1px solid var(--accent); border-radius: 14px; padding: 10px 14px; display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 12px; font-size: 14px; }
+.banner.boost { border-color: #f5b301; background: linear-gradient(90deg, rgba(245,179,1,.14), var(--card)); font-weight: 600; }
 
 /* ---- hover tooltips (pointer devices only; taps open a sheet instead) ---- */
 @media (hover: hover) and (pointer: fine) {

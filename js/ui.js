@@ -5,7 +5,7 @@ import { state, save } from './store.js';
 import { PRESETS } from './presets.js';
 import { QUESTIONS, isTriggered, reviewStatus } from './setup.js';
 import { suggestEmoji } from './emoji.js';
-import { BASE_PTS, SNOOZE_PENALTY, canSnooze, currentOf, todayPoints } from './engine.js';
+import { BASE_PTS, SNOOZE_PENALTY, canSnooze, currentOf, todayPoints, boostActive } from './engine.js';
 import { levelInfo, rankLadder, BADGES, BADGE_PAGE, badgeProgress, tips as gameTips } from './game.js';
 import { fmtClock, fmtCountdown, fmtDuration, fmtAgo, fmtDate, fmtDateTime, fmtWhenShort, nowHM, minutesToHM, parseHM, dayKey, weekday, at } from './time.js';
 import { permission, TONE_NAMES, PATTERN_NAMES } from './notify.js';
@@ -75,7 +75,9 @@ function slotOf(o) {
 // header again collapses it back. The primary current moment is never
 // collapsible, so it can't accidentally be tapped away.
 function currentCard(o, now, collapsible = false) {
-  const stake = BASE_PTS[o.habit.importance] || 20;
+  const base = BASE_PTS[o.habit.importance] || 20;
+  const boost = boostActive(now);
+  const stake = boost ? Math.round(base * 1.5) : base;
   const sn = canSnooze(o);
   const snoozeLabel = sn === 'ok' ? '💤 ' + t('snoozeMin', { n: state.settings.snoozeMinutes }) : sn === 'exhausted' ? t('noSnoozeLeft') : t('snoozeDisabled');
   const showSnooze = !(sn === 'disabled' && (!state.settings.snoozeAllowed || o.habit.snooze === false));
@@ -84,7 +86,7 @@ function currentCard(o, now, collapsible = false) {
     <div class="emo">${esc(o.habit.emoji)}</div>
     <div class="name">${habitName(o.habit)}</div>
     ${desc ? `<div class="desc">${desc}</div>` : ''}
-    <div class="when">${slotOf(o)} · <span class="stake" data-tip="${esc(t('tipStake', { n: stake, m: stake + Math.round(stake / 2) }))}">${t('ptsAtStake', { n: stake })}</span></div>
+    <div class="when">${slotOf(o)} · <span class="stake" data-tip="${esc(t('tipStake', { n: stake, m: Math.round((base + Math.round(base / 2)) * (boost ? 1.5 : 1)) }))}">${boost ? '⚡ ' : ''}${t('ptsAtStake', { n: stake })}</span></div>
     <div class="ringwrap" data-ring="${esc(o.key)}">
       <svg viewBox="0 0 160 160"><circle class="track" cx="80" cy="80" r="${RING_R}"/><circle class="prog" cx="80" cy="80" r="${RING_R}" stroke-dasharray="${RING_C.toFixed(1)}" stroke-dashoffset="0"/></svg>
       <div class="count"><span data-cd="${esc(o.key)}">${fmtCountdown(o.end - now)}</span><small>${t('left', { t: '' }).trim()}</small></div>
@@ -114,6 +116,9 @@ export function renderLive(occs, now, opts) {
   let body = '';
   if (opts.updateReady) {
     body += `<div class="banner"><span>${t('updateAvailable')}</span><button class="btn small primary" data-action="apply-update">${t('updateNow')}</button></div>`;
+  }
+  if (boostActive(now)) {
+    body += `<div class="banner boost"><span>⚡ ${t('boostBanner', { until: fmtClock(state.game.boostUntil) })}</span></div>`;
   }
   body += `<div class="timeline">`;
   if (past.length) {
@@ -339,6 +344,8 @@ export function openExplainSheet(topic, s, todayOccs = []) {
         <div class="lrow"><span>${t('ruleMissed')}</span><span class="neg">−${BASE_PTS[1]} / −${BASE_PTS[2]} / −${BASE_PTS[3]}</span></div>
         <div class="lrow"><span>${t('ruleSkipped')}</span><span class="neg">−50%</span></div>
         <div class="lrow"><span>${t('ruleSnooze')}</span><span class="neg">−${SNOOZE_PENALTY}</span></div>
+        <div class="lrow"><span>${t('ruleLate')}</span><span class="pos">+25%</span></div>
+        <div class="lrow"><span>${t('ruleBoost')}</span><span class="pos">×1.5</span></div>
       </div>`;
   }
   const el = openSheet(html + `<div class="btnrow"><button class="btn primary wide" data-close>${t('close')}</button></div>`);
