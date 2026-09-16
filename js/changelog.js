@@ -3,6 +3,10 @@
 // exhaustive (the detailed notes live on the GitHub release). Both languages.
 export const CHANGELOG = {
   en: {
+    '1.12.0': [
+      '💾 Backups overwrite one file by default; dated files are a tick away next to the button.',
+      '↩️ A just-added one-off moment can be undone for 10 seconds, at no cost.',
+    ],
     '1.11.0': [
       '📋 Update notes now list every version you skipped, and can be hidden from the note itself.',
       '🎨 Re-running the setup shows what changes: green new, orange moved, red removed.',
@@ -17,6 +21,10 @@ export const CHANGELOG = {
     '1.8.1': ['🔔 More reliable background reminders.'],
   },
   fr: {
+    '1.12.0': [
+      '💾 Les sauvegardes écrasent un seul fichier par défaut ; les fichiers datés sont à une case du bouton.',
+      '↩️ Un moment ponctuel tout juste ajouté peut être annulé pendant 10 secondes, sans coût.',
+    ],
     '1.11.0': [
       '📋 La note de mise à jour liste toutes les versions passées, et peut être masquée depuis la note.',
       '🎨 Relancer la configuration montre ce qui change : vert nouveau, orange déplacé, rouge retiré.',
