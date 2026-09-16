@@ -403,7 +403,12 @@ input[type="time"] { font-variant-numeric: tabular-nums; }
 .chart .lbl { font-size: 12px; color: var(--muted); font-weight: 700; }
 .chart .col.today .lbl { color: var(--text); }
 .chart .star { position: absolute; top: -2px; font-size: 11px; color: var(--warn); }
-.badges { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 10px; }
+.badges { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+.pager { display: flex; align-items: center; justify-content: center; gap: 14px; margin-top: 10px; }
+.pager .dots { margin: 0; }
+.pager .iconbtn:disabled { opacity: .3; cursor: default; }
+.occ.tomorrow { opacity: .8; }
+.occ.tomorrow .side { font-size: 13px; color: var(--muted); }
 .badge { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 12px 8px 10px; display: flex; flex-direction: column; align-items: center; gap: 4px; cursor: pointer; }
 .badge:active { transform: scale(.97); }
 .badge .emo { font-size: 30px; line-height: 1.1; }

@@ -40,6 +40,7 @@ let dirty = true;
 let installPrompt = null;
 let updateReady = false;
 let checkingUpdate = false;
+let badgePage = 0;
 // First-run questionnaire state: answers, the proposals computed from them,
 // which presets are picked, and whether a re-run already saved a recovery
 // snapshot of the previous setup.
@@ -68,6 +69,7 @@ const hooks = {
     N.notify(t('nMissed', { name: pick(o.habit.name) }), t('nMissedBody'), o.key);
     N.feedback('miss');
     if (view === 'live') U.toast(o.habit.emoji + ' ' + t('missed') + ' · ' + pen, 'bad');
+    encourageIfRoughPatch(Date.now());
   },
 };
 
@@ -80,6 +82,8 @@ function render(now = Date.now()) {
       again: state.onboarded, existing: new Map(state.habits.filter((h) => h.preset).map((h) => [h.preset, h])),
       isIosBrowser, canInstall: !!installPrompt, standalone, canAutoImport: AutoImport.supported,
     });
+  } else if (view === 'moments') {
+    app.innerHTML = U.renderMoments({ needsBackup: needsBackup() });
   } else if (view === 'setup') {
     app.innerHTML = U.renderSetup({
       version: VERSION, updateReady, checkingUpdate, canInstall: !!installPrompt, isIosBrowser,
@@ -90,11 +94,15 @@ function render(now = Date.now()) {
     occs = E.buildOccurrences(now);
     const stats = G.computeStats(now, occs);
     G.unlockBadges(stats, now); // persist anything already earned (e.g. history from before badges existed), quietly
-    app.innerHTML = U.renderProgress(stats, now);
+    app.innerHTML = U.renderProgress(stats, now, badgePage);
   } else {
     for (const o of occs) o.fresh = fresh.has(o.key);
     fresh.clear();
-    app.innerHTML = U.renderLive(occs, now, { updateReady, recovery: state.habits.length ? null : getRecoverySnapshot(), expanded });
+    const tmrw = addDays(dayKey(new Date(now)), 1);
+    app.innerHTML = U.renderLive(occs, now, {
+      updateReady, recovery: state.habits.length ? null : getRecoverySnapshot(), expanded,
+      tomorrow: state.habits.filter((h) => h.once === tmrw && h.enabled !== false),
+    });
     renderedDay = dayKey(new Date(now));
     const cur = E.currentOf(occs);
     const key = cur ? cur.key : '';
@@ -257,6 +265,21 @@ function celebrateBadges(delay = 0) {
 }
 
 function showProgress() { view = 'progress'; dirty = true; render(); scrollTo(0, 0); }
+
+// Three misses in a row today (nothing done in between) is a rough patch, not
+// a character flaw: one warm nudge per day, with "Done late" as a way back.
+function encourageIfRoughPatch(now) {
+  const today = dayKey(new Date(now));
+  if (state.game.lastEncouraged === today) return;
+  const resolved = E.buildOccurrences(now).filter((o) => o.day === today && o.status !== 'open' && o.at).sort((a, b) => a.at - b.at);
+  let run = 0;
+  for (let i = resolved.length - 1; i >= 0; i--) { if (resolved[i].status === 'missed') run++; else break; }
+  if (run < 3) return;
+  const msgs = t('encouragements');
+  const msg = msgs[(state.game.missed || run) % msgs.length];
+  state.game.lastEncouraged = today; save();
+  setTimeout(() => U.toast('💙 ' + msg, '', { ms: 9000 }), 1200);
+}
 
 // ---- sharing -------------------------------------------------------------------
 const APP_URL = 'https://purgator.github.io/Momen2m/';
@@ -502,7 +525,22 @@ app.addEventListener('click', async (e) => {
     }
     case 'recap': {
       const o = findOcc(btn.dataset.key); if (!o) break;
-      U.openRecapSheet(o, { onUndo: () => { if (E.undo(o)) { N.feedback('tap'); refresh(); } } });
+      U.openRecapSheet(o, {
+        onUndo: () => { if (E.undo(o)) { N.feedback('tap'); refresh(); } },
+        latePts: Math.round((E.BASE_PTS[o.habit.importance] || 20) / 4),
+        onLate: E.canCompleteLate(o, now) ? () => {
+          const r = E.completeLate(o, now);
+          if (!r) return;
+          N.feedback('tap');
+          U.toast('🩹 ' + t('doneLateToast', { pts: (r.pts >= 0 ? '+' : '') + r.pts }), 'good');
+          refresh(); celebrateBadges(600);
+        } : undefined,
+      });
+      break;
+    }
+    case 'badge-page': {
+      badgePage += Number(btn.dataset.d);
+      render();
       break;
     }
     case 'upcoming-detail': {
