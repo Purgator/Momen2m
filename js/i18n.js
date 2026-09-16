@@ -744,7 +744,7 @@ const STRINGS = {
     badgeLockedTip: '{name} — {n}/{of}. Touche pour voir comment l’obtenir.',
     badgeNames: {
       first: 'Premier pas', ten: 'Dix faits', fifty: 'Cinquante faits', hundred: 'Cent', fivehundred: 'Cinq cents',
-      early: 'Mains rapides', perfect: 'Jour parfait', streak3: 'Trois d’affilée', streak7: 'Semaine complète', streak30: 'Un mois entier',
+      early: 'Flash', perfect: 'Jour parfait', streak3: 'Trois d’affilée', streak7: 'Semaine complète', streak30: 'Un mois entier',
       level5: 'Niveau 5', level10: 'Niveau 10', dawn: 'Aube', night: 'Oiseau de nuit', variety: 'Polyvalent', comeback: 'Retour en force', sharer: 'Ambassadeur',
       twohundred: 'Deux cents', thousand: 'Mille', streak14: 'Deux semaines', streak100: 'Cent jours', level20: 'Niveau 20',
       early50: 'Cinquante rapides', recovered: 'Mieux vaut tard', oneoff: 'Spontané', weekend: 'Week-end', nosnooze: 'Sans report',
