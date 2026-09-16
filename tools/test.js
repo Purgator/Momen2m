@@ -508,7 +508,7 @@ globalThis.window = globalThis;
     assert.deepStrictEqual([per[0].done, per[0].missed, per[0].total], [1, 1, 2]);
   });
 
-  await test('late completion: penalty lifted for a quarter of the points, within a day only', () => {
+  await test('late completion: the miss stays, a quarter of the points comes back, within a day only', () => {
     const h = habit('late1', '08:00', '09:00', { importance: 2 });
     S.state.habits = [h];
     S.state.days = {};
@@ -520,12 +520,32 @@ globalThis.window = globalThis;
     assert.ok(E.canCompleteLate(o, D(0, '20:00')));
     assert.ok(!E.canCompleteLate(o, D(2, '09:00')), 'too old after 24 h');
     const r = E.completeLate(o, D(0, '20:00'));
-    assert.strictEqual(r.pts, 25, '-20 lifted plus +5 (a quarter of 20)');
-    assert.strictEqual(S.state.game.xp, 105);
+    assert.strictEqual(r.pts, 5, 'only a quarter of 20 comes back');
+    assert.strictEqual(S.state.game.xp, 85, 'the -20 miss is kept');
     o = E.buildOccurrences(D(0, '20:00')).find((x) => x.habit.id === 'late1');
-    assert.strictEqual(o.status, 'done'); assert.ok(o.late); assert.strictEqual(o.pts, 5);
+    assert.strictEqual(o.status, 'done'); assert.ok(o.late); assert.strictEqual(o.pts, -15);
     assert.deepStrictEqual([S.state.game.done, S.state.game.missed, S.state.game.recovered], [1, 0, 1]);
     assert.strictEqual(E.completeLate(o, D(0, '21:00')), null, 'not twice');
+  });
+
+  await test('boost: +50% on every gain for 12 h, then back to normal', () => {
+    const h = habit('boost1', '08:00', '09:00', { importance: 2 });
+    S.state.habits = [h];
+    S.state.days = {};
+    S.state.game.xp = 100; S.state.game.boostUntil = 0;
+    assert.ok(!E.boostActive(D(0, '08:00')));
+    const until = E.grantBoost(D(0, '07:00'));
+    assert.strictEqual(until, D(0, '19:00'), '12 hours');
+    assert.ok(E.boostActive(D(0, '18:59')) && !E.boostActive(D(0, '19:00')));
+    let o = E.buildOccurrences(D(0, '08:10')).find((x) => x.habit.id === 'boost1');
+    const r = E.complete(o, D(0, '08:10'));
+    assert.deepStrictEqual([r.pts, r.early, r.boost], [45, true, true], '(20 + 10 early) × 1.5');
+    assert.strictEqual(S.state.game.xp, 145);
+    assert.strictEqual(E.latePts(o, D(0, '10:00')), 8, 'a late quarter (5) is boosted too');
+    assert.strictEqual(E.latePts(o, D(1, '10:00')), 5, 'boost over the next day');
+    S.state.days = {};
+    o = E.buildOccurrences(D(1, '08:10')).find((x) => x.habit.id === 'boost1');
+    assert.deepStrictEqual(E.complete(o, D(1, '08:10')).pts, 30, 'normal again the next day');
   });
 
   await test('timing advice: only with enough tight data; earlier when done before the window', async () => {
