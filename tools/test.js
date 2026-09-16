@@ -491,5 +491,22 @@ globalThis.window = globalThis;
     assert.strictEqual(SU.reviewStatus({ slots }, true, [{ start: '07:00', end: '08:00' }]), 'changed');
   });
 
+  await test('moment identity: duplicates refused per kind, stats merge repeating + one-time', async () => {
+    const G = await import(url('game.js'));
+    const now = D(0, '12:00');
+    const rec = habit('r1', '08:00', '09:00', { name: 'Read', emoji: '📚' });
+    const oneOff = habit('o1', '20:00', '21:00', { name: 'read ', emoji: '📚', days: [], once: today });
+    S.state.habits = [rec, oneOff];
+    assert.strictEqual(G.momentKey(rec), G.momentKey(oneOff), 'case and spacing do not matter');
+    assert.strictEqual(G.nameConflict({ id: 'x', name: 'Read', emoji: '📚', once: null }), rec, 'a second repeating Read is a duplicate');
+    assert.strictEqual(G.nameConflict({ id: 'x', name: 'Read', emoji: '📚', once: today }), oneOff, 'a second one-time Read is a duplicate');
+    assert.strictEqual(G.nameConflict({ id: 'x', name: 'Read', emoji: '📖', once: null }), null, 'a different emoji is a different moment');
+    assert.strictEqual(G.nameConflict({ ...rec }), null, 'a moment does not conflict with itself');
+    S.state.days = { [today]: { 'r1#0': { status: 'done', pts: 20 }, 'o1#0': { status: 'missed', pts: -20 } } };
+    const per = G.computeStats(now).perHabit;
+    assert.strictEqual(per.length, 1, 'repeating and one-time "Read" are one line in the statistics');
+    assert.deepStrictEqual([per[0].done, per[0].missed, per[0].total], [1, 1, 2]);
+  });
+
   console.log(`\n${passed} tests passed`);
 })().catch((e) => { console.error(e); process.exit(1); });

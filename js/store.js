@@ -31,6 +31,7 @@ function defaults() {
       backupSingleFile: true, // overwrite momen2m-backup.json; false = a new dated file per backup
     },
     habits: [],
+    templates: [],          // premade one-time moments: {id, name, emoji, minutes, importance}
     days: {},               // dayKey -> occKey -> record
     game: {
       xp: 0, streak: 0, bestStreak: 0, lastEvaluated: null, done: 0, missed: 0,
