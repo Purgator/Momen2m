@@ -33,11 +33,26 @@ const habitIdOf = (occKey) => occKey.slice(0, occKey.lastIndexOf('#'));
 // Everything the Progress tab and the badges need, in one pass over the last
 // HISTORY_DAYS days of records. `todayOccs` are the engine's occurrences for
 // today (already built by the controller), used for "N left today".
+// Identity of a moment for people, not for the engine: same emoji and name
+// (any language, any case) means the same thing, whether it repeats or was a
+// one-off. Statistics merge on it; creation refuses a duplicate of its own kind.
+export function momentKey(h) {
+  const name = typeof h.name === 'object' ? (h.name.en || Object.values(h.name)[0] || '') : h.name;
+  return (h.emoji || '').trim() + ' ' + String(name).trim().toLowerCase();
+}
+
+// Another moment with the same key and the same kind (repeating vs one-time).
+// A repeating "Read" and a one-time "Read" may coexist.
+export function nameConflict(h, list = state.habits) {
+  const key = momentKey(h), once = !!h.once;
+  return list.find((x) => x.id !== h.id && !!x.once === once && momentKey(x) === key) || null;
+}
+
 export function computeStats(now, todayOccs = []) {
   const today = dayKey(new Date(now));
   const g = state.game;
   const habits = new Map(state.habits.map((h) => [h.id, h]));
-  const perHabit = new Map();
+  const perHabit = new Map(); // keyed by momentKey: a recurring and a one-time "Read" count as one
   const history = [];
   let done = 0, missed = 0, skipped = 0, early = 0, snoozes = 0, dawn = 0, night = 0;
   const distinct = new Set();
@@ -62,9 +77,10 @@ export function computeStats(now, todayOccs = []) {
         const hid = habitIdOf(key);
         const h = habits.get(hid);
         if (h) {
-          const p = perHabit.get(hid) || { habit: h, done: 0, missed: 0, skipped: 0 };
+          const mk = momentKey(h);
+          const p = perHabit.get(mk) || { habit: h, done: 0, missed: 0, skipped: 0 };
           p[r.status]++;
-          perHabit.set(hid, p);
+          perHabit.set(mk, p);
         }
       }
     }
