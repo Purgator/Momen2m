@@ -28,6 +28,7 @@ function defaults() {
       snoozeMinutes: 10,
       maxSnoozes: 2,
       updateSummaries: true, // show a "what's new" popup right after the app updates
+      backupSingleFile: true, // overwrite momen2m-backup.json; false = a new dated file per backup
     },
     habits: [],
     days: {},               // dayKey -> occKey -> record

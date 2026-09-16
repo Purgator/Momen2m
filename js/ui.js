@@ -468,6 +468,7 @@ export function renderSetup(opts) {
           : `<button class="btn" data-action="import">${t('importData')}</button>`}
         <button class="btn danger" data-action="reset">${t('resetData')}</button>
       </div>
+      <label class="dontshow"><input type="checkbox" data-setting="backupSingleFile" ${s.backupSingleFile ? 'checked' : ''}>${t('backupSingleFile')}</label>
       ${opts.canAutoImport ? `<p class="hint" style="margin:10px 0 0">${t('findBackupHint')}
         <button class="link" style="padding:0" data-action="import">${t('chooseFileManually')}</button></p>` : ''}
       <input type="file" accept="application/json,.json" id="importFile" hidden>
@@ -582,6 +583,7 @@ export function renderOnboarding(step, data) {
     }
     body = `<h1>${t('obBackupTitle')}</h1><p>${t('obBackupText')}</p>${summary}
       <button class="btn primary big wide" data-action="export" style="margin-top:20px">💾 ${t('backupNow')}</button>
+      <label class="dontshow"><input type="checkbox" data-setting="backupSingleFile" ${state.settings.backupSingleFile ? 'checked' : ''}>${t('backupSingleFile')}</label>
       <p class="note">${t('obBackupNote')}</p>`;
     foot = `<button class="btn ghost big" data-action="ob-back">${t('obBack')}</button><button class="btn ok big" data-action="ob-start">${t('obStart')}</button>`;
   }
