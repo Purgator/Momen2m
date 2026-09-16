@@ -76,6 +76,13 @@ function applyXp(delta) {
   state.game.xp = Math.max(0, state.game.xp + delta);
 }
 
+// A 12 h "+50 % points" boost, granted after a rough patch (see app.js).
+export const BOOST_MS = 12 * 60 * 60 * 1000;
+export const BOOST_MULT = 1.5;
+export function boostActive(now) { return (state.game.boostUntil || 0) > now; }
+export function grantBoost(now) { state.game.boostUntil = now + BOOST_MS; save(); return state.game.boostUntil; }
+function boosted(pts, now) { return boostActive(now) ? Math.round(pts * BOOST_MULT) : pts; }
+
 function markMisses(day, now, hooks) {
   let changed = false;
   for (const o of occurrencesOfDay(day)) {
@@ -159,7 +166,8 @@ export function complete(o, now) {
   if (rec.status !== 'open') return null;
   const base = BASE_PTS[o.habit.importance] || 20;
   const early = now <= o.start + (o.originalEnd - o.start) / 2;
-  const pts = base + (early ? Math.round(base / 2) : 0);
+  const boost = boostActive(now);
+  const pts = boosted(base + (early ? Math.round(base / 2) : 0), now);
   rec.status = 'done';
   rec.pts = (rec.pts || 0) + pts;
   rec.at = now;
@@ -170,7 +178,7 @@ export function complete(o, now) {
   if (o.habit.once) state.game.onceDone = (state.game.onceDone || 0) + 1;
   const perfect = dayComplete(o.day) === true;
   save();
-  return { pts, early, perfect };
+  return { pts, early, perfect, boost };
 }
 
 export const LATE_WINDOW = 24 * 60 * 60 * 1000;
@@ -179,20 +187,18 @@ export function canCompleteLate(o, now) {
   return o.status === 'missed' && now - o.end <= LATE_WINDOW;
 }
 
-// A missed moment done within a day still counts: the penalty is lifted and
-// a quarter of the base points is earned, so it ends slightly positive
-// instead of at -base. Snooze penalties stay.
+// A missed moment done within a day still counts as done, but stays a
+// penalty: the miss (-base) is kept and only a quarter of the base points
+// is given back on top (boosted like any gain).
+export function latePts(o, now) { return boosted(Math.round((BASE_PTS[o.habit.importance] || 20) / 4), now); }
 export function completeLate(o, now) {
   const rec = record(o.day, o.occ, false);
   if (!rec || !canCompleteLate({ ...o, status: rec.status }, now)) return null;
-  const base = BASE_PTS[o.habit.importance] || 20;
-  const snoozePts = -rec.snoozes * SNOOZE_PENALTY;
-  const target = snoozePts + Math.round(base / 4);
-  const delta = target - (rec.pts || 0);
+  const delta = latePts(o, now);
   rec.status = 'done';
   rec.late = true;
   rec.early = false;
-  rec.pts = target;
+  rec.pts = (rec.pts || 0) + delta;
   rec.at = now;
   applyXp(delta);
   state.game.done++;
