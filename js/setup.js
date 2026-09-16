@@ -86,6 +86,16 @@ export function slotsFor(id, a) {
   }
 }
 
+// What validating the setup would do to one preset, for the review step of a
+// re-run: 'new' (added), 'changed' (kept, times move), 'same' (kept as is),
+// 'removed' (there today, not picked), or null (neither there nor picked).
+export function reviewStatus(existing, picked, slots) {
+  if (!existing) return picked ? 'new' : null;
+  if (!picked) return 'removed';
+  const key = (s) => s.map((x) => x.start + '-' + x.end).join(',');
+  return key(existing.slots) === key(slots) ? 'same' : 'changed';
+}
+
 // Every preset with its slots for these answers; `proposed` marks the ones the
 // answers call for (wake and bed are always in, they were just typed in).
 export function proposeMoments(a) {

@@ -9,7 +9,7 @@ import * as E from './engine.js';
 import * as N from './notify.js';
 import * as U from './ui.js';
 import { initUpdates, applyUpdate, checkForUpdate } from './update.js';
-import { CHANGELOG } from './changelog.js';
+import { versionsSince } from './changelog.js';
 import { defaultAnswers, proposeMoments, QUESTIONS, clampCount } from './setup.js';
 import { dayKey, addDays, at, nowHM, minutesToHM, parseHM, fmtDuration, fmtClock, fmtDateTime, fileStamp } from './time.js';
 import * as AutoImport from './autobackup.js';
@@ -77,6 +77,7 @@ function render(now = Date.now()) {
   if (view === 'ob') {
     app.innerHTML = U.renderOnboarding(ob.step, {
       a: ob.a, proposals: ob.proposals, selected: ob.selected,
+      again: state.onboarded, existing: new Map(state.habits.filter((h) => h.preset).map((h) => [h.preset, h])),
       isIosBrowser, canInstall: !!installPrompt, standalone, canAutoImport: AutoImport.supported,
     });
   } else if (view === 'setup') {
@@ -178,8 +179,8 @@ function finishSetup() {
   // The answers define the preset moments: kept ones keep their id (so their
   // history and points), unpicked ones go, the user's own moments are untouched.
   // On a re-run the previous setup is recoverable from Setup > Data.
+  if (state.onboarded && !ob.snapshotted) { snapshotRecovery('setup'); ob.snapshotted = true; }
   const dropping = state.habits.some((h) => h.preset && !ob.selected.has(h.preset));
-  if (dropping && state.onboarded && !ob.snapshotted) { snapshotRecovery('setup'); ob.snapshotted = true; }
   if (dropping) { state.habits = state.habits.filter((h) => !h.preset || ob.selected.has(h.preset)); touchHabits(); }
   for (const x of ob.proposals) {
     if (!ob.selected.has(x.preset.id)) continue;
@@ -194,8 +195,7 @@ function obAdvance() {
     ob.proposals = proposeMoments(ob.a);
     ob.selected = new Set(ob.proposals.filter((x) => x.proposed).map((x) => x.preset.id));
   }
-  // Create the habits before the backup step, so "Back up now" has something to save.
-  if (ob.step === 4) finishSetup();
+  // Nothing is applied until the last page validates it (Start, or Back up now).
   ob.step = Math.min(OB_LAST, ob.step + 1); render(); scrollTo(0, 0);
 }
 
@@ -550,7 +550,11 @@ app.addEventListener('click', async (e) => {
     case 'push-sync': Push.sync(true).then((ok) => { U.toast(ok ? t('pushSyncedNow') : t('pushFailed'), ok ? 'good' : 'bad'); render(); }); break;
     case 'test-sound': N.testSound(); break;
     case 'test-vibration': N.testVibration(); break;
-    case 'export': exportData(); break;
+    case 'export':
+      // On the setup's last page, backing up validates the setup first, so the file holds it.
+      if (view === 'ob') finishSetup();
+      exportData();
+      break;
     case 'import': U.$('#importFile').click(); break;
     case 'import-auto': runAutoImport(); break;
     case 'change-folder': changeBackupFolder(); break;
@@ -609,7 +613,7 @@ app.addEventListener('click', async (e) => {
     case 'ob-preset': {
       const id = btn.dataset.preset;
       if (ob.selected.has(id)) ob.selected.delete(id); else ob.selected.add(id);
-      btn.classList.toggle('on', ob.selected.has(id));
+      if (state.onboarded) render(); else btn.classList.toggle('on', ob.selected.has(id));
       break;
     }
     case 'ob-work': ob.a.work = btn.dataset.v === 'yes'; render(); break;
@@ -648,6 +652,7 @@ app.addEventListener('change', (e) => {
   if (el.dataset.ob) { ob.a[el.dataset.ob] = el.value; return; }
   if (el.dataset.obPick) {
     if (el.checked) ob.selected.add(el.dataset.obPick); else ob.selected.delete(el.dataset.obPick);
+    if (state.onboarded) render(); // re-run: the row's colour says what the switch now means
     return;
   }
   if (el.id === 'importFile') {
@@ -728,9 +733,12 @@ if (view === 'live') startTicker(); else render();
 // worker applied an update, in the background or via "Update now", and
 // reloaded): say so once, then forget the old version.
 if (state.lastSeenVersion && state.lastSeenVersion !== VERSION) {
-  const note = (CHANGELOG[getLang()] || CHANGELOG.en)[VERSION] || CHANGELOG.en[VERSION];
-  if (state.settings.updateSummaries) setTimeout(() => U.openUpdateSheet(VERSION, note), 300);
-  else U.toast(t('updatedTo', { v: VERSION }), 'good');
+  if (state.settings.updateSummaries) {
+    const notes = versionsSince(state.lastSeenVersion, VERSION, getLang());
+    setTimeout(() => U.openUpdateSheet(VERSION, notes, (dontShow) => {
+      if (dontShow) { state.settings.updateSummaries = false; save(); if (view === 'setup') render(); }
+    }), 300);
+  } else U.toast(t('updatedTo', { v: VERSION }), 'good');
 }
 state.lastSeenVersion = VERSION;
 save();
