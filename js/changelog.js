@@ -3,6 +3,10 @@
 // exhaustive (the detailed notes live on the GitHub release). Both languages.
 export const CHANGELOG = {
   en: {
+    '1.14.0': [
+      '✏️ Premade moments can now be edited or created straight from Setup, not only saved from quick-add.',
+      '➕💾 The Add button shows a save icon too when "Save as premade" is ticked, making clear it does both.',
+    ],
     '1.13.0': [
       '⭐ Save a one-time moment as premade and add it again in one tap; manage them in Setup.',
       '🔒 Two moments can no longer share the same emoji and name — except a repeating one and a one-time one, which now count as one in Progress.',
@@ -25,6 +29,10 @@ export const CHANGELOG = {
     '1.8.1': ['🔔 More reliable background reminders.'],
   },
   fr: {
+    '1.14.0': [
+      '✏️ Les moments prédéfinis peuvent maintenant être modifiés ou créés depuis Réglages, pas seulement enregistrés depuis l’ajout rapide.',
+      '➕💾 Le bouton Ajouter montre aussi une icône d’enregistrement quand « Enregistrer comme prédéfini » est cochée.',
+    ],
     '1.13.0': [
       '⭐ Enregistre un moment ponctuel comme prédéfini et rajoute-le en un geste ; gère-les dans Réglages.',
       '🔒 Deux moments ne peuvent plus partager le même emoji et nom — sauf un récurrent et un ponctuel, désormais comptés ensemble dans Progrès.',

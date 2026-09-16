@@ -452,9 +452,13 @@ export function renderSetup(opts) {
     <div class="section">
       <h2>${t('templates')}</h2>
       <p class="hint" style="margin:0 0 10px">${t('templatesHint')}</p>
-      ${state.templates.length ? `<div class="card">${state.templates.map((x) => `<div class="toggle"><div><div class="t">${esc(x.emoji)} ${esc(x.name)}</div><div class="s">${fmtDuration(x.minutes * 60000, getLang())} · ${[null, t('impLow'), t('impNormal'), t('impHigh')][x.importance]}</div></div>
-        <button class="iconbtn" data-action="tpl-del" data-id="${esc(x.id)}" aria-label="${t('delete')}">✕</button></div>`).join('')}</div>`
+      ${state.templates.length ? `<div class="list">${state.templates.map((x) => `<div class="item" data-action="tpl-edit" data-id="${esc(x.id)}">
+        <div class="emo">${esc(x.emoji)}</div>
+        <div><div class="name">${esc(x.name)}</div><div class="sub">${fmtDuration(x.minutes * 60000, getLang())} · ${[null, t('impLow'), t('impNormal'), t('impHigh')][x.importance]}</div></div>
+        <button class="iconbtn" data-stop data-action="tpl-del" data-id="${esc(x.id)}" aria-label="${t('delete')}">✕</button>
+      </div>`).join('')}</div>`
         : `<p class="hint">${t('templatesEmpty')}</p>`}
+      <div class="toggle"><button class="link" data-action="tpl-add">➕ ${t('templateAdd')}</button></div>
     </div>
 
     <div class="section">
@@ -804,7 +808,7 @@ export function openQuickSheet(onAdd, { templates = [], onSaveTemplate } = {}) {
     <div class="field"><label>${t('importance')}</label>
       <div class="seg" data-imp>${[1, 2, 3].map((i) => `<button data-imp="${i}" class="${importance === i ? 'on' : ''}">${[null, t('impLow'), t('impNormal'), t('impHigh')][i]}</button>`).join('')}</div></div>
     ${onSaveTemplate ? `<label class="dontshow"><input type="checkbox" data-f="template">${t('saveAsTemplate')}</label>` : ''}
-    <div class="btnrow"><button class="btn ghost" data-cancel>${t('cancel')}</button><button class="btn" data-save-tpl hidden>${t('save')}</button><button class="btn primary" data-save>${t('quickAdd')}</button></div>`);
+    <div class="btnrow"><button class="btn ghost" data-cancel>✖️ ${t('cancel')}</button><button class="btn" data-save-tpl hidden>💾 ${t('save')}</button><button class="btn primary" data-save><span data-add-icon>➕</span> ${t('quickAdd')}</button></div>`);
   const nameIn = $('[data-f="name"]', el), emojiIn = $('[data-f="emoji"]', el);
   let autoEmoji = true;
   nameIn.addEventListener('input', () => { if (autoEmoji) emojiIn.value = suggestEmoji(nameIn.value); });
@@ -855,7 +859,9 @@ export function openQuickSheet(onAdd, { templates = [], onSaveTemplate } = {}) {
     $$('button', e.currentTarget).forEach((x) => x.classList.toggle('on', x === b));
   });
   const tplBox = $('[data-f="template"]', el), tplBtn = $('[data-save-tpl]', el);
-  if (tplBox) tplBox.addEventListener('change', () => { tplBtn.hidden = !tplBox.checked; });
+  const addIcon = $('[data-add-icon]', el);
+  // Checked: Add also saves a premade, so its icon says both at a glance.
+  if (tplBox) tplBox.addEventListener('change', () => { tplBtn.hidden = !tplBox.checked; addIcon.textContent = tplBox.checked ? '💾➕' : '➕'; });
   const tplChips = $('[data-templates]', el);
   if (tplChips) tplChips.addEventListener('click', (e) => {
     const c = e.target.closest('[data-tpl]'); if (!c) return;
@@ -883,6 +889,52 @@ export function openQuickSheet(onAdd, { templates = [], onSaveTemplate } = {}) {
   $('[data-save]', el).addEventListener('click', submit);
   tplBtn.addEventListener('click', () => { const d = read(); if (!d) return; if (onSaveTemplate(d) === false) return; closeSheet(); });
   nameIn.addEventListener('keydown', (e) => { if (e.key === 'Enter') submit(); });
+  setTimeout(() => nameIn.focus(), 300);
+}
+
+// Create or edit a premade one-time moment, from Setup. `tpl` is null for a new
+// one. onSave may return false (name+emoji clash with another premade) to
+// keep editing; onDelete is only wired when editing an existing one.
+export function openTemplateSheet(tpl, onSave, onDelete) {
+  const x = tpl || { name: '', emoji: '⭐', minutes: 30, importance: 2 };
+  const lang = getLang();
+  let minutes = x.minutes, importance = x.importance;
+  const el = openSheet(`
+    <h2>⭐ ${t('templates')}</h2>
+    <div class="field"><label>${t('quickTaskName')}</label>
+      <div class="row"><input class="input emoji-in" data-f="emoji" value="${esc(x.emoji)}" maxlength="4" aria-label="${t('emoji')}">
+      <input class="input" data-f="name" value="${esc(x.name)}" placeholder="${t('namePlaceholder')}" autocomplete="off" enterkeyhint="done"></div></div>
+    <div class="field"><label>${t('quickTaskDuration')}</label>
+      <div class="chips" data-dur>${[10, 15, 30, 45, 60, 120].map((m) => `<button class="chip ${m === minutes ? 'on' : ''}" data-min="${m}">${fmtDuration(m * 60000, lang)}</button>`).join('')}</div></div>
+    <div class="field"><label>${t('importance')}</label>
+      <div class="seg" data-imp>${[1, 2, 3].map((i) => `<button data-imp="${i}" class="${importance === i ? 'on' : ''}">${[null, t('impLow'), t('impNormal'), t('impHigh')][i]}</button>`).join('')}</div></div>
+    <div class="btnrow">
+      ${tpl ? `<button class="btn danger" data-del>🗑️ ${t('delete')}</button>` : `<button class="btn ghost" data-cancel>✖️ ${t('cancel')}</button>`}
+      <button class="btn primary" data-save>💾 ${t('save')}</button>
+    </div>`);
+  const nameIn = $('[data-f="name"]', el), emojiIn = $('[data-f="emoji"]', el);
+  let autoEmoji = !x.name;
+  nameIn.addEventListener('input', () => { if (autoEmoji) emojiIn.value = suggestEmoji(nameIn.value); });
+  emojiIn.addEventListener('input', () => { autoEmoji = !emojiIn.value.trim(); });
+  $('[data-dur]', el).addEventListener('click', (e) => {
+    const c = e.target.closest('[data-min]'); if (!c) return;
+    minutes = Number(c.dataset.min);
+    $$('.chip', e.currentTarget).forEach((y) => y.classList.toggle('on', y === c));
+  });
+  $('[data-imp]', el).addEventListener('click', (e) => {
+    const b = e.target.closest('[data-imp]'); if (!b) return;
+    importance = Number(b.dataset.imp);
+    $$('button', e.currentTarget).forEach((y) => y.classList.toggle('on', y === b));
+  });
+  const cancel = $('[data-cancel]', el); if (cancel) cancel.addEventListener('click', closeSheet);
+  $('[data-save]', el).addEventListener('click', () => {
+    const name = nameIn.value.trim();
+    if (!name) { nameIn.classList.add('shake'); setTimeout(() => nameIn.classList.remove('shake'), 500); return; }
+    if (onSave({ name, emoji: emojiIn.value.trim() || suggestEmoji(name), minutes, importance }) === false) return;
+    closeSheet();
+  });
+  const del = $('[data-del]', el); if (del) del.addEventListener('click', () => { closeSheet(); onDelete(); });
+  nameIn.addEventListener('keydown', (e) => { if (e.key === 'Enter') $('[data-save]', el).click(); });
   setTimeout(() => nameIn.focus(), 300);
 }
 
