@@ -475,6 +475,36 @@ async function changeBackupFolder() {
   }
 }
 
+// Moves the badge grid by `delta` pages, clamped to the badge count, and
+// re-renders. Shared by the ‹/› buttons and the swipe gesture below.
+function changeBadgePage(delta) {
+  const pages = Math.ceil(G.BADGES.length / G.BADGE_PAGE);
+  const next = Math.max(0, Math.min(pages - 1, badgePage + delta));
+  if (next === badgePage) return;
+  badgePage = next;
+  N.feedback('tap');
+  render();
+}
+
+// ---- swipe (badges grid) -----------------------------------------------------------
+// A left/right swipe on the badge grid pages it, same as the ‹/› buttons.
+let swipeStart = null;
+app.addEventListener('touchstart', (e) => {
+  const grid = e.target.closest('.badges');
+  if (!grid || e.touches.length !== 1) { swipeStart = null; return; }
+  const touch = e.touches[0];
+  swipeStart = { x: touch.clientX, y: touch.clientY };
+}, { passive: true });
+app.addEventListener('touchend', (e) => {
+  if (!swipeStart) return;
+  const touch = e.changedTouches[0];
+  const dx = touch.clientX - swipeStart.x;
+  const dy = touch.clientY - swipeStart.y;
+  swipeStart = null;
+  if (Math.abs(dx) < 40 || Math.abs(dx) < Math.abs(dy) * 1.5) return; // not a clean horizontal swipe
+  changeBadgePage(dx < 0 ? 1 : -1);
+}, { passive: true });
+
 // ---- events (delegated) ------------------------------------------------------------
 app.addEventListener('click', async (e) => {
   if (e.target.closest('[data-stop]')) return; // switches inside tappable rows
@@ -542,8 +572,7 @@ app.addEventListener('click', async (e) => {
       break;
     }
     case 'badge-page': {
-      badgePage += Number(btn.dataset.d);
-      render();
+      changeBadgePage(Number(btn.dataset.d));
       break;
     }
     case 'upcoming-detail': {
