@@ -475,5 +475,21 @@ globalThis.window = globalThis;
     assert.strictEqual(SU.clampCount(SU.QUESTIONS[0], 0), 1);
   });
 
+  await test('update notes: every skipped version, newest first; re-setup review statuses', async () => {
+    const C = await import(url('changelog.js'));
+    const SU = await import(url('setup.js'));
+    assert.deepStrictEqual(C.versionsSince('1.8.3', '1.9.0', 'en').map((x) => x.v), ['1.9.0', '1.8.4'], 'skipped versions are listed, the old one is not');
+    assert.deepStrictEqual(C.versionsSince('1.8.4', '1.9.0', 'fr').map((x) => x.v), ['1.9.0']);
+    assert.ok(C.versionsSince('1.8.4', '1.9.0', 'fr')[0].lines[0].startsWith('🔄'), 'lines come in the asked language');
+    assert.deepStrictEqual(C.versionsSince('1.9.0', '9.9.9', 'en')[0], { v: '9.9.9', lines: [] }, 'an unknown release is still listed');
+    assert.ok(C.compareVersions('1.10.0', '1.9.0') > 0, 'semver compare, not string compare');
+    const slots = [{ start: '08:00', end: '09:00' }];
+    assert.strictEqual(SU.reviewStatus(null, true, slots), 'new');
+    assert.strictEqual(SU.reviewStatus(null, false, slots), null);
+    assert.strictEqual(SU.reviewStatus({ slots }, false, slots), 'removed');
+    assert.strictEqual(SU.reviewStatus({ slots }, true, slots), 'same');
+    assert.strictEqual(SU.reviewStatus({ slots }, true, [{ start: '07:00', end: '08:00' }]), 'changed');
+  });
+
   console.log(`\n${passed} tests passed`);
 })().catch((e) => { console.error(e); process.exit(1); });

@@ -286,6 +286,31 @@ input[type="time"] { font-variant-numeric: tabular-nums; }
 .stepper { display: flex; align-items: center; gap: 10px; padding: 0 0 12px 32px; color: var(--muted); font-size: 14px; font-weight: 600; }
 .stepper button { width: 36px; height: 36px; border-radius: 50%; border: 1px solid var(--line); background: var(--card2); color: var(--text); font-size: 18px; font-weight: 700; cursor: pointer; }
 .stepper b { min-width: 22px; text-align: center; color: var(--text); font-size: 17px; }
+/* Re-setup review: what validating would do to each moment. */
+.toggle.st { padding-left: 12px; border-left: 3px solid transparent; margin-left: -14px; }
+.toggle.st-new { border-left-color: var(--ok); }
+.toggle.st-changed { border-left-color: #f5a524; }
+.toggle.st-removed { border-left-color: var(--danger); }
+.toggle.st-removed .t { text-decoration: line-through; opacity: .7; }
+.tag { display: inline-block; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; padding: 1px 7px; border-radius: 8px; margin-left: 6px; vertical-align: 1px; color: #fff; }
+.tag.new { background: var(--ok); color: #05261a; }
+.tag.changed { background: #f5a524; color: #2b1a00; }
+.tag.removed { background: var(--danger); }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 14px; margin-top: 10px; font-size: 13px; color: var(--muted); }
+.legend span::before { content: ""; display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 6px; vertical-align: -1px; }
+.legend .new::before { background: var(--ok); }
+.legend .changed::before { background: #f5a524; }
+.legend .removed::before { background: var(--danger); }
+.chip.st-new { border-color: var(--ok); }
+/* Update note: shorter than a normal sheet so the app stays visible behind it. */
+.sheet.update { max-height: 78vh; max-height: 78dvh; display: flex; flex-direction: column; }
+.sheet.update .notes { overflow-y: auto; min-height: 0; flex: 1; margin: 6px -4px 0; padding: 0 4px; }
+.sheet.update .notes h3 { font-size: 14px; color: var(--muted); margin: 14px 0 4px; }
+.sheet.update .notes h3:first-child { margin-top: 4px; }
+.sheet.update .notes ul { list-style: none; padding: 0; margin: 0; }
+.sheet.update .notes li { padding: 5px 0; font-size: 15px; line-height: 1.35; }
+.dontshow { display: flex; align-items: center; gap: 10px; margin-top: 12px; font-size: 14px; color: var(--muted); }
+.dontshow input { width: 18px; height: 18px; accent-color: var(--accent); margin: 0; }
 .note { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 12px 14px; font-size: 14px; color: var(--muted); margin-top: 14px; }
 
 /* ---- toasts -------------------------------------------------------------- */
