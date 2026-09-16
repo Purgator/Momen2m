@@ -3,7 +3,7 @@
 import { t, pick, getLang } from './i18n.js';
 import { state, save } from './store.js';
 import { PRESETS } from './presets.js';
-import { QUESTIONS, isTriggered } from './setup.js';
+import { QUESTIONS, isTriggered, reviewStatus } from './setup.js';
 import { suggestEmoji } from './emoji.js';
 import { BASE_PTS, SNOOZE_PENALTY, canSnooze, currentOf, todayPoints } from './engine.js';
 import { levelInfo, rankLadder, BADGES, badgeProgress, tips as gameTips } from './game.js';
@@ -543,14 +543,25 @@ export function renderOnboarding(step, data) {
       }).join('')}</div>
       ${skip}`;
   } else if (step === 3) {
-    const proposed = data.proposals.filter((x) => x.proposed);
-    const rest = data.proposals.filter((x) => !x.proposed);
-    const rows = proposed.map((x) => `<div class="toggle"><div><div class="t">${x.preset.emoji} ${esc(pick(x.preset.name))}</div><div class="s">${x.slots.map((s) => s.start).join(' · ')}</div></div>
-      <label class="switch"><input type="checkbox" data-ob-pick="${x.preset.id}" ${data.selected.has(x.preset.id) ? 'checked' : ''}><span></span></label></div>`).join('');
-    body = `<h1>${t('obReviewTitle')}</h1><p>${data.selected.size ? t('obReviewText') : t('obReviewEmpty')}</p>
+    // On a re-run, moments the user already has are listed too (unticked when
+    // the answers no longer call for them) and every row says what validating
+    // would do to it.
+    const again = data.again, ex = data.existing;
+    const st = (x) => (again ? reviewStatus(ex.get(x.preset.id), data.selected.has(x.preset.id), x.slots) : null);
+    const label = { new: t('obStNew'), changed: t('obStChanged'), removed: t('obStRemoved'), same: t('obStSame') };
+    const tip = { new: t('obTipNew'), changed: t('obTipChanged'), removed: t('obTipRemoved'), same: t('obTipSame') };
+    const listed = data.proposals.filter((x) => x.proposed || (again && ex.has(x.preset.id)));
+    const rest = data.proposals.filter((x) => !listed.includes(x));
+    const rows = listed.map((x) => {
+      const s = st(x);
+      return `<div class="toggle ${s ? 'st st-' + s : ''}" ${s ? `title="${esc(tip[s])}"` : ''}><div><div class="t">${x.preset.emoji} ${esc(pick(x.preset.name))}${s && s !== 'same' ? `<span class="tag ${s}">${label[s]}</span>` : ''}</div><div class="s">${x.slots.map((sl) => sl.start).join(' · ')}</div></div>
+      <label class="switch"><input type="checkbox" data-ob-pick="${x.preset.id}" ${data.selected.has(x.preset.id) ? 'checked' : ''}><span></span></label></div>`;
+    }).join('');
+    const legend = again ? `<div class="legend"><span class="new">${t('obStNew')}</span><span class="changed">${t('obStChanged')}</span><span class="removed">${t('obStRemoved')}</span></div>` : '';
+    body = `<h1>${t('obReviewTitle')}</h1><p>${again ? t('obReviewAgainText') : data.selected.size ? t('obReviewText') : t('obReviewEmpty')}</p>${legend}
       ${rows ? `<div class="card">${rows}</div>` : ''}
       <p class="hint" style="margin:18px 0 0">${t('obMore')}</p>
-      <div class="chips" style="margin-top:8px">${rest.map((x) => `<button class="chip ${data.selected.has(x.preset.id) ? 'on' : ''}" data-action="ob-preset" data-preset="${x.preset.id}" title="${x.slots.map((s) => s.start).join(' · ')}">${x.preset.emoji} ${esc(pick(x.preset.name))}</button>`).join('')}</div>
+      <div class="chips" style="margin-top:8px">${rest.map((x) => { const s = st(x); return `<button class="chip ${data.selected.has(x.preset.id) ? 'on' : ''} ${s ? 'st-' + s : ''}" data-action="ob-preset" data-preset="${x.preset.id}" title="${s ? esc(tip[s]) + ' ' : ''}${x.slots.map((sl) => sl.start).join(' · ')}">${x.preset.emoji} ${esc(pick(x.preset.name))}</button>`; }).join('')}</div>
       ${skip}`;
   } else if (step === 4) {
     const perm = permission();
@@ -563,7 +574,13 @@ export function renderOnboarding(step, data) {
       ${!data.isIosBrowser && !data.canInstall && !data.standalone ? `<p class="note">${t('obInstallHint')}</p>` : ''}`;
     foot = `<button class="btn ghost big" data-action="ob-back">${t('obBack')}</button><button class="btn primary big" data-action="ob-next">${t('obNext')}</button>`;
   } else {
-    body = `<h1>${t('obBackupTitle')}</h1><p>${t('obBackupText')}</p>
+    let summary = '';
+    if (data.again) {
+      const c = { new: 0, changed: 0, removed: 0 };
+      for (const x of data.proposals) { const s = reviewStatus(data.existing.get(x.preset.id), data.selected.has(x.preset.id), x.slots); if (s in c) c[s]++; }
+      summary = `<p class="note"><b>${t('obApplySummary', { n: c.new, c: c.changed, r: c.removed })}</b><br>${t('obApplyNote')}</p>`;
+    }
+    body = `<h1>${t('obBackupTitle')}</h1><p>${t('obBackupText')}</p>${summary}
       <button class="btn primary big wide" data-action="export" style="margin-top:20px">💾 ${t('backupNow')}</button>
       <p class="note">${t('obBackupNote')}</p>`;
     foot = `<button class="btn ghost big" data-action="ob-back">${t('obBack')}</button><button class="btn ok big" data-action="ob-start">${t('obStart')}</button>`;
@@ -849,12 +866,22 @@ export function openConfirmSheet({ title, body, confirmLabel, onConfirm }) {
 
 // Shown once right after the app applies an update (a fresh reload landed on
 // a newer version). `note` is the changelog line for that version, if any.
-export function openUpdateSheet(version, note) {
+// `notes` is [{v, lines}] newest first — every release since the last one
+// seen, so skipping versions loses nothing. onClose(dontShowAgain) fires
+// however the sheet is dismissed (button or backdrop).
+export function openUpdateSheet(version, notes, onClose) {
+  const many = notes.length > 1;
+  const list = notes.map((n) => `${many ? `<h3>${t('version', { v: esc(n.v) })}</h3>` : ''}
+    <ul>${(n.lines.length ? n.lines : [t('updatedGeneric')]).map((l) => `<li>${esc(l)}</li>`).join('')}</ul>`).join('');
   const el = openSheet(`
     <h2>🎉 ${t('updatedTitle', { v: esc(version) })}</h2>
-    <p class="hint" style="margin-top:6px">${esc(note || t('updatedGeneric'))}</p>
+    <div class="notes">${list}</div>
+    <label class="dontshow"><input type="checkbox" data-dontshow>${t('dontShowAgain')}</label>
     <div class="btnrow"><button class="btn primary wide" data-close>${t('close')}</button></div>`);
-  $('[data-close]', el).addEventListener('click', closeSheet);
+  el.classList.add('update');
+  const done = () => { onClose($('[data-dontshow]', el).checked); closeSheet(); };
+  $('[data-close]', el).addEventListener('click', done);
+  backdropEl.addEventListener('click', done);
 }
 
 // Reset needs a stronger, more deliberate choice than a single OK button: the
