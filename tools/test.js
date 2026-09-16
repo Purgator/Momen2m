@@ -508,5 +508,53 @@ globalThis.window = globalThis;
     assert.deepStrictEqual([per[0].done, per[0].missed, per[0].total], [1, 1, 2]);
   });
 
+  await test('late completion: penalty lifted for a quarter of the points, within a day only', () => {
+    const h = habit('late1', '08:00', '09:00', { importance: 2 });
+    S.state.habits = [h];
+    S.state.days = {};
+    S.state.game.xp = 100; S.state.game.missed = 0; S.state.game.done = 0; S.state.game.recovered = 0;
+    E.tick(D(0, '09:30'), hooks); // marks the miss: -20
+    let o = E.buildOccurrences(D(0, '09:30')).find((x) => x.habit.id === 'late1');
+    assert.strictEqual(o.status, 'missed');
+    assert.strictEqual(S.state.game.xp, 80);
+    assert.ok(E.canCompleteLate(o, D(0, '20:00')));
+    assert.ok(!E.canCompleteLate(o, D(2, '09:00')), 'too old after 24 h');
+    const r = E.completeLate(o, D(0, '20:00'));
+    assert.strictEqual(r.pts, 25, '-20 lifted plus +5 (a quarter of 20)');
+    assert.strictEqual(S.state.game.xp, 105);
+    o = E.buildOccurrences(D(0, '20:00')).find((x) => x.habit.id === 'late1');
+    assert.strictEqual(o.status, 'done'); assert.ok(o.late); assert.strictEqual(o.pts, 5);
+    assert.deepStrictEqual([S.state.game.done, S.state.game.missed, S.state.game.recovered], [1, 0, 1]);
+    assert.strictEqual(E.completeLate(o, D(0, '21:00')), null, 'not twice');
+  });
+
+  await test('timing advice: only with enough tight data; earlier when done before the window', async () => {
+    const G = await import(url('game.js'));
+    const h = habit('adv1', '09:00', '10:00');
+    S.state.habits = [h];
+    S.state.days = {};
+    const now = D(0, '12:00');
+    for (let i = 1; i <= 5; i++) S.state.days[T.addDays(today, -i)] = { 'adv1#0': { status: 'done', pts: 20, at: D(-i, '08:20') } };
+    assert.deepStrictEqual(G.timingAdvice(now), [], 'five samples are not enough to speak');
+    for (let i = 6; i <= 9; i++) S.state.days[T.addDays(today, -i)] = { 'adv1#0': { status: 'done', pts: 20, at: D(-i, '08:25') } };
+    let a = G.timingAdvice(now);
+    assert.strictEqual(a.length, 1);
+    assert.strictEqual(a[0].key, 'adviceEarlier');
+    assert.strictEqual(a[0].vars.to, '08:10', 'suggested start sits just before where it actually happens');
+    assert.strictEqual(a[0].vars.n, 9);
+    // Three odd days out of nine do not shake a clear pattern (middle half still tight)...
+    S.state.days[T.addDays(today, -2)]['adv1#0'].at = D(-2, '06:00');
+    S.state.days[T.addDays(today, -3)]['adv1#0'].at = D(-3, '11:30');
+    S.state.days[T.addDays(today, -4)]['adv1#0'].at = D(-4, '07:00');
+    assert.strictEqual(G.timingAdvice(now).length, 1, 'a few outliers do not silence a clear pattern');
+    // ...but completions all over the morning do: silence, not a guess.
+    for (let i = 1; i <= 9; i++) S.state.days[T.addDays(today, -i)]['adv1#0'].at = D(-i, i % 2 ? '06:00' : '11:30');
+    assert.deepStrictEqual(G.timingAdvice(now), [], 'a wide spread means silence, not a guess');
+    // Late completions are not evidence of a preferred time.
+    S.state.days = {};
+    for (let i = 1; i <= 9; i++) S.state.days[T.addDays(today, -i)] = { 'adv1#0': { status: 'done', pts: 5, at: D(-i, '15:00'), late: true } };
+    assert.deepStrictEqual(G.timingAdvice(now), []);
+  });
+
   console.log(`\n${passed} tests passed`);
 })().catch((e) => { console.error(e); process.exit(1); });
