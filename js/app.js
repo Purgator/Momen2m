@@ -161,12 +161,13 @@ const findOcc = (key) => occs.find((o) => o.key === key);
 const findHabit = (id) => state.habits.find((h) => h.id === id);
 const shakeEl = (el) => { el.classList.add('shake'); setTimeout(() => el.classList.remove('shake'), 500); };
 
-// Premade one-time moments: same emoji + name replaces the earlier one, so
-// re-saving a template tunes it instead of piling up copies.
-function saveTemplateFrom({ name, emoji, minutes, importance }) {
+// Premade one-time moments: same emoji + name replaces the earlier one (by
+// key, excluding the template being edited itself), so tuning a premade or
+// re-saving one from quick-add never piles up copies.
+function upsertTemplate(id, { name, emoji, minutes, importance }) {
   const key = G.momentKey({ name, emoji });
-  state.templates = state.templates.filter((x) => G.momentKey(x) !== key);
-  state.templates.push({ id: uid(), name, emoji, minutes, importance });
+  state.templates = state.templates.filter((x) => x.id !== id && G.momentKey(x) !== key);
+  state.templates.push({ id: id || uid(), name, emoji, minutes, importance });
   save();
 }
 
@@ -526,7 +527,7 @@ app.addEventListener('click', async (e) => {
           days: [], importance, snooze: true, enabled: true, once: tomorrow ? addDays(day, 1) : day, createdAt: now,
         };
         if (G.nameConflict(h)) { U.toast(t('nameTaken'), 'bad'); return false; }
-        if (saveTemplate) saveTemplateFrom({ name, emoji, minutes, importance });
+        if (saveTemplate) upsertTemplate(null, { name, emoji, minutes, importance });
         state.habits.push(h);
         save(); N.feedback('tap'); refresh();
         const text = tomorrow ? '📅 ' + t('quickAddedTomorrow', { t: fmtClock(at(addDays(day, 1), start)) })
@@ -538,7 +539,7 @@ app.addEventListener('click', async (e) => {
           for (const d of Object.values(state.days)) for (const k of Object.keys(d)) if (k.startsWith(id + '#')) delete d[k];
           phases.clear(); save(); refresh();
         } } });
-      }, { templates: state.templates, onSaveTemplate: (d) => { saveTemplateFrom(d); U.toast(t('templateSaved'), 'good'); } });
+      }, { templates: state.templates, onSaveTemplate: (d) => { upsertTemplate(null, d); U.toast(t('templateSaved'), 'good'); } });
       break;
 
     case 'add':
@@ -565,6 +566,18 @@ app.addEventListener('click', async (e) => {
       state.templates = state.templates.filter((x) => x.id !== btn.dataset.id);
       save(); render();
       break;
+    case 'tpl-add':
+      // Same identity as quick-add's own "Save as premade": matching an
+      // existing premade replaces it rather than warning, so tuning one by
+      // re-creating it with the same emoji + name just works.
+      U.openTemplateSheet(null, (d) => { upsertTemplate(null, d); render(); });
+      break;
+    case 'tpl-edit': {
+      const tpl = state.templates.find((x) => x.id === btn.dataset.id); if (!tpl) break;
+      U.openTemplateSheet(tpl, (d) => { upsertTemplate(tpl.id, d); render(); },
+        () => { state.templates = state.templates.filter((x) => x.id !== tpl.id); save(); render(); });
+      break;
+    }
     case 'preset': {
       const p = PRESETS.find((x) => x.id === btn.dataset.preset);
       if (p && !state.habits.some((h) => h.preset === p.id)) { addPreset(p); save(); N.feedback('tap'); refresh(); }
