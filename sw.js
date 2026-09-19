@@ -1,6 +1,6 @@
 // Momen2m service worker: offline app shell + versioned cache + notification clicks.
 // VERSION is bumped by tools/bump.js; a changed file is what triggers an update.
-const VERSION = '1.16.2';
+const VERSION = '1.17.0';
 // Optional push relay settings (relay.config.js is deployment-specific and may be empty/missing).
 try { importScripts('relay.config.js'); } catch { /* no relay for this copy */ }
 const CACHE = 'momen2m-' + VERSION;

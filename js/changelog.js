@@ -3,6 +3,10 @@
 // exhaustive (the detailed notes live on the GitHub release). Both languages.
 export const CHANGELOG = {
   en: {
+    '1.17.0': [
+      '⚡ The boost announcement is now hard to miss: a colored, sound-and-vibration toast with a "See" shortcut to the rules.',
+      '👉 The "boost on" banner is now tappable and shows the rules.',
+    ],
     '1.16.2': ['👉 Swipe left or right on the badges to change page.'],
     '1.16.1': ['💨 The "Quick hands" badge is now called "Flash" in French.'],
     '1.16.0': [
@@ -44,6 +48,10 @@ export const CHANGELOG = {
     '1.8.1': ['🔔 More reliable background reminders.'],
   },
   fr: {
+    '1.17.0': [
+      '⚡ L’annonce du boost est plus visible : notification colorée avec son et vibration, et un raccourci « Voir » vers les règles.',
+      '👉 Le bandeau « boost actif » est maintenant cliquable et montre les règles.',
+    ],
     '1.16.2': ['👉 Glisse à gauche ou à droite sur les badges pour changer de page.'],
     '1.16.1': ['💨 Le badge « Mains rapides » devient « Flash ».'],
     '1.16.0': [
