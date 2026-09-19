@@ -280,7 +280,14 @@ function encourageIfRoughPatch(now) {
   const msg = msgs[(state.game.missed || run) % msgs.length];
   state.game.lastEncouraged = today;
   const until = E.grantBoost(now);
-  setTimeout(() => U.toast('💙 ' + msg + ' ' + t('boostGranted', { until: fmtClock(until) }), '', { ms: 10000 }), 1200);
+  setTimeout(() => {
+    N.feedback('badge');
+    U.celebrate(['⚡', '💙', '✨']);
+    U.toast('💙 ' + msg + ' ' + t('boostGranted', { until: fmtClock(until) }), 'good', {
+      ms: 8000,
+      action: { label: t('see'), fn: () => U.openExplainSheet('today', G.computeStats(Date.now(), occs), occs) },
+    });
+  }, 1200);
   dirty = true;
 }
 
