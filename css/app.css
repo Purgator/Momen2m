@@ -46,6 +46,7 @@ h1, h2, h3, p { margin: 0; }
 h1 { font-size: 28px; font-weight: 800; letter-spacing: -.02em; }
 h2 { font-size: 20px; font-weight: 700; }
 .hint { color: var(--muted); font-size: 14px; }
+.hint.boost-hint { color: #f5b301; font-weight: 600; }
 .muted { color: var(--muted); }
 .center { text-align: center; }
 
@@ -362,7 +363,7 @@ input[type="time"] { font-variant-numeric: tabular-nums; }
 
 /* offline / update banner */
 .banner { background: var(--card); border: 1px solid var(--accent); border-radius: 14px; padding: 10px 14px; display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 12px; font-size: 14px; }
-.banner.boost { border-color: #f5b301; background: linear-gradient(90deg, rgba(245,179,1,.14), var(--card)); font-weight: 600; }
+.banner.boost { border-color: #f5b301; background: linear-gradient(90deg, rgba(245,179,1,.14), var(--card)); font-weight: 600; cursor: pointer; }
 
 /* ---- hover tooltips (pointer devices only; taps open a sheet instead) ---- */
 @media (hover: hover) and (pointer: fine) {

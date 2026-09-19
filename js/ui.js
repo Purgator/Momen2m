@@ -118,7 +118,7 @@ export function renderLive(occs, now, opts) {
     body += `<div class="banner"><span>${t('updateAvailable')}</span><button class="btn small primary" data-action="apply-update">${t('updateNow')}</button></div>`;
   }
   if (boostActive(now)) {
-    body += `<div class="banner boost"><span>⚡ ${t('boostBanner', { until: fmtClock(state.game.boostUntil) })}</span></div>`;
+    body += `<div class="banner boost" data-action="explain" data-topic="today"><span>⚡ ${t('boostBanner', { until: fmtClock(state.game.boostUntil) })}</span></div>`;
   }
   body += `<div class="timeline">`;
   if (past.length) {
@@ -337,6 +337,7 @@ export function openExplainSheet(topic, s, todayOccs = []) {
       .map((o) => `<div class="lrow"><span>${esc(o.habit.emoji)} ${habitName(o.habit)} <small class="muted">${o.status === 'done' ? t('completed') : o.status === 'missed' ? t('missed') : t('skipped')}${o.snoozes ? ' · 💤×' + o.snoozes : ''}</small></span><span class="${o.pts >= 0 ? 'pos' : 'neg'}">${signed(o.pts)}</span></div>`).join('');
     html = `<h2>${t('today')} · ${signed(s.today.pts)} pts</h2>
       <p class="hint" style="margin-top:6px">${t('explainToday')}</p>
+      ${boostActive(Date.now()) ? `<p class="hint boost-hint" style="margin-top:6px">⚡ ${t('boostBanner', { until: fmtClock(state.game.boostUntil) })}</p>` : ''}
       ${rows ? `<div class="card ladder" style="margin-top:10px">${rows}</div>` : ''}
       <div class="card ladder" style="margin-top:10px">
         <div class="lrow"><span>${t('ruleDone')}</span><span class="pos">+${BASE_PTS[1]} / +${BASE_PTS[2]} / +${BASE_PTS[3]}</span></div>
