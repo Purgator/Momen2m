@@ -3,6 +3,10 @@
 // exhaustive (the detailed notes live on the GitHub release). Both languages.
 export const CHANGELOG = {
   en: {
+    '1.18.0': [
+      '📌 A one-time moment can be added as many times as you like, even while another copy is pending.',
+      '💾 Saving a premade over one with the same emoji and name now asks before replacing it.',
+    ],
     '1.17.2': ['🐛 A completed one-time moment no longer blocks re-adding it later; only a still-pending one does.'],
     '1.17.1': ['🐛 The rough-patch boost now triggers even if the app was closed when the misses happened.'],
     '1.17.0': [
@@ -50,6 +54,10 @@ export const CHANGELOG = {
     '1.8.1': ['🔔 More reliable background reminders.'],
   },
   fr: {
+    '1.18.0': [
+      '📌 Un moment ponctuel peut être ajouté autant de fois que tu veux, même si une autre copie est en attente.',
+      '💾 Enregistrer un prédéfini par-dessus un autre de même emoji et nom demande confirmation avant de le remplacer.',
+    ],
     '1.17.2': ['🐛 Un moment ponctuel déjà fait ne bloque plus son ajout plus tard ; seul un moment encore en attente le fait.'],
     '1.17.1': ['🐛 Le boost « passage difficile » se déclenche maintenant même si l’appli était fermée au moment des ratés.'],
     '1.17.0': [
