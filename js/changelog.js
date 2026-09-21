@@ -3,6 +3,7 @@
 // exhaustive (the detailed notes live on the GitHub release). Both languages.
 export const CHANGELOG = {
   en: {
+    '1.17.2': ['🐛 A completed one-time moment no longer blocks re-adding it later; only a still-pending one does.'],
     '1.17.1': ['🐛 The rough-patch boost now triggers even if the app was closed when the misses happened.'],
     '1.17.0': [
       '⚡ The boost announcement is now hard to miss: a colored, sound-and-vibration toast with a "See" shortcut to the rules.',
@@ -49,6 +50,7 @@ export const CHANGELOG = {
     '1.8.1': ['🔔 More reliable background reminders.'],
   },
   fr: {
+    '1.17.2': ['🐛 Un moment ponctuel déjà fait ne bloque plus son ajout plus tard ; seul un moment encore en attente le fait.'],
     '1.17.1': ['🐛 Le boost « passage difficile » se déclenche maintenant même si l’appli était fermée au moment des ratés.'],
     '1.17.0': [
       '⚡ L’annonce du boost est plus visible : notification colorée avec son et vibration, et un raccourci « Voir » vers les règles.',
