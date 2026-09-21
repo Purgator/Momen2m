@@ -69,7 +69,6 @@ const hooks = {
     N.notify(t('nMissed', { name: pick(o.habit.name) }), t('nMissedBody'), o.key);
     N.feedback('miss');
     if (view === 'live') U.toast(o.habit.emoji + ' ' + t('missed') + ' · ' + pen, 'bad');
-    encourageIfRoughPatch(Date.now());
   },
 };
 
@@ -117,6 +116,7 @@ function render(now = Date.now()) {
 function frame() {
   const now = Date.now();
   const changed = E.tick(now, hooks);
+  encourageIfRoughPatch(now);
   occs = E.buildOccurrences(now);
   let phaseChanged = false;
   const seen = new Set();
@@ -266,13 +266,16 @@ function celebrateBadges(delay = 0) {
 
 function showProgress() { view = 'progress'; dirty = true; render(); scrollTo(0, 0); }
 
-// Three misses in a row today (nothing done in between) is a rough patch, not
-// a character flaw: one warm nudge per day, plus a 12 h +50 % points boost so
-// that getting back on track pays off right away.
+// Three misses in a row (nothing done in between) is a rough patch, not a
+// character flaw: one warm nudge per day, plus a 12 h +50 % points boost so
+// that getting back on track pays off right away. Checked every tick (not
+// just when a miss is fresh enough to notify) so it still fires even if the
+// app was closed when the misses actually happened.
 function encourageIfRoughPatch(now) {
   const today = dayKey(new Date(now));
   if (state.game.lastEncouraged === today) return;
-  const resolved = E.buildOccurrences(now).filter((o) => o.day === today && o.status !== 'open' && o.at).sort((a, b) => a.at - b.at);
+  const resolved = [...E.occurrencesOfDay(addDays(today, -1)), ...E.occurrencesOfDay(today)]
+    .filter((o) => o.status !== 'open' && o.at).sort((a, b) => a.at - b.at);
   let run = 0;
   for (let i = resolved.length - 1; i >= 0; i--) { if (resolved[i].status === 'missed') run++; else break; }
   if (run < 3) return;
