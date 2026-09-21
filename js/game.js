@@ -42,10 +42,17 @@ export function momentKey(h) {
 }
 
 // Another moment with the same key and the same kind (repeating vs one-time).
-// A repeating "Read" and a one-time "Read" may coexist.
-export function nameConflict(h, list = state.habits) {
-  const key = momentKey(h), once = !!h.once;
-  return list.find((x) => x.id !== h.id && !!x.once === once && momentKey(x) === key) || null;
+// A repeating "Read" and a one-time "Read" may coexist. A one-time moment
+// whose day has already passed no longer blocks a new one: it's done and
+// gone, not a standing duplicate — otherwise "save as premade" could only
+// ever be used once per name.
+export function nameConflict(h, list = state.habits, now = Date.now()) {
+  const key = momentKey(h), once = !!h.once, today = dayKey(new Date(now));
+  return list.find((x) => {
+    if (x.id === h.id || !!x.once !== once || momentKey(x) !== key) return false;
+    if (once && x.once < today) return false;
+    return true;
+  }) || null;
 }
 
 export function computeStats(now, todayOccs = []) {
