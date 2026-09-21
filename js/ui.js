@@ -921,7 +921,7 @@ export function openQuickSheet(onAdd, { templates = [], onSaveTemplate } = {}) {
   };
   const submit = () => {
     const d = read(); if (!d) return;
-    // onAdd may refuse (duplicate name): the sheet stays open for a fix.
+    // onAdd may back out (premade replacement declined): the sheet stays open.
     if (onAdd({ ...d, ...resolveStart(), saveTemplate: !!(tplBox && tplBox.checked) }) === false) return;
     closeSheet();
   };
@@ -933,7 +933,7 @@ export function openQuickSheet(onAdd, { templates = [], onSaveTemplate } = {}) {
 }
 
 // Create or edit a premade one-time moment, from Setup. `tpl` is null for a new
-// one. onSave may return false (name+emoji clash with another premade) to
+// one. onSave may return false (replacing another premade was declined) to
 // keep editing; onDelete is only wired when editing an existing one.
 export function openTemplateSheet(tpl, onSave, onDelete) {
   const x = tpl || { name: '', emoji: '⭐', minutes: 30, importance: 2 };
