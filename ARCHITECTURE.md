@@ -33,8 +33,10 @@ importance, `SNOOZE_PENALTY = 3`.
 **Gamification** (`js/game.js`): `computeStats(now, occs)` builds everything
 `ui.js` renders (level, streak, lifetime/period counters, perHabit,
 badges-in-progress, tips). `momentKey(habit)` = emoji+name lowercased —
-identity for uniqueness (`nameConflict`) and for merging a repeating and a
-one-time moment's stats (the one exception to the uniqueness rule). `BADGES`
+identity for merging stats across a repeating and any one-time copies, for
+keeping repeating moments unique (`nameConflict`) and premades unique
+(`upsertTemplate`, which asks before replacing). One-time moments themselves
+can be added any number of times. `BADGES`
 is an array of `{id, emoji, goal(stats) -> [current, target]}`, names and
 descriptions live in i18n under `badgeNames` / `badgeDescs`. `BADGE_PAGE = 9`,
 paged UI in `renderProgress`, navigable by tapping ‹/› or by swiping the
