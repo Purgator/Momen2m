@@ -3,6 +3,7 @@
 // exhaustive (the detailed notes live on the GitHub release). Both languages.
 export const CHANGELOG = {
   en: {
+    '1.17.1': ['🐛 The rough-patch boost now triggers even if the app was closed when the misses happened.'],
     '1.17.0': [
       '⚡ The boost announcement is now hard to miss: a colored, sound-and-vibration toast with a "See" shortcut to the rules.',
       '👉 The "boost on" banner is now tappable and shows the rules.',
@@ -48,6 +49,7 @@ export const CHANGELOG = {
     '1.8.1': ['🔔 More reliable background reminders.'],
   },
   fr: {
+    '1.17.1': ['🐛 Le boost « passage difficile » se déclenche maintenant même si l’appli était fermée au moment des ratés.'],
     '1.17.0': [
       '⚡ L’annonce du boost est plus visible : notification colorée avec son et vibration, et un raccourci « Voir » vers les règles.',
       '👉 Le bandeau « boost actif » est maintenant cliquable et montre les règles.',
