@@ -364,6 +364,12 @@ input[type="time"] { font-variant-numeric: tabular-nums; }
 /* offline / update banner */
 .banner { background: var(--card); border: 1px solid var(--accent); border-radius: 14px; padding: 10px 14px; display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 12px; font-size: 14px; }
 .banner.boost { border-color: #f5b301; background: linear-gradient(90deg, rgba(245,179,1,.14), var(--card)); font-weight: 600; cursor: pointer; }
+.greet { display: flex; gap: 14px; align-items: center; padding: 14px 16px; margin-bottom: 12px; border-radius: 16px; cursor: pointer;
+  background: linear-gradient(135deg, rgba(108,112,255,.22), var(--card) 70%); border: 1px solid var(--line); animation: greetin .5s ease; }
+.greet .emo { font-size: 30px; line-height: 1; flex: none; }
+.greet p { margin: 0; font-weight: 600; font-size: 15px; line-height: 1.35; }
+.greet small { display: block; margin-top: 4px; color: var(--muted); font-size: 12px; }
+@keyframes greetin { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: none; } }
 
 /* ---- hover tooltips (pointer devices only; taps open a sheet instead) ---- */
 @media (hover: hover) and (pointer: fine) {
