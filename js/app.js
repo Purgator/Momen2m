@@ -116,7 +116,7 @@ function render(now = Date.now()) {
 function frame() {
   const now = Date.now();
   const changed = E.tick(now, hooks);
-  encourageIfRoughPatch(now);
+  checkRoughPatch(now);
   occs = E.buildOccurrences(now);
   let phaseChanged = false;
   const seen = new Set();
@@ -270,31 +270,32 @@ function celebrateBadges(delay = 0) {
 function showProgress() { view = 'progress'; dirty = true; render(); scrollTo(0, 0); }
 
 // Three misses in a row (nothing done in between) is a rough patch, not a
-// character flaw: one warm nudge per day, plus a 12 h +50 % points boost so
-// that getting back on track pays off right away. Checked every tick (not
-// just when a miss is fresh enough to notify) so it still fires even if the
-// app was closed when the misses actually happened.
-function encourageIfRoughPatch(now) {
+// character flaw. Two separate things follow: a warm greeting card each time
+// the run reaches a multiple of three, and — once a day — a 12 h +50 % points
+// boost so that getting back on track pays off right away. Checked every
+// tick, straight off stored state, so it still fires when the app was closed
+// while the misses happened.
+function checkRoughPatch(now) {
   const today = dayKey(new Date(now));
-  if (state.game.lastEncouraged === today) return;
   const resolved = [...E.occurrencesOfDay(addDays(today, -1)), ...E.occurrencesOfDay(today)]
     .filter((o) => o.status !== 'open' && o.at).sort((a, b) => a.at - b.at);
   let run = 0;
   for (let i = resolved.length - 1; i >= 0; i--) { if (resolved[i].status === 'missed') run++; else break; }
   if (run < 3) return;
-  const msgs = t('encouragements');
-  const msg = msgs[(state.game.missed || run) % msgs.length];
-  state.game.lastEncouraged = today;
-  const until = E.grantBoost(now);
-  setTimeout(() => {
-    N.feedback('badge');
-    U.celebrate(['⚡', '💙', '✨']);
-    U.toast('💙 ' + msg + ' ' + t('boostGranted', { until: fmtClock(until) }), 'good', {
-      ms: 8000,
-      action: { label: t('see'), fn: () => U.openExplainSheet('today', G.computeStats(Date.now(), occs), occs) },
-    });
-  }, 1200);
-  dirty = true;
+  const g = state.game;
+  const last = resolved[resolved.length - 1];
+  if (run % 3 === 0 && g.lastGreetAt !== last.at) {
+    g.lastGreetAt = last.at;
+    g.greetCount = (g.greetCount || 0) + 1;
+    g.greeting = { day: today, i: g.greetCount % t('greetings').length };
+    save(); dirty = true;
+  }
+  if (g.lastEncouraged !== today) {
+    g.lastEncouraged = today;
+    const until = E.grantBoost(now);
+    setTimeout(() => { N.feedback('badge'); U.celebrate(['⚡', '✨', '⭐']); U.openBoostSheet(until); }, 1200);
+    dirty = true;
+  }
 }
 
 // ---- sharing -------------------------------------------------------------------
@@ -539,6 +540,7 @@ app.addEventListener('click', async (e) => {
     }
     case 'share-progress': shareProgress(); break;
     case 'share-app': shareApp(); break;
+    case 'greet-dismiss': state.game.greeting = null; save(); N.feedback('tap'); refresh(); break;
 
     case 'done': {
       const o = findOcc(btn.dataset.key); if (!o) break;
