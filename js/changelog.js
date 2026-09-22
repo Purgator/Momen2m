@@ -3,6 +3,10 @@
 // exhaustive (the detailed notes live on the GitHub release). Both languages.
 export const CHANGELOG = {
   en: {
+    '1.19.0': [
+      '💙 After three misses in a row, a warm little card greets you in the timeline — no advice, just kindness.',
+      '⚡ A new boost now announces itself in a popup that explains it; tap OK or anywhere outside to close.',
+    ],
     '1.18.0': [
       '📌 A one-time moment can be added as many times as you like, even while another copy is pending.',
       '💾 Saving a premade over one with the same emoji and name now asks before replacing it.',
@@ -54,6 +58,10 @@ export const CHANGELOG = {
     '1.8.1': ['🔔 More reliable background reminders.'],
   },
   fr: {
+    '1.19.0': [
+      '💙 Après trois ratés d’affilée, une petite carte chaleureuse t’accueille dans la journée — pas de conseil, juste de la douceur.',
+      '⚡ Un nouveau boost s’annonce dans une fenêtre qui l’explique ; touche OK ou n’importe où à côté pour fermer.',
+    ],
     '1.18.0': [
       '📌 Un moment ponctuel peut être ajouté autant de fois que tu veux, même si une autre copie est en attente.',
       '💾 Enregistrer un prédéfini par-dessus un autre de même emoji et nom demande confirmation avant de le remplacer.',
