@@ -120,6 +120,10 @@ export function renderLive(occs, now, opts) {
   if (boostActive(now)) {
     body += `<div class="banner boost" data-action="explain" data-topic="today"><span>⚡ ${t('boostBanner', { until: fmtClock(state.game.boostUntil) })}</span></div>`;
   }
+  if (g.greeting && g.greeting.day === dayKey(new Date(now))) {
+    const msgs = t('greetings');
+    body += `<div class="greet" data-action="greet-dismiss"><span class="emo">💙</span><div><p>${esc(msgs[g.greeting.i % msgs.length])}</p><small>${t('greetTap')}</small></div></div>`;
+  }
   body += `<div class="timeline">`;
   if (past.length) {
     body += `<div class="group-title">${t('earlier')}</div>`;
@@ -367,6 +371,16 @@ export function openBadgeSheet(b, p, { onShare } = {}) {
     </div>`);
   $('[data-close]', el).addEventListener('click', closeSheet);
   if (p.earned && onShare) $('[data-share]', el).addEventListener('click', () => { closeSheet(); onShare(); });
+}
+
+// Announces a freshly granted boost. Closes on OK or a tap outside.
+export function openBoostSheet(until) {
+  const el = openSheet(`
+    <div class="center"><div class="badge-hero earned">⚡</div>
+    <h2>${t('boostTitle')}</h2>
+    <p class="hint" style="margin-top:6px">${t('boostBody', { until: fmtClock(until) })}</p></div>
+    <div class="btnrow"><button class="btn primary wide" data-close>${t('ok')}</button></div>`);
+  $('[data-close]', el).addEventListener('click', closeSheet);
 }
 
 // A bigger burst than sparkles(): centred, for level-ups and badges.
