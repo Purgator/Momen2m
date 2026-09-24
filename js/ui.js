@@ -5,7 +5,7 @@ import { state, save } from './store.js';
 import { PRESETS } from './presets.js';
 import { QUESTIONS, isTriggered, reviewStatus } from './setup.js';
 import { suggestEmoji } from './emoji.js';
-import { BASE_PTS, SNOOZE_PENALTY, canSnooze, currentOf, todayPoints, boostActive } from './engine.js';
+import { BASE_PTS, SNOOZE_PENALTY, PAUSE_MAX, PAUSE_XP, PAUSE_MS, canSnooze, currentOf, todayPoints, boostActive, pausedUntil } from './engine.js';
 import { levelInfo, rankLadder, BADGES, BADGE_PAGE, badgeProgress, tips as gameTips } from './game.js';
 import { fmtClock, fmtCountdown, fmtDuration, fmtAgo, fmtDate, fmtDateTime, fmtWhenShort, nowHM, minutesToHM, parseHM, dayKey, weekday, at } from './time.js';
 import { permission, TONE_NAMES, PATTERN_NAMES } from './notify.js';
@@ -120,6 +120,10 @@ export function renderLive(occs, now, opts) {
   if (boostActive(now)) {
     body += `<div class="banner boost" data-action="explain" data-topic="today"><span>⚡ ${t('boostBanner', { until: fmtClock(state.game.boostUntil) })}</span></div>`;
   }
+  const paused = pausedUntil(now);
+  if (paused) {
+    body += `<div class="banner" data-action="pause-info"><span>⏸️ ${t('pausedBanner', { until: fmtClock(paused) })}</span></div>`;
+  }
   if (g.greeting && g.greeting.day === dayKey(new Date(now))) {
     const msgs = t('greetings');
     body += `<div class="greet" data-action="greet-dismiss"><span class="emo">💙</span><div><p>${esc(msgs[g.greeting.i % msgs.length])}</p><small>${t('greetTap')}</small></div></div>`;
@@ -176,6 +180,7 @@ export function renderLive(occs, now, opts) {
         <button class="stat" data-action="explain" data-topic="level" data-tip="${esc(t('tipLevel', { rank, n: hi - g.xp }))}">⭐ ${t('level', { n: level })}</button>
         ${g.streak ? `<button class="stat" data-action="explain" data-topic="streak" data-tip="${esc(t('tipStreak', { n: g.streak, best: g.bestStreak }))}">🔥 ${g.streak}</button>` : ''}
         <button class="stat today ${today < 0 ? 'neg' : ''}" data-action="explain" data-topic="today" data-tip="${esc(t('tipToday'))}">${today >= 0 ? '+' : ''}${today}</button>
+        <button class="stat" data-action="pause-info" data-tip="${esc(t('tipPause', { n: g.pauseTokens || 0, max: PAUSE_MAX }))}">⏸️ ${g.pauseTokens || 0}</button>
       </div>
     </div>
     <div class="xpwrap" data-action="explain" data-topic="level" data-tip="${esc(t('tipXp', { n: g.xp, hi }))}">
@@ -371,6 +376,27 @@ export function openBadgeSheet(b, p, { onShare } = {}) {
     </div>`);
   $('[data-close]', el).addEventListener('click', closeSheet);
   if (p.earned && onShare) $('[data-share]', el).addEventListener('click', () => { closeSheet(); onShare(); });
+}
+
+// The pause stock: what it is, progress to the next one, and — when some are
+// in stock and none is running — buttons to spend one to three at once.
+export function openPauseSheet({ tokens, xp, until }, onPause) {
+  const lang = getLang();
+  const hours = (n) => fmtDuration(n * PAUSE_MS, lang);
+  const pct = Math.min(100, Math.round((xp / PAUSE_XP) * 100));
+  const el = openSheet(`
+    <h2>⏸️ ${t('pauseTitle', { n: tokens, max: PAUSE_MAX })}</h2>
+    <p class="hint" style="margin-top:6px">${t('pauseExplain', { h: hours(1), pts: PAUSE_XP, max: PAUSE_MAX })}</p>
+    ${tokens < PAUSE_MAX
+      ? `<div class="xpbar" style="margin:12px 2px"><div class="xpfill" style="width:${pct}%"></div></div><p class="hint">${t('pauseProgress', { n: PAUSE_XP - xp })}</p>`
+      : `<p class="hint" style="margin-top:8px">${t('pauseFull')}</p>`}
+    ${until ? `<p class="hint boost-hint" style="margin-top:12px">⏸️ ${t('pausedBanner', { until: fmtClock(until) })}</p>`
+      : tokens ? `<p class="hint" style="margin-top:12px">${t('pauseUseHint')}</p>
+        <div class="btnrow" style="margin-top:8px">${[1, 2, 3].filter((n) => n <= tokens).map((n) => `<button class="btn" data-pause="${n}">${t('pauseBtn', { h: hours(n), n })}</button>`).join('')}</div>`
+      : ''}
+    <div class="btnrow"><button class="btn primary wide" data-close>${t('close')}</button></div>`);
+  $('[data-close]', el).addEventListener('click', closeSheet);
+  $$('[data-pause]', el).forEach((b) => b.addEventListener('click', () => { closeSheet(); onPause(Number(b.dataset.pause)); }));
 }
 
 // Announces a freshly granted boost. Closes on OK or a tap outside.

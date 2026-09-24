@@ -231,6 +231,7 @@ function notifActions(o) {
 
 function doDone(o, now, at) {
   const levelBefore = E.levelFor(state.game.xp);
+  const pausesBefore = state.game.pauseTokens || 0;
   const r = E.complete(o, now); if (!r) return false;
   if (at) U.sparkles(at.x, at.y);
   N.feedback('done'); N.dismiss(o.key);
@@ -252,6 +253,10 @@ function doDone(o, now, at) {
       U.toast('⬆️ ' + t('toastLevelUp', { n: levelAfter, rank }), 'good', { ms: 4500, action: { label: t('see'), fn: () => showProgress() } });
     }, delay);
     delay += 1200;
+  }
+  if ((state.game.pauseTokens || 0) > pausesBefore) {
+    setTimeout(() => U.toast('⏸️ ' + t('pauseEarned', { n: state.game.pauseTokens }), 'good', { ms: 4000 }), delay);
+    delay += 1000;
   }
   celebrateBadges(delay);
   return true;
@@ -541,6 +546,14 @@ app.addEventListener('click', async (e) => {
     case 'share-progress': shareProgress(); break;
     case 'share-app': shareApp(); break;
     case 'greet-dismiss': state.game.greeting = null; save(); N.feedback('tap'); refresh(); break;
+    case 'pause-info':
+      N.feedback('tap');
+      U.openPauseSheet({ tokens: state.game.pauseTokens || 0, xp: state.game.pauseXp || 0, until: E.pausedUntil(now) }, (n) => {
+        const until = E.startPause(n, Date.now()); if (!until) return;
+        N.feedback('tap'); phases.clear(); refresh(); Push.syncSoon();
+        U.toast('⏸️ ' + t('pausedBanner', { until: fmtClock(until) }), 'good');
+      });
+      break;
 
     case 'done': {
       const o = findOcc(btn.dataset.key); if (!o) break;

@@ -28,7 +28,12 @@ counters/boostUntil/lastEncouraged/onceDone/recovered), `lastSeenVersion`,
 (advances time, marks misses, settles streaks), `buildOccurrences`,
 `canCompleteLate` / `LATE_WINDOW` (24 h), `boostActive` / `grantBoost` /
 `BOOST_MS` (12 h) / `BOOST_MULT` (1.5×). `BASE_PTS = {1:10, 2:20, 3:30}` by
-importance, `SNOOZE_PENALTY = 3`.
+importance, `SNOOZE_PENALTY = 3`. Pauses: `PAUSE_MAX` (3 in stock) /
+`PAUSE_XP` (150 pts of gains per token, stock stops filling when full) /
+`PAUSE_MS` (3 h each); `startPause(n, now)` spends 1–3 tokens (no stacking
+while one runs), `pausedUntil(now)`; `game.pauseLog` keeps the intervals and
+`occurrencesOfDay` leaves out open moments overlapping one, so they are
+neither shown, notified, nor missed, and don't block a perfect day.
 
 **Gamification** (`js/game.js`): `computeStats(now, occs)` builds everything
 `ui.js` renders (level, streak, lifetime/period counters, perHabit,
