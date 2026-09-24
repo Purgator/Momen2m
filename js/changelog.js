@@ -3,6 +3,10 @@
 // exhaustive (the detailed notes live on the GitHub release). Both languages.
 export const CHANGELOG = {
   en: {
+    '1.20.0': [
+      '⏸️ Pauses: stop your moments for a few hours when the routine shifts — the ones inside are left out, at no cost.',
+      '🎁 Earn one pause every 150 points, keep up to three, spend one to three at once (3 h each). Count and details in the top bar.',
+    ],
     '1.19.0': [
       '💙 After three misses in a row, a warm little card greets you in the timeline — no advice, just kindness.',
       '⚡ A new boost now announces itself in a popup that explains it; tap OK or anywhere outside to close.',
@@ -58,6 +62,10 @@ export const CHANGELOG = {
     '1.8.1': ['🔔 More reliable background reminders.'],
   },
   fr: {
+    '1.20.0': [
+      '⏸️ Pauses : arrête tes moments quelques heures quand la routine change — ceux qui tombent dedans sont laissés de côté, sans rien coûter.',
+      '🎁 Gagne une pause tous les 150 points, garde-en trois au plus, utilise une à trois d’un coup (3 h chacune). Le compte et les détails sont dans la barre du haut.',
+    ],
     '1.19.0': [
       '💙 Après trois ratés d’affilée, une petite carte chaleureuse t’accueille dans la journée — pas de conseil, juste de la douceur.',
       '⚡ Un nouveau boost s’annonce dans une fenêtre qui l’explique ; touche OK ou n’importe où à côté pour fermer.',
