@@ -41,6 +41,9 @@ function defaults() {
       onceDone: 0,  // one-time moments completed
       lastEncouraged: '', // dayKey of the last "rough patch" encouragement
       boostUntil: 0,      // ms epoch until which every gain is worth +50 % (granted with the encouragement)
+      pauseTokens: 0,     // pauses in stock (see engine PAUSE_*)
+      pauseXp: 0,         // points earned towards the next pause
+      pauseLog: [],       // { from, until } of pauses taken, last two days kept
       badges: {},   // badge id -> ms epoch when unlocked (kept even if history is pruned)
       badgesInit: false, // set once badges already earned from old history were persisted quietly
     },

@@ -548,6 +548,36 @@ globalThis.window = globalThis;
     assert.deepStrictEqual(E.complete(o, D(1, '08:10')).pts, 30, 'normal again the next day');
   });
 
+  await test('pauses: earned with points, spent one to three at a time, overlapping moments left out', () => {
+    S.state.habits = [habit('p1', '10:00', '10:30'), habit('p2', '12:00', '12:30'), habit('p3', '15:00', '15:30')];
+    S.state.days = {}; Object.assign(S.state.game, { xp: 0, pauseTokens: 0, pauseXp: 0, pauseLog: [], boostUntil: 0 });
+    let o = E.buildOccurrences(D(0, '10:05')).find((x) => x.habit.id === 'p1');
+    E.complete(o, D(0, '10:05'));
+    assert.deepStrictEqual([S.state.game.pauseTokens, S.state.game.pauseXp], [0, 30], 'gains fill the next pause');
+    S.state.days = {}; S.state.game.pauseXp = 140;
+    o = E.buildOccurrences(D(0, '10:05')).find((x) => x.habit.id === 'p1');
+    E.complete(o, D(0, '10:05'));
+    assert.deepStrictEqual([S.state.game.pauseTokens, S.state.game.pauseXp], [1, 20], 'one pause per 150 pts, remainder kept');
+    assert.strictEqual(E.startPause(2, D(0, '11:00')), 0, 'not enough in stock');
+    S.state.game.pauseTokens = 3;
+    const until = E.startPause(2, D(0, '11:00'));
+    assert.strictEqual(until, D(0, '17:00'), 'two pauses = 6 h');
+    assert.strictEqual(S.state.game.pauseTokens, 1);
+    assert.strictEqual(E.startPause(1, D(0, '12:00')), 0, 'no stacking while one is running');
+    assert.ok(E.pausedUntil(D(0, '16:59')) && !E.pausedUntil(D(0, '17:00')));
+    assert.deepStrictEqual(E.buildOccurrences(D(0, '13:00')).map((x) => x.habit.id), ['p1'], 'open moments inside the pause are left out; the done one stays');
+    events.length = 0;
+    E.tick(D(0, '17:30'), hooks);
+    assert.deepStrictEqual(events.filter((e) => e.startsWith('missed:')), [], 'nothing missed during the pause');
+    assert.strictEqual(E.dayComplete(today), true, 'the day can still be perfect');
+    S.state.game.pauseTokens = 3;
+    S.state.days = {};
+    o = E.buildOccurrences(D(1, '10:05')).find((x) => x.habit.id === 'p1');
+    E.complete(o, D(1, '10:05'));
+    assert.deepStrictEqual([S.state.game.pauseTokens, S.state.game.pauseXp], [3, 0], 'a full stock does not fill further');
+    S.state.game.pauseLog = [];
+  });
+
   await test('timing advice: only with enough tight data; earlier when done before the window', async () => {
     const G = await import(url('game.js'));
     const h = habit('adv1', '09:00', '10:00');
