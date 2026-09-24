@@ -29,15 +29,17 @@ export function occurrencesOfDay(day) {
   for (const h of state.habits) {
     if (!habitOnDay(h, day)) continue;
     (h.slots || []).forEach((slot, i) => {
-      const start = at(day, slot.start);
+      const start0 = at(day, slot.start);
       const originalEnd = at(day, slot.end, parseHM(slot.end) <= parseHM(slot.start) ? 1 : 0);
       if (h.createdAt && originalEnd <= h.createdAt) return; // window ended before the moment existed
       const key = occKey(h.id, i);
       const rec = record(day, key, false);
+      const start = rec && rec.start ? rec.start : start0;
+      const end = rec && rec.deadline ? rec.deadline : originalEnd;
+      if ((!rec || rec.status === 'open') && inPause(start, end)) return; // paused: the moment simply does not happen
       list.push({
         key: day + '|' + key, day, occ: key, habit: h, slot: i,
-        start: rec && rec.start ? rec.start : start,
-        originalEnd, end: rec && rec.deadline ? rec.deadline : originalEnd,
+        start, originalEnd, end,
         status: rec ? rec.status : 'open', snoozes: rec ? rec.snoozes : 0, pts: rec ? rec.pts || 0 : 0,
         at: rec ? rec.at : 0, late: !!(rec && rec.late),
       });
@@ -74,6 +76,40 @@ export function currentOf(list) {
 
 function applyXp(delta) {
   state.game.xp = Math.max(0, state.game.xp + delta);
+  if (delta > 0) earnPause(delta);
+}
+
+// ---- pauses ---------------------------------------------------------------------
+// A pause token stops the moments for PAUSE_MS: open moments overlapping a
+// pause are left out of the day, neither shown nor missed. Tokens are earned
+// with points (PAUSE_XP of gains each, up to PAUSE_MAX in stock) and spent
+// one to three at a time; the stock stops filling while it is full.
+export const PAUSE_MAX = 3;
+export const PAUSE_XP = 150;
+export const PAUSE_MS = 3 * 60 * 60 * 1000;
+export function pausedUntil(now) {
+  const p = (state.game.pauseLog || []).find((x) => x.from <= now && now < x.until);
+  return p ? p.until : 0;
+}
+export function startPause(n, now) {
+  const g = state.game;
+  if (n < 1 || n > PAUSE_MAX || (g.pauseTokens || 0) < n || pausedUntil(now)) return 0;
+  g.pauseTokens -= n;
+  const until = now + n * PAUSE_MS;
+  g.pauseLog = [...(g.pauseLog || []), { from: now, until }];
+  save();
+  return until;
+}
+function inPause(start, end) {
+  return (state.game.pauseLog || []).some((p) => start < p.until && end > p.from);
+}
+function earnPause(delta) {
+  const g = state.game;
+  g.pauseTokens = g.pauseTokens || 0;
+  if (g.pauseTokens >= PAUSE_MAX) { g.pauseXp = 0; return; }
+  g.pauseXp = (g.pauseXp || 0) + delta;
+  while (g.pauseXp >= PAUSE_XP && g.pauseTokens < PAUSE_MAX) { g.pauseXp -= PAUSE_XP; g.pauseTokens++; }
+  if (g.pauseTokens >= PAUSE_MAX) g.pauseXp = 0;
 }
 
 // A 12 h "+50 % points" boost, granted after a rough patch (see app.js).
@@ -154,6 +190,8 @@ export function tick(now, hooks) {
       hooks.onEnding(o);
     }
   }
+  const log = state.game.pauseLog || [];
+  if (log.length && log[0].until < now - 2 * 86400000) { state.game.pauseLog = log.filter((p) => p.until >= now - 2 * 86400000); changed = true; }
   if (changed) { pruneDays(today); save(); }
   state.lastSeen = now;
   return changed;
