@@ -34,7 +34,7 @@ function habitName(h) { return esc(pick(h.name)); }
 function habitDesc(h) { return esc(pick(h.desc || '')); }
 
 function slotsText(h) {
-  return (h.slots || []).map((s) => s.start + '–' + s.end).join(' · ');
+  return esc((h.slots || []).map((s) => s.start + '–' + s.end).join(' · '));
 }
 
 function daysText(h) {
@@ -687,21 +687,31 @@ export function renderOnboarding(step, data) {
 
 // ---- sheets -------------------------------------------------------------------
 
-let sheetEl = null, backdropEl = null;
+let sheetEl = null, backdropEl = null, dismissCb = null;
+export function sheetOpen() { return !!sheetEl; }
 export function closeSheet() {
   if (!sheetEl) return;
   const s = sheetEl, b = backdropEl;
-  sheetEl = backdropEl = null;
+  sheetEl = backdropEl = null; dismissCb = null;
   s.classList.remove('open'); b.classList.remove('open');
   setTimeout(() => { s.remove(); b.remove(); }, 260);
 }
-export function openSheet(html) {
+// Leaving a sheet without choosing (tap outside, Escape): the sheet may have
+// something to do about it (go back to a parent sheet, record a checkbox).
+export function dismissSheet() {
+  const cb = dismissCb;
   closeSheet();
+  if (cb) cb();
+}
+export function openSheet(html, onDismiss = null) {
+  closeSheet();
+  dismissCb = onDismiss;
   backdropEl = document.createElement('div'); backdropEl.className = 'backdrop';
   sheetEl = document.createElement('div'); sheetEl.className = 'sheet';
+  sheetEl.setAttribute('role', 'dialog'); sheetEl.setAttribute('aria-modal', 'true');
   sheetEl.innerHTML = `<div class="grab"></div>${html}`;
   document.body.append(backdropEl, sheetEl);
-  backdropEl.addEventListener('click', closeSheet);
+  backdropEl.addEventListener('click', dismissSheet);
   const b = backdropEl, sh = sheetEl;
   requestAnimationFrame(() => { b.classList.add('open'); sh.classList.add('open'); });
   return sheetEl;
@@ -719,15 +729,15 @@ export function durationOf(s) {
 function slotRow(s, i, mode = state.settings.slotMode) {
   if (mode === 'dur') {
     return `<div class="slot dur" data-slot="${i}">
-      <input class="input" type="time" value="${s.start}" data-f="start" required>
+      <input class="input" type="time" value="${esc(s.start)}" data-f="start" required>
       <div class="durctl"><input class="input" type="number" inputmode="numeric" min="1" max="1440" step="5" value="${durationOf(s)}" data-f="dur" required><span class="unit">min</span></div>
       <button class="iconbtn" data-rm="${i}" aria-label="${t('delete')}">✕</button>
     </div>`;
   }
   return `<div class="slot" data-slot="${i}">
-    <input class="input" type="time" value="${s.start}" data-f="start" required>
+    <input class="input" type="time" value="${esc(s.start)}" data-f="start" required>
     <span class="arrow">→</span>
-    <input class="input" type="time" value="${s.end}" data-f="end" required>
+    <input class="input" type="time" value="${esc(s.end)}" data-f="end" required>
     <button class="iconbtn" data-rm="${i}" aria-label="${t('delete')}">✕</button>
   </div>`;
 }
@@ -1043,15 +1053,15 @@ export function openUpdateSheet(version, notes, onClose) {
   const many = notes.length > 1;
   const list = notes.map((n) => `${many ? `<h3>${t('version', { v: esc(n.v) })}</h3>` : ''}
     <ul>${(n.lines.length ? n.lines : [t('updatedGeneric')]).map((l) => `<li>${esc(l)}</li>`).join('')}</ul>`).join('');
-  const el = openSheet(`
+  let el = null;
+  const read = () => onClose(!!(el && $('[data-dontshow]', el).checked));
+  el = openSheet(`
     <h2>🎉 ${t('updatedTitle', { v: esc(version) })}</h2>
     <div class="notes">${list}</div>
     <label class="dontshow"><input type="checkbox" data-dontshow>${t('dontShowAgain')}</label>
-    <div class="btnrow"><button class="btn primary wide" data-close>${t('close')}</button></div>`);
+    <div class="btnrow"><button class="btn primary wide" data-close>${t('close')}</button></div>`, read);
   el.classList.add('update');
-  const done = () => { onClose($('[data-dontshow]', el).checked); closeSheet(); };
-  $('[data-close]', el).addEventListener('click', done);
-  backdropEl.addEventListener('click', done);
+  $('[data-close]', el).addEventListener('click', () => { read(); closeSheet(); });
 }
 
 // Reset needs a stronger, more deliberate choice than a single OK button: the
@@ -1130,7 +1140,7 @@ function diffRow(sign, cls, h, detail) {
     <span class="txt"><span class="name">${habitName(h)}</span>${detail ? `<span class="sub">${detail}</span>` : ''}</span></div>`;
 }
 function diffMore(n) { return n > 0 ? `<div class="diff-row more">${t('diffMore', { n })}</div>` : ''; }
-function briefOf(h) { return esc(slotsText(h)) + ' · ' + esc(daysText(h)); }
+function briefOf(h) { return slotsText(h) + ' · ' + esc(daysText(h)); }
 function changeDetail(c) {
   const parts = [];
   for (const f of c.facets) {

@@ -81,8 +81,12 @@ confirm — never loses points, snapshots to recovery first.
 `openSheet`/`closeSheet` bottom sheets): `renderLive` / `renderProgress` /
 `renderMoments` / `renderSetup` / `renderOnboarding`. A delegated click
 handler on `#app` is keyed by `data-action` (`app.js`); `data-stop` blocks a
-row's own action; `data-setting` is the generic settings-change handler.
-Tabs: live, progress, moments, setup.
+row's own action (unless the stopper is the tapped button itself);
+`data-setting` is the generic settings-change handler. Sheets:
+`openSheet(html, onDismiss)` — `onDismiss` runs on tap-outside / Escape
+(`dismissSheet`), not on the sheet's own buttons; `sheetOpen()` lets a timer
+avoid tearing down an editor. Tabs: live, progress, moments, agenda
+(Quests, hideable), setup.
 
 **i18n** (`js/i18n.js`): `t(key, vars)` with `{var}` interpolation, `en`/`fr`
 objects side by side — every new user-facing string needs both, French uses
@@ -103,7 +107,8 @@ reload, then read `.toast` / `.sheet` etc. text, or dispatch synthetic
 
 ## Scoring rules
 
-As of v1.16.2 (2026-09-19), in `js/engine.js`:
+As of v1.23.0 (2026-09-30), in `js/engine.js` (quest points: see **Quests**
+above; pauses: see **Engine**):
 
 - **Done in time**: `BASE_PTS[importance]` (10/20/30), +50% if in the first
   half of the window ("early"/"quick", not morning — see the badge rename
@@ -141,8 +146,12 @@ if this doc and the code ever disagree.
 
 ## Current status
 
-Latest released version as of 2026-09-19: **v1.16.2** (tag pushed, GitHub
-release published, `main` up to date). The user's local `main` checkout has
+Latest released version as of 2026-09-30: **v1.23.0** (tag pushed, GitHub
+release published, `main` up to date). Since v1.16.2: louder boost
+announcement + tappable banner (1.17), one-time moments always addable /
+premades ask before replacing (1.18), greeting card split from the boost
+popup (1.19), pauses (1.20), Quests tab (1.21), quest sharing by link, run
+copies, give up, undo, full overview (1.22), review fixes + `docs/REVIEW-2026-09-30.md` (1.23). The user's local `main` checkout has
 repeatedly lagged behind `origin/main` after worktree sessions land — if
 behaviour looks stale, suggest `git pull` before debugging further.
 

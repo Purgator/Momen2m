@@ -6,7 +6,8 @@
   <title>Momen2m</title>
   <meta name="description" content="Your day, one moment at a time. Habits that pop up when it's time, with a countdown and points.">
   <meta name="color-scheme" content="dark light">
-  <meta name="theme-color" content="#0f1220">
+  <meta name="theme-color" content="#0f1220" media="(prefers-color-scheme: dark)">
+  <meta name="theme-color" content="#f4f5fb" media="(prefers-color-scheme: light)">
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png">
   <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
@@ -19,8 +20,8 @@
 </head>
 <body>
   <noscript>Momen2m needs JavaScript. / Momen2m a besoin de JavaScript.</noscript>
-  <main id="app" aria-live="polite"></main>
-  <div id="toasts" aria-live="assertive"></div>
+  <main id="app"></main>
+  <div id="toasts" aria-live="polite"></div>
   <script src="relay.config.js"></script>
   <script src="version.js"></script>
   <script type="module" src="js/app.js"></script>

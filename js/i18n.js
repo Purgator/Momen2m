@@ -99,7 +99,9 @@ const STRINGS = {
     agActive: 'In progress',
     agNoActiveHint: 'Pick a quest below and start it whenever you are ready.',
     agComingUp: 'Coming up',
-    agUpcoming: 'Next',
+    agStartsOn: 'Starts {day}',
+    agUnreachable: '⚠️ Some steps cannot be reached from the first one: link them, or remove them.',
+    agNoExit: 'This quest never ends: no step, and no answer, leads to the end.',
     agDrafts: 'Ready to start',
     agNoDraftsHint: 'Define a quest, lay out its steps, and it waits here for the day you start it — as often as you like.',
     agDone: 'Finished',
@@ -143,7 +145,7 @@ const STRINGS = {
     agTaskDone: '+{n} pts',
     agStepDone: 'step complete',
     agUndone: 'Taken back.',
-    agUndoLate: 'Too late to take it back (5 minutes).',
+    agUndoLate: 'Cannot take it back: five minutes have passed, or the quest is over.',
     agFinished: '{name} finished: {pct}% · +{pts} pts',
     agFinishedLine: '+{pts} pts over {days} days.',
     agFlawless: 'Flawless',
@@ -164,7 +166,7 @@ const STRINGS = {
     agImportAdd: 'Add it',
     agImportBad: 'This is not a quest link or code.',
     agImported: '{name} added to "Ready to start".',
-    agRules: 'A task done during its step: +{task}. Done later: +{late}. Every task of a step done on time: +{bonus}. A finished quest: completion × {day} pts × planned days, doubled at 100%. Giving up pays nothing.',
+    agRules: 'A task done during its step: +{task}. Done later: +{late}. Every task of a step done on time: +{bonus}. A finished quest: completion × {day} pts × planned days, doubled at 100%. Rest steps (no task) count for nothing; giving up pays nothing.',
     agSetting: 'Quests tab',
     agSettingHint: 'Goals planned in steps, with their own points.',
     completedLate: 'Done late',
@@ -596,7 +598,9 @@ const STRINGS = {
     agActive: 'En cours',
     agNoActiveHint: 'Choisis une quête plus bas et lance-la quand tu es prêt.',
     agComingUp: 'À venir',
-    agUpcoming: 'Ensuite',
+    agStartsOn: 'Commence {day}',
+    agUnreachable: '⚠️ Certaines étapes ne peuvent pas être atteintes depuis la première : relie-les, ou supprime-les.',
+    agNoExit: 'Cette quête ne finit jamais : aucune étape, aucune réponse ne mène à la fin.',
     agDrafts: 'Prêtes à démarrer',
     agNoDraftsHint: 'Définis une quête, pose ses étapes, et elle attend ici le jour où tu la lances — autant de fois que tu veux.',
     agDone: 'Terminées',
@@ -640,7 +644,7 @@ const STRINGS = {
     agTaskDone: '+{n} pts',
     agStepDone: 'étape complète',
     agUndone: 'Annulé.',
-    agUndoLate: 'Trop tard pour annuler (5 minutes).',
+    agUndoLate: 'Impossible d’annuler : cinq minutes sont passées, ou la quête est finie.',
     agFinished: '{name} terminée : {pct} % · +{pts} pts',
     agFinishedLine: '+{pts} pts sur {days} jours.',
     agFlawless: 'Sans faute',
@@ -661,7 +665,7 @@ const STRINGS = {
     agImportAdd: 'L’ajouter',
     agImportBad: 'Ce n’est pas un lien ou un code de quête.',
     agImported: '{name} ajoutée dans « Prêtes à démarrer ».',
-    agRules: 'Une tâche faite pendant son étape : +{task}. Faite plus tard : +{late}. Toutes les tâches d’une étape faites à temps : +{bonus}. Une quête terminée : avancement × {day} pts × jours prévus, doublé à 100 %. Abandonner ne rapporte rien.',
+    agRules: 'Une tâche faite pendant son étape : +{task}. Faite plus tard : +{late}. Toutes les tâches d’une étape faites à temps : +{bonus}. Une quête terminée : avancement × {day} pts × jours prévus, doublé à 100 %. Les étapes de repos (sans tâche) ne comptent pas ; abandonner ne rapporte rien.',
     agSetting: 'Onglet Quêtes',
     agSettingHint: 'Des objectifs planifiés par étapes, avec leurs propres points.',
     completedLate: 'Fait en retard',
@@ -1015,7 +1019,7 @@ export function t(key, vars) {
   if (s === undefined) s = STRINGS.en[key];
   if (s === undefined) return key;
   if (typeof s !== 'string') return s;
-  if (vars) for (const k in vars) s = s.replace(new RegExp('\\{' + k + '\\}', 'g'), vars[k]);
+  if (vars) for (const k in vars) s = s.split('{' + k + '}').join(String(vars[k])); // no $-pattern surprises from user text
   return s;
 }
 

@@ -11,7 +11,7 @@ import * as U from './ui.js';
 import { initUpdates, applyUpdate, checkForUpdate } from './update.js';
 import { versionsSince } from './changelog.js';
 import { defaultAnswers, proposeMoments, QUESTIONS, clampCount } from './setup.js';
-import { dayKey, addDays, at, nowHM, minutesToHM, parseHM, fmtDuration, fmtClock, fmtDateTime, fileStamp } from './time.js';
+import { dayKey, addDays, at, nowHM, minutesToHM, parseHM, fmtDuration, fmtClock, fmtDate, fmtDateTime, fileStamp } from './time.js';
 import * as AutoImport from './autobackup.js';
 import { diffStates } from './diff.js';
 import * as G from './game.js';
@@ -152,9 +152,16 @@ function frame() {
   else U.updateCountdowns(occs, now);
 }
 
+let pendingQuest = '';
+function offerPendingQuest() {
+  const shared = pendingQuest; pendingQuest = '';
+  if (shared) setTimeout(() => A.openImportSheet(shared, addImportedPlan), 700);
+}
+
 let interval = 0, wake = 0;
 function startTicker() {
   stopTicker();
+  if (pendingQuest && state.onboarded) offerPendingQuest();
   frame();
   // align to the second boundary so countdowns tick cleanly
   wake = setTimeout(() => { frame(); interval = setInterval(frame, 1000); }, 1000 - (Date.now() % 1000));
@@ -300,18 +307,20 @@ function announceGoalEnd(p, r) {
   U.toast(p.emoji + ' ' + t('agFinished', { name: p.name, pct: Math.round(r.pct * 100), pts: r.pts }), 'good', { ms: 6000 });
 }
 
-// Edits happen on a copy; a running goal takes the changes itself (its saved
-// template is a different object since starting made a copy).
+// Edits happen on a copy and only the content comes back — never the
+// progress, which the ticker may have moved while the editor was open. A
+// running quest takes the changes itself (its saved template is a different
+// object since starting made a copy).
 function editPlan(p) {
   const draft = JSON.parse(JSON.stringify(p));
   A.openGoalSheet(draft, {
-    onSave: (d) => { Object.assign(p, d); save(); N.feedback('tap'); render(); },
+    onSave: (d) => { Object.assign(p, { name: d.name, emoji: d.emoji, blocks: d.blocks, root: d.root }); save(); N.feedback('tap'); render(); },
     onDelete: p.status === 'draft' ? () => { P.remove(p.id); render(); } : null,
   });
 }
 
-function undoPlanTask(p, blockId, taskId) {
-  if (!P.undoTask(p, blockId, taskId, Date.now())) { U.toast(t('agUndoLate'), 'bad'); return; }
+function undoPlanTask(p, i, taskId) {
+  if (!P.undoTask(p, i, taskId, Date.now())) { U.toast(t('agUndoLate'), 'bad'); return; }
   N.feedback('tap'); render();
   U.toast('↩️ ' + t('agUndone'));
 }
@@ -325,7 +334,9 @@ async function shareQuest(p) {
 }
 
 function addImportedPlan(p) {
-  state.plans.push(p); save();
+  state.plans.push(p);
+  if (state.settings.agenda === false) state.settings.agenda = true; // an imported quest needs its tab
+  save();
   view = 'agenda'; dirty = true; render(); scrollTo(0, 0);
   N.feedback('tap');
   U.toast('📥 ' + t('agImported', { name: p.name }), 'good');
@@ -355,7 +366,12 @@ function checkRoughPatch(now) {
   if (g.lastEncouraged !== today) {
     g.lastEncouraged = today;
     const until = E.grantBoost(now);
-    setTimeout(() => { N.feedback('badge'); U.celebrate(['⚡', '✨', '⭐']); U.openBoostSheet(until); }, 1200);
+    setTimeout(() => {
+      N.feedback('badge'); U.celebrate(['⚡', '✨', '⭐']);
+      // Never tear down something the user is typing in: a toast then.
+      if (U.sheetOpen()) U.toast('⚡ ' + t('boostBanner', { until: fmtClock(until) }), 'good', { ms: 6000 });
+      else U.openBoostSheet(until);
+    }, 1200);
     dirty = true;
   }
 }
@@ -524,8 +540,8 @@ async function runAutoImport(opts) {
     const label = momentsLabel(found.parsed.habits.length);
     const made = found.parsed.lastBackupAt || found.modified;
     const body = made
-      ? t('autoImportFoundDated', { file: found.fileName, label, t: fmtDateTime(made) })
-      : t('autoImportFound', { file: found.fileName, label });
+      ? t('autoImportFoundDated', { file: U.esc(found.fileName), label, t: fmtDateTime(made) })
+      : t('autoImportFound', { file: U.esc(found.fileName), label });
     confirmAndApplyImport(found.text, body, found.parsed);
   } catch (err) {
     const kind = AutoImport.classifyError(err);
@@ -583,8 +599,11 @@ app.addEventListener('touchend', (e) => {
 
 // ---- events (delegated) ------------------------------------------------------------
 app.addEventListener('click', async (e) => {
-  if (e.target.closest('[data-stop]')) return; // switches inside tappable rows
   const btn = e.target.closest('[data-action]');
+  // A switch inside a tappable row is handled on `change`, not here — unless
+  // the stopper is itself the button being tapped (a delete cross in a row).
+  const stop = e.target.closest('[data-stop]');
+  if (stop && stop !== btn) return;
   if (!btn) return;
   const a = btn.dataset.action;
   N.unlockAudio();
@@ -620,7 +639,7 @@ app.addEventListener('click', async (e) => {
     case 'ag-start': {
       const p = findPlan(btn.dataset.id); if (!p) break;
       A.openStartSheet(p, (day) => {
-        const run = P.start(p, day); if (!run) return;
+        const run = P.start(p, day, Date.now()); if (!run) return;
         P.advance(Date.now());
         N.feedback('tap'); render();
         U.toast('▶️ ' + t('agStarted', { name: run.name, day: day === dayKey(new Date()) ? t('today').toLowerCase() : fmtDate(new Date(day + 'T12:00')) }), 'good');
@@ -630,20 +649,20 @@ app.addEventListener('click', async (e) => {
     case 'ag-done': {
       const p = findPlan(btn.dataset.id); if (!p) break;
       const levelBefore = E.levelFor(state.game.xp);
-      const { block, task } = btn.dataset;
-      const r = P.completeTask(p, block, task, now); if (!r) break;
+      const i = Number(btn.dataset.i), task = btn.dataset.task;
+      const r = P.completeTask(p, i, task, now); if (!r) break;
       const b = btn.getBoundingClientRect();
       U.sparkles(b.left + b.width / 2, b.top + b.height / 2);
       N.feedback('done'); render();
       U.toast((r.full ? '🏁 ' : '✓ ') + t('agTaskDone', { n: r.pts }) + (r.full ? ' · ' + t('agStepDone') : ''), 'good', {
-        ms: 6000, action: { label: t('undo'), fn: () => undoPlanTask(p, block, task) },
+        ms: 6000, action: { label: t('undo'), fn: () => undoPlanTask(p, i, task) },
       });
       celebrateGains(levelBefore, state.game.pauseTokens || 0, 700);
       break;
     }
     case 'ag-decide': {
       const p = findPlan(btn.dataset.id); if (!p) break;
-      if (!P.decide(p, btn.dataset.block, Number(btn.dataset.opt), now)) break;
+      if (!P.decide(p, Number(btn.dataset.i), Number(btn.dataset.opt), now)) break;
       N.feedback('tap'); render();
       if (p.status === 'done') { announceGoalEnd(p, p.finished); celebrateBadges(1500); } // the answer was the last step
       break;
@@ -654,7 +673,7 @@ app.addEventListener('click', async (e) => {
       A.openDetailSheet(p, now, {
         onEdit: active ? () => editPlan(p) : null,
         onForfeit: active ? () => { P.forfeit(p, Date.now()); N.feedback('miss'); U.toast('🏳️ ' + t('agForfeitedToast', { name: p.name })); render(); } : null,
-        onUndo: active ? (blockId, taskId) => undoPlanTask(p, blockId, taskId) : null,
+        onUndo: active ? (i, taskId) => undoPlanTask(p, i, taskId) : null,
         onDup: () => { state.plans.push(P.clonePlan(p)); save(); render(); U.toast('📋 ' + t('agDuplicated'), 'good'); },
         onShare: () => shareQuest(p),
         onDelete: p.status === 'done' ? () => { P.remove(p.id); render(); } : null,
@@ -950,7 +969,7 @@ app.addEventListener('change', (e) => {
 });
 const STRING_SETTINGS = new Set(['alertStyle', 'soundName', 'soundOutput', 'vibPattern']);
 
-document.addEventListener('keydown', (e) => { if (e.key === 'Escape') U.closeSheet(); });
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape') U.dismissSheet(); });
 
 // ---- notification buttons -----------------------------------------------------------------
 if ('serviceWorker' in navigator) {
@@ -977,7 +996,7 @@ if (view === 'live') startTicker(); else render();
 // This boot landed on a different version than the last one (the service
 // worker applied an update, in the background or via "Update now", and
 // reloaded): say so once, then forget the old version.
-if (state.lastSeenVersion && state.lastSeenVersion !== VERSION) {
+if (state.lastSeenVersion && state.lastSeenVersion !== VERSION && !pendingQuest) { // a shared quest has the stage; the note waits for the next boot
   if (state.settings.updateSummaries) {
     const notes = versionsSince(state.lastSeenVersion, VERSION, getLang());
     setTimeout(() => U.openUpdateSheet(VERSION, notes, (dontShow) => {
@@ -1009,8 +1028,9 @@ if (params.get('notif') && params.get('key') && state.onboarded) {
   setTimeout(() => handleNotifAction(params.get('notif'), params.get('key')), 200);
 }
 // A shared quest link lands here: preview it, then add it to "Ready to start".
-if (location.hash.startsWith('#quest=')) {
-  const shared = location.hash;
+// A first-time user sees it once the setup is over (see startTicker).
+if (location.hash.startsWith('#quest=') && P.importCode(location.hash)) {
+  pendingQuest = location.hash;
   history.replaceState(null, '', location.pathname + location.search);
-  if (state.onboarded && P.importCode(shared)) setTimeout(() => A.openImportSheet(shared, addImportedPlan), 700);
+  if (state.onboarded) offerPendingQuest();
 }

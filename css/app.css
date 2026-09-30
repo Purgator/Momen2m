@@ -23,6 +23,7 @@
   :root:not([data-theme="dark"]) {
     --bg: #f4f5fb; --bg2: #eceef8; --card: #ffffff; --card2: #f1f2fa; --line: #dfe2f0;
     --text: #171a2e; --muted: #626890; --accent: #5458f0; --accent2: #6c70ff;
+    --ok: #178a5e; --warn: #a86a00; --danger: #d6335a; /* readable on white */
     --shadow: 0 10px 30px rgba(20, 24, 60, .10);
     color-scheme: light;
   }
