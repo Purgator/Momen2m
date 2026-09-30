@@ -3,6 +3,12 @@
 // exhaustive (the detailed notes live on the GitHub release). Both languages.
 export const CHANGELOG = {
   en: {
+    '1.21.0': [
+      '🗓️ New Agenda tab: plan a goal in steps of one or more days, each with its tasks, then start it on the day you choose.',
+      '🧭 A step can end with a question whose answer decides the next step — your goal can branch.',
+      '🏁 Points only there: +5 a task (+1 late), +10 a flawless step, and a big payoff when the goal ends. No boost, no pause, no penalty.',
+      '🏅 Six new badges. The tab can be hidden from Setup.',
+    ],
     '1.20.0': [
       '⏸️ Pauses: stop your moments for a few hours when the routine shifts — the ones inside are left out, at no cost.',
       '🎁 Earn one pause every 150 points, keep up to three, spend one to three at once (3 h each). Count and details in the top bar.',
@@ -62,6 +68,12 @@ export const CHANGELOG = {
     '1.8.1': ['🔔 More reliable background reminders.'],
   },
   fr: {
+    '1.21.0': [
+      '🗓️ Nouvel onglet Agenda : planifie un objectif par étapes d’un ou plusieurs jours, chacune avec ses tâches, puis lance-le le jour de ton choix.',
+      '🧭 Une étape peut se terminer par une question dont la réponse décide de la suite — ton objectif peut se ramifier.',
+      '🏁 Des points seulement : +5 la tâche (+1 en retard), +10 l’étape sans faute, et une grosse récompense à la fin de l’objectif. Ni boost, ni pause, ni pénalité.',
+      '🏅 Six nouveaux badges. L’onglet se masque depuis les Réglages.',
+    ],
     '1.20.0': [
       '⏸️ Pauses : arrête tes moments quelques heures quand la routine change — ceux qui tombent dedans sont laissés de côté, sans rien coûter.',
       '🎁 Gagne une pause tous les 150 points, garde-en trois au plus, utilise une à trois d’un coup (3 h chacune). Le compte et les détails sont dans la barre du haut.',
