@@ -3,6 +3,12 @@
 // exhaustive (the detailed notes live on the GitHub release). Both languages.
 export const CHANGELOG = {
   en: {
+    '1.24.0': [
+      '💎 The quest sheet shows a progress bar with what the quest is worth right now and at most.',
+      '🗺️ Lifetime quest points on the Progress tab.',
+      '🔒 Once a step has started, its task list is set (names can still be fixed).',
+      '📱 Share a quest as a QR code for the phone next to you; import pastes from the clipboard in one tap.',
+    ],
     '1.23.0': [
       '🔁 A quest step walked twice (a question answering "again") is fresh each time and pays in full.',
       '🛌 Rest steps (no task) no longer count in a quest\'s completion; a quest must have a way to its end to be saved.',
@@ -83,6 +89,12 @@ export const CHANGELOG = {
     '1.8.1': ['🔔 More reliable background reminders.'],
   },
   fr: {
+    '1.24.0': [
+      '💎 La fiche d’une quête montre une barre d’avancement avec ce qu’elle vaut maintenant et au mieux.',
+      '🗺️ Les points de quêtes cumulés dans l’onglet Progrès.',
+      '🔒 Une fois une étape commencée, sa liste de tâches est figée (les noms se corrigent encore).',
+      '📱 Partage une quête en QR code pour le téléphone d’à côté ; l’import colle le presse-papiers d’un geste.',
+    ],
     '1.23.0': [
       '🔁 Une étape de quête parcourue deux fois (une question qui répond « encore ») repart de zéro et paie en entier.',
       '🛌 Les étapes de repos (sans tâche) ne comptent plus dans l’avancement ; une quête doit avoir une issue pour être enregistrée.',
