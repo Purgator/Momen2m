@@ -27,6 +27,8 @@ const ASSETS = [
   './js/fsstore.js',
   './js/autobackup.js',
   './js/plan.js',
+  './js/plans.js',
+  './js/agenda.js',
   './js/push.js',
   './relay.config.js',
   './js/diff.js',

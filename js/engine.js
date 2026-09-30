@@ -78,6 +78,10 @@ function applyXp(delta) {
   state.game.xp = Math.max(0, state.game.xp + delta);
   if (delta > 0) earnPause(delta);
 }
+// Points from outside the moments (the Agenda): no boost, no pause tokens.
+export function addPlainXp(delta) {
+  state.game.xp = Math.max(0, state.game.xp + delta);
+}
 
 // ---- pauses ---------------------------------------------------------------------
 // A pause token stops the moments for PAUSE_MS: open moments overlapping a
