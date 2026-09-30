@@ -44,7 +44,10 @@ draft stays in "Ready to start"); `forfeit` ends a run for 0 pts;
 the first unanswered question. Sharing is file-less: `exportCode(p)` packs
 the quest as base64url JSON into `APP_URL#quest=…`, `importCode(str)` reads
 a link or bare code back into a fresh draft (the boot code in `app.js`
-catches the hash). A
+catches the hash); `js/qr.js` (byte mode, level L, versions 1–40, no
+dependency) draws the link as a QR code in the share sheet. `payout(p)` =
+what a run is worth now / at most; `game.goalPts` is the lifetime total shown
+on the Progress tab. A
 block = `{ title, days, tasks[], next | decision: { question, options[{label,
 next}] } }`, so blocks form a graph walked from `root`. `schedule(p)` dates
 the `path` (each step starts right after the previous one, whatever day its

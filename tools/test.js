@@ -587,7 +587,7 @@ globalThis.window = globalThis;
   await test('agenda: dated steps, 5 pts a task (1 late), step bonus, questions branch, flawless goal pays double', async () => {
     const P = await import(url('plans.js'));
     S.state.plans = [];
-    Object.assign(S.state.game, { xp: 0, goalsDone: 0, goalsFlawless: 0, goalLongest: 0, goalTasks: 0, boostUntil: D(9, '00:00') });
+    Object.assign(S.state.game, { xp: 0, goalsDone: 0, goalsFlawless: 0, goalLongest: 0, goalTasks: 0, goalPts: 0, boostUntil: D(9, '00:00') });
     let p = P.newPlan(); p.name = 'Paint the room';
     let [b1] = p.blocks; b1.title = 'Prep'; b1.tasks = [{ id: 't1', name: 'Buy paint', emoji: '🎨' }];
     let b2 = P.newBlock(); b2.days = 2; b2.tasks = [{ id: 't2', name: 'Walls', emoji: '' }, { id: 't3', name: 'Ceiling', emoji: '' }];
@@ -641,7 +641,7 @@ globalThis.window = globalThis;
     assert.strictEqual(p.status, 'done');
     assert.deepStrictEqual([ev[0].pct, ev[0].days, ev[0].pts, ev[0].flawless], [1, 5, 500, true], '50 × 5 days, doubled');
     assert.strictEqual(P.pointsOn(T.addDays(today, 5)), 500);
-    assert.deepStrictEqual(P.stats(), { done: 1, flawless: 1, longest: 5, tasks: 5 });
+    assert.deepStrictEqual(P.stats(), { done: 1, flawless: 1, longest: 5, tasks: 5, pts: 551 }, 'lifetime quest points: 15 + 5 + 1 + 15 + 15 + 500');
     const c = P.clonePlan(p);
     assert.deepStrictEqual([c.status, c.blocks.length, P.estimate(c).days], ['draft', 4, 4], 'a copy is a fresh draft with the links kept');
     // Sharing: one URL-safe code carries the whole quest, links included.
@@ -662,7 +662,7 @@ globalThis.window = globalThis;
 
   await test('agenda: a step walked twice is fresh each time; rest steps weigh nothing; a quest needs an exit', async () => {
     const P = await import(url('plans.js'));
-    S.state.plans = []; Object.assign(S.state.game, { xp: 0, goalsDone: 0, goalsFlawless: 0, goalTasks: 0 });
+    S.state.plans = []; Object.assign(S.state.game, { xp: 0, goalsDone: 0, goalsFlawless: 0, goalLongest: 0, goalTasks: 0, goalPts: 0 });
     const tpl = P.newPlan(); tpl.name = 'Practice';
     const [a] = tpl.blocks; a.title = 'Play'; a.tasks = [{ id: 'x', name: 'Scales', emoji: '🎹' }];
     const rest = P.newBlock(); rest.title = 'Rest'; // no task
@@ -676,7 +676,9 @@ globalThis.window = globalThis;
     assert.deepStrictEqual(P.reachableIds(tpl).size, 2);
     const p = P.start(tpl, today, D(0, '09:00'));
     const task = p.blocks[0].tasks[0].id;
+    assert.deepStrictEqual(P.payout(p), { pct: 0, now: 0, max: 200, days: 2 }, 'in sight: Play + Rest = 2 days, 50 × 2 × 2 at most');
     assert.deepStrictEqual(P.completeTask(p, 0, task, D(0, '10:00')).pts, 15);
+    assert.deepStrictEqual([P.payout(p).now, P.payout(p).pct], [100, 1], 'flawless so far: 50 × 1 day × 2');
     P.advance(D(1, '08:00')); // rest day
     P.advance(D(2, '08:00'));
     assert.ok(P.pendingDecision(p, T.addDays(today, 2)));
@@ -688,6 +690,26 @@ globalThis.window = globalThis;
     assert.ok(P.decide(p, 3, 1, D(4, '08:00')), 'second rest day over: "Stop" — the answer itself ends the quest');
     assert.deepStrictEqual([p.status, p.finished.pct, p.finished.days, p.finished.pts], ['done', 1, 4, 400], 'rest days count in the length but not in the completion');
     S.state.plans = [];
+  });
+
+  await test('qr: every version is consistent, a link fits, a novel does not, the matrix has its finders', async () => {
+    const Q = await import(url('qr.js'));
+    for (let v = 1; v <= 40; v++) assert.ok(Q.dataCodewords(v) > 0 && Q.rawDataModules(v) % 8 < 8, 'version ' + v);
+    assert.deepStrictEqual([Q.dataCodewords(1), Q.dataCodewords(10), Q.dataCodewords(40)], [19, 274, 2956], 'known data capacities for level L');
+    const link = 'https://purgator.github.io/Momen2m/#quest=' + 'A'.repeat(400);
+    const m = Q.encode(link);
+    assert.ok(m && m.length === m[0].length && (m.length - 17) % 4 === 0, 'a square of 4v+17 modules');
+    assert.ok(m.length >= 4 * 12 + 17, 'a 440-byte link needs at least version 12');
+    const n = m.length;
+    for (const [cx, cy] of [[3, 3], [n - 4, 3], [3, n - 4]]) {
+      assert.strictEqual(m[cy][cx], 1, 'finder centre dark');
+      assert.strictEqual(m[cy - 2][cx - 2], 0, 'finder inner ring light');
+      assert.strictEqual(m[cy - 3][cx - 3], 1, 'finder outer ring dark');
+    }
+    assert.strictEqual(m[n - 8][8], 1, 'the dark module');
+    for (let i = 8; i < n - 8; i++) assert.strictEqual(m[6][i], i % 2 === 0 ? 1 : 0, 'timing row');
+    assert.strictEqual(Q.encode('x'.repeat(3000)), null, 'beyond version 40');
+    assert.ok(Q.encode('hi').length === 21, 'a tiny text fits version 1');
   });
 
   await test('timing advice: only with enough tight data; earlier when done before the window', async () => {
