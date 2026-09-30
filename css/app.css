@@ -390,6 +390,13 @@ textarea.input { resize: vertical; }
 .ag-dtask { font-size: 13px; color: var(--muted); padding: 2px 0 2px 8px; }
 .ag-dtask.ok { color: var(--text); }
 .ag-taskrow, .ag-opt { margin-top: 6px; }
+.ag-payout { margin-top: 12px; }
+.ag-payout .bprog.big { max-width: none; margin: 6px 0 8px; height: 10px; }
+.ag-paylegend { display: flex; justify-content: space-between; gap: 8px; font-size: 13px; font-weight: 600; flex-wrap: wrap; }
+.qrwrap { display: flex; justify-content: center; margin: 14px 0 8px; }
+.qrwrap canvas { width: 240px; max-width: 100%; height: auto; image-rendering: pixelated; border-radius: 10px; }
+.ag-url { word-break: break-all; font-size: 11px; font-family: monospace; }
+.tile.wide { grid-column: 1 / -1; }
 .ag-taskrow .iconbtn, .ag-opt .iconbtn { flex: 0 0 40px; }
 .greet { display: flex; gap: 14px; align-items: center; padding: 14px 16px; margin-bottom: 12px; border-radius: 16px; cursor: pointer;
   background: linear-gradient(135deg, rgba(108,112,255,.22), var(--card) 70%); border: 1px solid var(--line); animation: greetin .5s ease; }

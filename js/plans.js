@@ -172,6 +172,7 @@ export function completeTask(p, i, taskId, now) {
   if (full) rec.bonus = BLOCK_BONUS;
   addPlainXp(pts + (rec.bonus || 0));
   state.game.goalTasks = (state.game.goalTasks || 0) + 1;
+  state.game.goalPts = (state.game.goalPts || 0) + pts + (rec.bonus || 0);
   save();
   return { pts: pts + (rec.bonus || 0), late, full };
 }
@@ -191,6 +192,7 @@ export function undoTask(p, i, taskId, now) {
   for (const y of x.block.tasks) { const o = p.done[taskKey(i, y.id)]; if (o && o.bonus) { back += o.bonus; delete o.bonus; } }
   addPlainXp(-back);
   state.game.goalTasks = Math.max(0, (state.game.goalTasks || 0) - 1);
+  state.game.goalPts = Math.max(0, (state.game.goalPts || 0) - back);
   save();
   return true;
 }
@@ -245,8 +247,22 @@ export function finish(p, now) {
   g.goalsDone = (g.goalsDone || 0) + 1;
   if (flawless) g.goalsFlawless = (g.goalsFlawless || 0) + 1;
   g.goalLongest = Math.max(g.goalLongest || 0, days);
+  g.goalPts = (g.goalPts || 0) + pts;
   save();
   return { pct, pts, days, flawless };
+}
+
+// What a running quest is worth: if it ended now, and at most (every step in
+// sight done on time). Steps in sight = the path plus what follows it up to
+// the next question.
+export function payout(p) {
+  const sched = schedule(p);
+  const all = sched.concat(projection(p).steps);
+  const days = all.reduce((n, x) => n + x.block.days, 0);
+  const tasked = all.some((x) => x.block.tasks.length);
+  const pct = goalPct(p, sched);
+  const pathDays_ = sched.reduce((n, x) => n + x.block.days, 0);
+  return { pct, now: Math.round(pct * GOAL_PTS_PER_DAY * pathDays_) * (pct >= 1 ? 2 : 1), max: tasked ? GOAL_PTS_PER_DAY * days * 2 : 0, days };
 }
 
 // What lies ahead: the steps that will follow the path as it stands, dated,
@@ -291,7 +307,7 @@ export function pointsOn(day) {
 
 export function stats() {
   const g = state.game;
-  return { done: g.goalsDone || 0, flawless: g.goalsFlawless || 0, longest: g.goalLongest || 0, tasks: g.goalTasks || 0 };
+  return { done: g.goalsDone || 0, flawless: g.goalsFlawless || 0, longest: g.goalLongest || 0, tasks: g.goalTasks || 0, pts: g.goalPts || 0 };
 }
 
 // ---- sharing ----------------------------------------------------------------------

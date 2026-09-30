@@ -276,6 +276,7 @@ export function renderProgress(s, now, page = 0) {
       <button class="tile" data-action="explain" data-topic="rate" data-tip="${esc(t('tipRate'))}"><span class="v">🎯 ${pctText(s.period.rate)}</span><span class="l">${t('successRate')}</span><span class="s">${t('last30')}</span></button>
       <button class="tile" data-action="explain" data-topic="today" data-tip="${esc(t('tipToday'))}"><span class="v">✅ ${s.lifetime.done}</span><span class="l">${t('doneWord')}</span><span class="s">${t('early', { n: s.lifetime.early })}</span></button>
       <button class="tile" data-action="explain" data-topic="today" data-tip="${esc(t('tipToday'))}"><span class="v ${s.today.pts < 0 ? 'neg' : 'pos'}">${signed(s.today.pts)}</span><span class="l">${t('today')}</span><span class="s">${t('todayCount', { done: s.today.done, total: s.today.total })}</span></button>
+      ${state.settings.agenda !== false ? `<button class="tile wide" data-action="tab" data-view="agenda" data-tip="${esc(t('tipQuestPts'))}"><span class="v">🗺️ ${s.goals.pts}</span><span class="l">${t('agQuestPts')}</span><span class="s">${t('agQuestsDone', { n: s.goals.done, f: s.goals.flawless })}</span></button>` : ''}
     </div>
 
     <div class="section">
