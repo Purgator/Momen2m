@@ -320,7 +320,7 @@ function showView(v, { push = true } = {}) {
 }
 function showProgress() { showView('progress'); }
 addEventListener('popstate', (e) => {
-  if (U.sheetOpen()) { U.dismissSheet(); return; }
+  if (U.handlePop()) return; // a sheet closed (or our own pop): the tab stays
   const v = e.state && e.state.view;
   if (v && v !== view && state.onboarded) showView(v, { push: false });
 });
@@ -655,6 +655,7 @@ app.addEventListener('click', async (e) => {
   switch (a) {
     case 'tab': showView(btn.dataset.view); break;
     case 'explain': U.openExplainSheet(btn.dataset.topic, G.computeStats(now, occs), occs); N.feedback('tap'); break;
+    case 'quest-reminder-auto': state.settings.questReminder = ''; save(); Push.syncSoon(); N.feedback('tap'); render(); break;
     case 'badge': {
       const b = G.BADGES.find((x) => x.id === btn.dataset.id); if (!b) break;
       const p = G.badgeProgress(b, G.computeStats(now, occs));
@@ -1002,6 +1003,7 @@ app.addEventListener('change', (e) => {
   if (!key) return;
   if (key === 'lang') { state.lang = el.value; setLang(state.lang); save(); render(); return; }
   state.settings[key] = el.type === 'checkbox' ? el.checked : STRING_SETTINGS.has(key) ? el.value : Number(el.value);
+  if (key === 'questReminder' && el.value === P.reminderHM(state.settings.dayStart)) state.settings.questReminder = ''; // back on the default: follow the day start again
   save();
   // Some rows depend on others (critical toggle, pattern lock): redraw them.
   if (key === 'alertStyle' || key === 'vibSync' || key === 'agenda') render();
@@ -1065,17 +1067,17 @@ if (state.onboarded) {
 }
 const params = new URLSearchParams(location.search);
 if (params.has('quick') && state.onboarded) {
-  history.replaceState(null, '', location.pathname);
+  history.replaceState(history.state, '', location.pathname); // keep the base entry's view
   setTimeout(() => U.$('.fab') && U.$('.fab').click(), 300);
 }
 if (params.get('notif') && params.get('key') && state.onboarded) {
-  history.replaceState(null, '', location.pathname);
+  history.replaceState(history.state, '', location.pathname);
   setTimeout(() => handleNotifAction(params.get('notif'), params.get('key')), 200);
 }
 // A shared quest link lands here: preview it, then add it to "Ready to start".
 // A first-time user sees it once the setup is over (see startTicker).
 if (location.hash.startsWith('#quest=') && P.importCode(location.hash)) {
   pendingQuest = location.hash;
-  history.replaceState(null, '', location.pathname + location.search);
+  history.replaceState(history.state, '', location.pathname + location.search);
   if (state.onboarded) offerPendingQuest();
 }

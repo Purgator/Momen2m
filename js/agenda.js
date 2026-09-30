@@ -242,7 +242,7 @@ function openBlockSheet(p, b, back) {
     if (p.root === b.id) p.root = p.blocks[0].id;
     leave();
   });
-  setTimeout(() => $('[data-f="title"]', el).focus(), 300);
+  // No field takes focus: the sheet shows whole before any keyboard comes up.
 }
 
 // ---- start / detail / share ---------------------------------------------------------
