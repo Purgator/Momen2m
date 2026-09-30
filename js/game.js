@@ -3,6 +3,7 @@
 // tiny writer, unlockBadges) so the whole thing is testable under Node.
 import { state, save, needsBackup } from './store.js';
 import { levelFor, xpForLevel, dayComplete, todayPoints } from './engine.js';
+import { pointsOn as agendaPointsOn, stats as agendaStats } from './plans.js';
 import { dayKey, addDays } from './time.js';
 import { permission } from './notify.js';
 
@@ -113,7 +114,8 @@ export function computeStats(now, todayOccs = []) {
     history, week: history.slice(-7),
     period: { done, missed, skipped, resolved, rate: resolved ? done / resolved : null, early, snoozes, bestDay, dawn, night, weekend, distinct: distinct.size, comeback },
     perHabit: perHabitList,
-    today: { total: todays.length, done: todayDone, resolved: todayResolved, left: todays.length - todayResolved, pts: todayPoints(now) },
+    today: { total: todays.length, done: todayDone, resolved: todayResolved, left: todays.length - todayResolved, pts: todayPoints(now) + agendaPointsOn(today) },
+    goals: agendaStats(),
   };
 }
 
@@ -148,6 +150,12 @@ export const BADGES = [
   { id: 'oneoff', emoji: '⚡', goal: (s) => [s.lifetime.onceDone, 10] },
   { id: 'weekend', emoji: '🛋️', goal: (s) => [s.period.weekend, 10] },
   { id: 'nosnooze', emoji: '🧘', goal: (s) => [s.period.done >= 20 && s.period.snoozes === 0 ? 1 : 0, 1] },
+  { id: 'goal1', emoji: '🗓️', goal: (s) => [s.goals.done, 1] },
+  { id: 'goal3', emoji: '🧭', goal: (s) => [s.goals.done, 3] },
+  { id: 'goal10', emoji: '🏔️', goal: (s) => [s.goals.done, 10] },
+  { id: 'goalFlawless', emoji: '💠', goal: (s) => [s.goals.flawless, 1] },
+  { id: 'goalWeek', emoji: '📆', goal: (s) => [s.goals.longest, 7] },
+  { id: 'goalTasks', emoji: '🧩', goal: (s) => [s.goals.tasks, 50] },
 ];
 export const BADGE_PAGE = 9;
 

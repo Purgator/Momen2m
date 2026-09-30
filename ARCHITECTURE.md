@@ -35,6 +35,20 @@ while one runs), `pausedUntil(now)`; `game.pauseLog` keeps the intervals and
 `occurrencesOfDay` leaves out open moments overlapping one, so they are
 neither shown, notified, nor missed, and don't block a perfect day.
 
+**Agenda** (`js/plans.js` rules, `js/agenda.js` rendering + sheets, tab
+hideable via `settings.agenda`): `state.plans[]` — a goal is `{ blocks, root,
+status: draft|active|done, startDay, path, done, decisions, finished }`. A
+block = `{ title, days, tasks[], next | decision: { question, options[{label,
+next}] } }`, so blocks form a graph walked from `root`. `schedule(p)` dates
+the `path` (each step starts right after the previous one, whatever day its
+question was answered); `advance(now)` runs every tick: follows `next` when a
+step's days are over, waits on an unanswered question (`pendingDecision`),
+`finish`es at a dead end. Points bypass boost and pause tokens
+(`engine.addPlainXp`): `TASK_PTS` 5 (÷`LATE_DIV` 4 after the step),
+`BLOCK_BONUS` 10 when every task is done on time, goal = pct × 
+`GOAL_PTS_PER_DAY` 50 × planned days, ×2 at 100 %. `pointsOn(day)` feeds
+today's total; `stats()` feeds the six `goal*` badges.
+
 **Gamification** (`js/game.js`): `computeStats(now, occs)` builds everything
 `ui.js` renders (level, streak, lifetime/period counters, perHabit,
 badges-in-progress, tips). `momentKey(habit)` = emoji+name lowercased —

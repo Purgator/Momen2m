@@ -17,6 +17,8 @@ import { diffStates } from './diff.js';
 import * as G from './game.js';
 import { drawShareCard, share } from './share.js';
 import * as Push from './push.js';
+import * as P from './plans.js';
+import * as A from './agenda.js';
 
 // Ask the browser not to garbage-collect this origin's storage under pressure.
 // Silent and best-effort: it cannot be forced, and some browsers ignore it.
@@ -89,6 +91,9 @@ function render(now = Date.now()) {
       needsBackup: needsBackup(), recovery: getRecoverySnapshot(), canAutoImport: AutoImport.supported,
       push: Push.supported() ? { ...Push.info(), caveat: Push.caveat() } : null,
     });
+  } else if (view === 'agenda') {
+    renderedDay = dayKey(new Date(now));
+    app.innerHTML = A.renderAgenda(now);
   } else if (view === 'progress') {
     occs = E.buildOccurrences(now);
     const stats = G.computeStats(now, occs);
@@ -117,6 +122,15 @@ function frame() {
   const now = Date.now();
   const changed = E.tick(now, hooks);
   checkRoughPatch(now);
+  const { finished, changed: plansMoved } = P.advance(now);
+  if (plansMoved) dirty = true;
+  if (finished.length) {
+    finished.forEach((e, i) => setTimeout(() => {
+      N.feedback('levelup'); U.celebrate(['🎯', '🏁', '✨', '💠']);
+      U.toast(e.plan.emoji + ' ' + t('agFinished', { name: e.plan.name, pct: Math.round(e.pct * 100), pts: e.pts }), 'good', { ms: 6000 });
+    }, i * 1500));
+    setTimeout(() => celebrateBadges(0), finished.length * 1500);
+  }
   occs = E.buildOccurrences(now);
   let phaseChanged = false;
   const seen = new Set();
@@ -132,6 +146,7 @@ function frame() {
   }
   for (const k of Array.from(phases.keys())) if (!seen.has(k)) { phases.delete(k); expanded.delete(k); fresh.delete(k); phaseChanged = true; }
   if (changed) Push.syncSoon();
+  if (view === 'agenda' && (dirty || dayKey(new Date(now)) !== renderedDay)) render(now);
   if (view !== 'live') return;
   if (dirty || changed || phaseChanged || dayKey(new Date(now)) !== renderedDay) render(now);
   else U.updateCountdowns(occs, now);
@@ -244,6 +259,12 @@ function doDone(o, now, at) {
   const combo = G.todayCombo(occs, now);
   if (combo >= 2 && !r.perfect) { setTimeout(() => U.toast('🔥 ' + t('toastCombo', { n: combo })), delay); delay += 900; }
   if (r.perfect) { setTimeout(() => U.toast('🎉 ' + t('toastPerfectDay', { n: state.game.streak + 1 }), 'good', { ms: 3500 }), delay); delay += 900; }
+  celebrateGains(levelBefore, pausesBefore, delay);
+  return true;
+}
+
+// Level up, new pause, new badges — whatever a gain just unlocked, in order.
+function celebrateGains(levelBefore, pausesBefore, delay) {
   const levelAfter = E.levelFor(state.game.xp);
   if (levelAfter > levelBefore) {
     const ranks = t('rankNames');
@@ -259,7 +280,6 @@ function doDone(o, now, at) {
     delay += 1000;
   }
   celebrateBadges(delay);
-  return true;
 }
 
 // Persists any newly earned badge and announces it. Safe to call often.
@@ -273,6 +293,12 @@ function celebrateBadges(delay = 0) {
 }
 
 function showProgress() { view = 'progress'; dirty = true; render(); scrollTo(0, 0); }
+const findPlan = (id) => (state.plans || []).find((p) => p.id === id);
+
+function announceGoalEnd(p, r) {
+  N.feedback('levelup'); U.celebrate(['🎯', '🏁', '✨', '💠']);
+  U.toast(p.emoji + ' ' + t('agFinished', { name: p.name, pct: Math.round(r.pct * 100), pts: r.pts }), 'good', { ms: 6000 });
+}
 
 // Three misses in a row (nothing done in between) is a rough patch, not a
 // character flaw. Two separate things follow: a warm greeting card each time
@@ -555,6 +581,58 @@ app.addEventListener('click', async (e) => {
       });
       break;
 
+    // ---- agenda ----
+    case 'ag-new':
+      A.openGoalSheet(P.newPlan(), { onSave: (p) => { state.plans.push(p); save(); N.feedback('tap'); render(); } });
+      break;
+    case 'ag-edit': {
+      const p = findPlan(btn.dataset.id); if (!p) break;
+      if (p.status !== 'draft') { U.toast(t('agLockedHint')); break; }
+      const draft = JSON.parse(JSON.stringify(p));
+      A.openGoalSheet(draft, {
+        onSave: (d) => { Object.assign(p, d); save(); N.feedback('tap'); render(); },
+        onDelete: () => { P.remove(p.id); render(); },
+      });
+      break;
+    }
+    case 'ag-start': {
+      const p = findPlan(btn.dataset.id); if (!p) break;
+      A.openStartSheet(p, (day) => {
+        if (!P.start(p, day)) return;
+        P.advance(Date.now());
+        N.feedback('tap'); render();
+        U.toast('▶️ ' + t('agStarted', { name: p.name, day: day === dayKey(new Date()) ? t('today') : fmtDate(new Date(day + 'T12:00')) }), 'good');
+      });
+      break;
+    }
+    case 'ag-done': {
+      const p = findPlan(btn.dataset.id); if (!p) break;
+      const levelBefore = E.levelFor(state.game.xp);
+      const r = P.completeTask(p, btn.dataset.block, btn.dataset.task, now); if (!r) break;
+      const b = btn.getBoundingClientRect();
+      U.sparkles(b.left + b.width / 2, b.top + b.height / 2);
+      N.feedback('done'); render();
+      U.toast((r.full ? '🏁 ' : '✓ ') + t('agTaskDone', { n: r.pts }) + (r.full ? ' · ' + t('agStepDone') : ''), 'good');
+      celebrateGains(levelBefore, state.game.pauseTokens || 0, 700);
+      break;
+    }
+    case 'ag-decide': {
+      const p = findPlan(btn.dataset.id); if (!p) break;
+      if (!P.decide(p, btn.dataset.block, Number(btn.dataset.opt), now)) break;
+      N.feedback('tap'); render();
+      if (p.status === 'done') { announceGoalEnd(p, p.finished); celebrateBadges(1500); } // the answer was the last step
+      break;
+    }
+    case 'ag-detail': {
+      const p = findPlan(btn.dataset.id); if (!p) break;
+      A.openDetailSheet(p, dayKey(new Date(now)), {
+        onEnd: p.status === 'active' ? () => { announceGoalEnd(p, P.finish(p, Date.now())); render(); celebrateBadges(1500); } : null,
+        onDup: () => { state.plans.push(P.clonePlan(p)); save(); render(); U.toast('📋 ' + t('agDuplicated'), 'good'); },
+        onDelete: p.status === 'done' ? () => { P.remove(p.id); render(); } : null,
+      });
+      break;
+    }
+
     case 'done': {
       const o = findOcc(btn.dataset.key); if (!o) break;
       const b = btn.getBoundingClientRect();
@@ -834,7 +912,7 @@ app.addEventListener('change', (e) => {
   state.settings[key] = el.type === 'checkbox' ? el.checked : STRING_SETTINGS.has(key) ? el.value : Number(el.value);
   save();
   // Some rows depend on others (critical toggle, pattern lock): redraw them.
-  if (key === 'alertStyle' || key === 'vibSync') render();
+  if (key === 'alertStyle' || key === 'vibSync' || key === 'agenda') render();
   // Preview as you go, so picking a tone or a volume is immediate.
   if (key === 'soundName' || key === 'volume') { N.unlockAudio(); N.playTone(false); N.vibrate(N.vibrationPattern(false)); }
   if (key === 'vibPattern') N.testVibration();

@@ -7,12 +7,13 @@ import { QUESTIONS, isTriggered, reviewStatus } from './setup.js';
 import { suggestEmoji } from './emoji.js';
 import { BASE_PTS, SNOOZE_PENALTY, PAUSE_MAX, PAUSE_XP, PAUSE_MS, canSnooze, currentOf, todayPoints, boostActive, pausedUntil } from './engine.js';
 import { levelInfo, rankLadder, BADGES, BADGE_PAGE, badgeProgress, tips as gameTips } from './game.js';
+import { pointsOn as agendaPointsOn } from './plans.js';
 import { fmtClock, fmtCountdown, fmtDuration, fmtAgo, fmtDate, fmtDateTime, fmtWhenShort, nowHM, minutesToHM, parseHM, dayKey, weekday, at } from './time.js';
 import { permission, TONE_NAMES, PATTERN_NAMES } from './notify.js';
 
 export const $ = (sel, root = document) => root.querySelector(sel);
 export const $$ = (sel, root = document) => Array.from(root.querySelectorAll(sel));
-const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+export const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
 const RING_R = 70;
 const RING_C = 2 * Math.PI * RING_R;
@@ -24,6 +25,7 @@ export function tabbar(view) {
     <button class="tab ${view === 'live' ? 'on' : ''}" data-action="tab" data-view="live"><span class="ico">⏱️</span>${t('tabNow')}</button>
     <button class="tab ${view === 'progress' ? 'on' : ''}" data-action="tab" data-view="progress"><span class="ico">🏆</span>${t('tabProgress')}</button>
     <button class="tab ${view === 'moments' ? 'on' : ''}" data-action="tab" data-view="moments"><span class="ico">📋</span>${t('tabMoments')}</button>
+    ${state.settings.agenda !== false ? `<button class="tab ${view === 'agenda' ? 'on' : ''}" data-action="tab" data-view="agenda"><span class="ico">🗓️</span>${t('tabAgenda')}</button>` : ''}
     <button class="tab ${view === 'setup' ? 'on' : ''}" data-action="tab" data-view="setup"><span class="ico">🎛️</span>${t('tabSetup')}</button>
   </nav>`;
 }
@@ -105,7 +107,7 @@ export function renderLive(occs, now, opts) {
   const ranks = t('rankNames');
   const li = levelInfo(g.xp, ranks.length);
   const level = li.level, hi = li.hi, pct = li.pct;
-  const today = todayPoints(now);
+  const today = todayPoints(now) + agendaPointsOn(dayKey(new Date(now)));
   const rank = ranks[li.rankIdx];
 
   const past = occs.filter((o) => o.phase === 'past');
@@ -347,7 +349,7 @@ export function openExplainSheet(topic, s, todayOccs = []) {
     html = `<h2>${t('today')} · ${signed(s.today.pts)} pts</h2>
       <p class="hint" style="margin-top:6px">${t('explainToday')}</p>
       ${boostActive(Date.now()) ? `<p class="hint boost-hint" style="margin-top:6px">⚡ ${t('boostBanner', { until: fmtClock(state.game.boostUntil) })}</p>` : ''}
-      ${rows ? `<div class="card ladder" style="margin-top:10px">${rows}</div>` : ''}
+      ${rows || agendaPointsOn(today) ? `<div class="card ladder" style="margin-top:10px">${rows}${agendaPointsOn(today) ? `<div class="lrow"><span>🗓️ ${t('tabAgenda')}</span><span class="pos">+${agendaPointsOn(today)}</span></div>` : ''}</div>` : ''}
       <div class="card ladder" style="margin-top:10px">
         <div class="lrow"><span>${t('ruleDone')}</span><span class="pos">+${BASE_PTS[1]} / +${BASE_PTS[2]} / +${BASE_PTS[3]}</span></div>
         <div class="lrow"><span>${t('ruleEarly')}</span><span class="pos">+50%</span></div>
@@ -576,6 +578,7 @@ export function renderSetup(opts) {
           ? `<button class="btn small primary" data-action="apply-update">${t('updateNow')}</button>`
           : `<button class="btn small" data-action="check-update" ${opts.checkingUpdate ? 'disabled' : ''}>${opts.checkingUpdate ? '<span class="spinner"></span>' : ''}${t('checkUpdate')}</button>`)}
         ${toggleRow(t('updateSummaries'), t('updateSummariesHint'), sw('updateSummaries', s.updateSummaries))}
+        ${toggleRow('🗓️ ' + t('agSetting'), t('agSettingHint'), sw('agenda', s.agenda !== false))}
         ${opts.canInstall ? toggleRow(t('install'), '', `<button class="btn small primary" data-action="install">${t('install')}</button>`) : ''}
         ${opts.isIosBrowser ? `<p class="hint" style="padding:10px 0">${t('obIosInstall')}</p>` : ''}
         <div class="toggle"><div><div class="t"><button class="link" style="padding:0" data-action="restart-ob">${t('onboardingRestart')}</button></div><div class="s">${t('obRestartHint')}</div></div></div>
@@ -692,7 +695,7 @@ export function closeSheet() {
   s.classList.remove('open'); b.classList.remove('open');
   setTimeout(() => { s.remove(); b.remove(); }, 260);
 }
-function openSheet(html) {
+export function openSheet(html) {
   closeSheet();
   backdropEl = document.createElement('div'); backdropEl.className = 'backdrop';
   sheetEl = document.createElement('div'); sheetEl.className = 'sheet';
