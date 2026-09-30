@@ -3,6 +3,11 @@
 // exhaustive (the detailed notes live on the GitHub release). Both languages.
 export const CHANGELOG = {
   en: {
+    '1.26.0': [
+      '🗺️ Four example quests (moving flat, exam week, race prep, spring-clean weekend) appear in "Ready to start" the first time you open Quests.',
+      '🌅 Your wake and bed times from the setup are kept and shown in Setup ("Your day"); the quest reminder follows your real morning.',
+      '🐛 Edit and Share from a running quest\'s sheet open again instead of closing everything.',
+    ],
     '1.25.0': [
       '🔔 A daily quest reminder, an hour after your day starts (or the hour you pick in Setup), on days when tasks or a question wait — through the relay too.',
       '🔴 A dot on the Quests tab when something waits today; the active tab is highlighted.',
@@ -95,6 +100,11 @@ export const CHANGELOG = {
     '1.8.1': ['🔔 More reliable background reminders.'],
   },
   fr: {
+    '1.26.0': [
+      '🗺️ Quatre quêtes d’exemple (déménager, semaine d’examen, préparer une course, week-end grand ménage) apparaissent dans « Prêtes à démarrer » à la première ouverture des Quêtes.',
+      '🌅 Tes heures de lever et de coucher de la configuration sont gardées et visibles dans les Réglages (« Ta journée ») ; le rappel des quêtes suit ton vrai matin.',
+      '🐛 Modifier et Partager depuis la fiche d’une quête en cours s’ouvrent de nouveau au lieu de tout fermer.',
+    ],
     '1.25.0': [
       '🔔 Un rappel de quêtes par jour, une heure après le début de ta journée (ou à l’heure choisie dans les Réglages), les jours où des tâches ou une question attendent — via le relais aussi.',
       '🔴 Un point sur l’onglet Quêtes quand quelque chose attend aujourd’hui ; l’onglet actif est mis en évidence.',
