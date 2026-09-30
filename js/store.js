@@ -31,6 +31,7 @@ function defaults() {
       backupSingleFile: true, // overwrite momen2m-backup.json; false = a new dated file per backup
       agenda: true,           // show the Quests tab (goals planned in steps)
       dayStart: '07:00',      // wake time from the setup; anchors the quest reminder
+      dayEnd: '22:30',        // bed time from the setup
       questReminder: '',      // HH:MM of the daily quest reminder; '' = an hour after dayStart
     },
     lastView: 'live',       // tab to reopen on
@@ -80,6 +81,12 @@ function mergeWithDefaults(raw) {
     if (s.settings.soundOutput === 'app') s.settings.soundOutput = 'both';
     s.v = 2;
   }
+  // Wake and bed times were asked during the setup but not kept before 1.25:
+  // read them back from the moments that setup created from them.
+  const rs = raw.settings || {};
+  const slot0 = (preset) => { const h = (raw.habits || []).find((x) => x.preset === preset); return h && h.slots && h.slots[0] ? h.slots[0].start : null; };
+  if (!rs.dayStart) s.settings.dayStart = slot0('wake') || s.settings.dayStart;
+  if (!rs.dayEnd) s.settings.dayEnd = slot0('sleep') || s.settings.dayEnd;
   return s;
 }
 
