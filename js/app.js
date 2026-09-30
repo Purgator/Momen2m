@@ -300,6 +300,37 @@ function announceGoalEnd(p, r) {
   U.toast(p.emoji + ' ' + t('agFinished', { name: p.name, pct: Math.round(r.pct * 100), pts: r.pts }), 'good', { ms: 6000 });
 }
 
+// Edits happen on a copy; a running goal takes the changes itself (its saved
+// template is a different object since starting made a copy).
+function editPlan(p) {
+  const draft = JSON.parse(JSON.stringify(p));
+  A.openGoalSheet(draft, {
+    onSave: (d) => { Object.assign(p, d); save(); N.feedback('tap'); render(); },
+    onDelete: p.status === 'draft' ? () => { P.remove(p.id); render(); } : null,
+  });
+}
+
+function undoPlanTask(p, blockId, taskId) {
+  if (!P.undoTask(p, blockId, taskId, Date.now())) { U.toast(t('agUndoLate'), 'bad'); return; }
+  N.feedback('tap'); render();
+  U.toast('↩️ ' + t('agUndone'));
+}
+
+async function shareQuest(p) {
+  const e = P.estimate(p);
+  const url = APP_URL + '#quest=' + P.exportCode(p);
+  const res = await share({ text: t('agShareText', { emoji: p.emoji, name: p.name, n: e.steps, d: e.days }), url });
+  if (res === 'shared' || res === 'copied') U.toast(t(res === 'shared' ? 'shared' : 'sharedCopied'), 'good');
+  else if (res === false) U.toast(t('shareFailed'), 'bad');
+}
+
+function addImportedPlan(p) {
+  state.plans.push(p); save();
+  view = 'agenda'; dirty = true; render(); scrollTo(0, 0);
+  N.feedback('tap');
+  U.toast('📥 ' + t('agImported', { name: p.name }), 'good');
+}
+
 // Three misses in a row (nothing done in between) is a rough patch, not a
 // character flaw. Two separate things follow: a warm greeting card each time
 // the run reaches a multiple of three, and — once a day — a 12 h +50 % points
@@ -581,38 +612,32 @@ app.addEventListener('click', async (e) => {
       });
       break;
 
-    // ---- agenda ----
+    // ---- quests (agenda) ----
     case 'ag-new':
       A.openGoalSheet(P.newPlan(), { onSave: (p) => { state.plans.push(p); save(); N.feedback('tap'); render(); } });
       break;
-    case 'ag-edit': {
-      const p = findPlan(btn.dataset.id); if (!p) break;
-      if (p.status !== 'draft') { U.toast(t('agLockedHint')); break; }
-      const draft = JSON.parse(JSON.stringify(p));
-      A.openGoalSheet(draft, {
-        onSave: (d) => { Object.assign(p, d); save(); N.feedback('tap'); render(); },
-        onDelete: () => { P.remove(p.id); render(); },
-      });
-      break;
-    }
+    case 'ag-edit': { const p = findPlan(btn.dataset.id); if (p) editPlan(p); break; }
     case 'ag-start': {
       const p = findPlan(btn.dataset.id); if (!p) break;
       A.openStartSheet(p, (day) => {
-        if (!P.start(p, day)) return;
+        const run = P.start(p, day); if (!run) return;
         P.advance(Date.now());
         N.feedback('tap'); render();
-        U.toast('▶️ ' + t('agStarted', { name: p.name, day: day === dayKey(new Date()) ? t('today') : fmtDate(new Date(day + 'T12:00')) }), 'good');
+        U.toast('▶️ ' + t('agStarted', { name: run.name, day: day === dayKey(new Date()) ? t('today').toLowerCase() : fmtDate(new Date(day + 'T12:00')) }), 'good');
       });
       break;
     }
     case 'ag-done': {
       const p = findPlan(btn.dataset.id); if (!p) break;
       const levelBefore = E.levelFor(state.game.xp);
-      const r = P.completeTask(p, btn.dataset.block, btn.dataset.task, now); if (!r) break;
+      const { block, task } = btn.dataset;
+      const r = P.completeTask(p, block, task, now); if (!r) break;
       const b = btn.getBoundingClientRect();
       U.sparkles(b.left + b.width / 2, b.top + b.height / 2);
       N.feedback('done'); render();
-      U.toast((r.full ? '🏁 ' : '✓ ') + t('agTaskDone', { n: r.pts }) + (r.full ? ' · ' + t('agStepDone') : ''), 'good');
+      U.toast((r.full ? '🏁 ' : '✓ ') + t('agTaskDone', { n: r.pts }) + (r.full ? ' · ' + t('agStepDone') : ''), 'good', {
+        ms: 6000, action: { label: t('undo'), fn: () => undoPlanTask(p, block, task) },
+      });
       celebrateGains(levelBefore, state.game.pauseTokens || 0, 700);
       break;
     }
@@ -625,13 +650,19 @@ app.addEventListener('click', async (e) => {
     }
     case 'ag-detail': {
       const p = findPlan(btn.dataset.id); if (!p) break;
-      A.openDetailSheet(p, dayKey(new Date(now)), {
-        onEnd: p.status === 'active' ? () => { announceGoalEnd(p, P.finish(p, Date.now())); render(); celebrateBadges(1500); } : null,
+      const active = p.status === 'active';
+      A.openDetailSheet(p, now, {
+        onEdit: active ? () => editPlan(p) : null,
+        onForfeit: active ? () => { P.forfeit(p, Date.now()); N.feedback('miss'); U.toast('🏳️ ' + t('agForfeitedToast', { name: p.name })); render(); } : null,
+        onUndo: active ? (blockId, taskId) => undoPlanTask(p, blockId, taskId) : null,
         onDup: () => { state.plans.push(P.clonePlan(p)); save(); render(); U.toast('📋 ' + t('agDuplicated'), 'good'); },
+        onShare: () => shareQuest(p),
         onDelete: p.status === 'done' ? () => { P.remove(p.id); render(); } : null,
       });
       break;
     }
+    case 'ag-share': { const p = findPlan(btn.dataset.id); if (p) shareQuest(p); break; }
+    case 'ag-import': A.openImportSheet('', addImportedPlan); break;
 
     case 'done': {
       const o = findOcc(btn.dataset.key); if (!o) break;
@@ -976,4 +1007,10 @@ if (params.has('quick') && state.onboarded) {
 if (params.get('notif') && params.get('key') && state.onboarded) {
   history.replaceState(null, '', location.pathname);
   setTimeout(() => handleNotifAction(params.get('notif'), params.get('key')), 200);
+}
+// A shared quest link lands here: preview it, then add it to "Ready to start".
+if (location.hash.startsWith('#quest=')) {
+  const shared = location.hash;
+  history.replaceState(null, '', location.pathname + location.search);
+  if (state.onboarded && P.importCode(shared)) setTimeout(() => A.openImportSheet(shared, addImportedPlan), 700);
 }
