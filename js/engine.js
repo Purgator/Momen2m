@@ -74,9 +74,12 @@ export function currentOf(list) {
   return best;
 }
 
+// Returns what really moved: a penalty stops at zero, and undo pays back that.
 function applyXp(delta) {
-  state.game.xp = Math.max(0, state.game.xp + delta);
+  const before = state.game.xp;
+  state.game.xp = Math.max(0, before + delta);
   if (delta > 0) earnPause(delta);
+  return state.game.xp - before;
 }
 // Points from outside the moments (the Agenda): no boost, no pause tokens.
 export function addPlainXp(delta) {
@@ -91,6 +94,7 @@ export function addPlainXp(delta) {
 export const PAUSE_MAX = 3;
 export const PAUSE_XP = 150;
 export const PAUSE_MS = 3 * 60 * 60 * 1000;
+export const PAUSE_KEEP_DAYS = 32; // > game.HISTORY_DAYS
 export function pausedUntil(now) {
   const p = (state.game.pauseLog || []).find((x) => x.from <= now && now < x.until);
   return p ? p.until : 0;
@@ -156,8 +160,11 @@ function lastDeadline(day) {
 function settlePastDays(now) {
   const today = dayKey(new Date(now));
   const g = state.game;
-  let day = g.lastEvaluated ? addDays(g.lastEvaluated, 1) : today;
   if (!g.lastEvaluated) { g.lastEvaluated = addDays(today, -1); return false; }
+  // The clock went backwards (a wrong date corrected): never leave the cursor
+  // in the future, or the streak would freeze for good.
+  if (g.lastEvaluated > addDays(today, -1)) { g.lastEvaluated = addDays(today, -1); return true; }
+  let day = addDays(g.lastEvaluated, 1);
   const floor = addDays(today, -45);
   if (day < floor) day = floor;
   let changed = false;
@@ -187,15 +194,18 @@ export function tick(now, hooks) {
     if (!rec.nStart) {
       rec.nStart = true;
       changed = true;
-      if (now - o.start < RECENT) hooks.onStart(o);
+      if (hooks && now - o.start < RECENT) hooks.onStart(o);
     }
     if (before > 0 && !rec.nEnd && o.end - now <= before && o.end - o.start > before * 2) {
       rec.nEnd = true;
-      hooks.onEnding(o);
+      if (hooks) hooks.onEnding(o);
     }
   }
+  // Pauses are kept as long as the statistics look back, so a paused day
+  // stays "perfect" in the history chart instead of resurfacing as misses.
   const log = state.game.pauseLog || [];
-  if (log.length && log[0].until < now - 2 * 86400000) { state.game.pauseLog = log.filter((p) => p.until >= now - 2 * 86400000); changed = true; }
+  const keepFrom = now - PAUSE_KEEP_DAYS * 86400000;
+  if (log.length && log[0].until < keepFrom) { state.game.pauseLog = log.filter((p) => p.until >= keepFrom); changed = true; }
   if (changed) { pruneDays(today); save(); }
   state.lastSeen = now;
   return changed;
@@ -214,7 +224,7 @@ export function complete(o, now) {
   rec.pts = (rec.pts || 0) + pts;
   rec.at = now;
   rec.early = early;
-  applyXp(pts);
+  rec.xp = applyXp(pts);
   state.game.done++;
   if (early) state.game.early = (state.game.early || 0) + 1;
   if (o.habit.once) state.game.onceDone = (state.game.onceDone || 0) + 1;
@@ -284,23 +294,29 @@ export function skip(o, now) {
   rec.status = 'skipped';
   rec.pts = (rec.pts || 0) + pen;
   rec.at = now;
-  applyXp(pen);
+  rec.xp = applyXp(pen);
   save();
   return { pts: pen };
 }
 
-// Reverts a done/skipped occurrence back to open (mis-tap protection).
+// Reverts a done/skipped occurrence back to open (mis-tap protection). A late
+// completion is not undoable: its window is dead, the miss would come back.
 export function undo(o) {
   const rec = record(o.day, o.occ, false);
-  if (!rec || rec.status === 'open' || rec.status === 'missed') return false;
+  if (!rec || rec.status === 'open' || rec.status === 'missed' || rec.late) return false;
   if (rec.status === 'done') {
     state.game.done = Math.max(0, state.game.done - 1);
     if (rec.early) state.game.early = Math.max(0, (state.game.early || 0) - 1);
   }
   rec.early = false;
-  // Snooze penalties stay; only the done/skip points are reverted.
+  // Snooze penalties stay; only the done/skip points are reverted — plainly:
+  // a reverted penalty is not a gain, and a reverted gain takes back the pause
+  // progress it had filled.
   const snoozePts = -rec.snoozes * SNOOZE_PENALTY;
-  applyXp(-((rec.pts || 0) - snoozePts));
+  const gain = (rec.pts || 0) - snoozePts;
+  addPlainXp(-(rec.xp === undefined ? gain : rec.xp));
+  if (gain > 0) state.game.pauseXp = Math.max(0, (state.game.pauseXp || 0) - gain);
+  delete rec.xp;
   rec.pts = snoozePts;
   rec.status = 'open';
   rec.at = 0;

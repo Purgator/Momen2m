@@ -28,25 +28,26 @@ export function renderAgenda(now) {
     if (pend) {
       todayHtml += `<div class="card pad ag-decide"><div class="ag-q">🧭 ${esc(pend.block.decision.question) || t('agDecide')}</div>
         <p class="hint ag-link" data-action="ag-detail" data-id="${p.id}">${goalTitle(p)} · ${stepName(p, pend.block)}</p>
-        <div class="btnrow wrap">${pend.block.decision.options.map((o, i) => `<button class="btn" data-action="ag-decide" data-id="${p.id}" data-block="${pend.block.id}" data-opt="${i}">${esc(o.label)}</button>`).join('')}</div></div>`;
+        <div class="btnrow wrap">${pend.block.decision.options.map((o, k) => `<button class="btn" data-action="ag-decide" data-id="${p.id}" data-i="${pend.i}" data-opt="${k}">${esc(o.label)}</button>`).join('')}</div></div>`;
     }
     for (const x of P.openTasks(p, today)) {
       todayHtml += `<div class="item ag-task" data-action="ag-detail" data-id="${p.id}">
         <div class="emo">${esc(x.task.emoji || '•')}</div>
         <div><div class="name">${esc(x.task.name)}</div><div class="sub">${goalTitle(p)} · ${stepName(p, x.block)}${x.late ? ` · <span class="neg">${t('agLate')}</span>` : ''}</div></div>
-        <button class="btn small ok" data-action="ag-done" data-id="${p.id}" data-block="${x.block.id}" data-task="${x.task.id}">✓ +${x.pts}</button></div>`;
+        <button class="btn small ok" data-action="ag-done" data-id="${p.id}" data-i="${x.i}" data-task="${esc(x.task.id)}">✓ +${x.pts}</button></div>`;
     }
   }
 
-  // The week ahead, across running goals: steps about to start, questions to come.
+  // The week ahead, across running quests: steps about to start, questions to come.
   const horizon = addDays(today, 7);
-  let soon = [];
+  const soon = [];
   for (const p of active) {
+    const sched = P.schedule(p);
     const { steps, decision } = P.projection(p);
-    for (const x of steps) if (x.from > today && x.from <= horizon) soon.push({ day: x.from, p, html: `${stepName(p, x.block)} <small class="muted">${daysText(x.block.days)} · ${t('agTasksN', { n: x.block.tasks.length })}</small>` });
-    if (decision) {
-      const sched = P.schedule(p), last = sched[sched.length - 1];
-      const day = addDays(last.to, 1);
+    const stepRow = (x) => `${stepName(p, x.block)} <small class="muted">${daysText(x.block.days)} · ${t('agTasksN', { n: x.block.tasks.length })}</small>`;
+    for (const x of sched.concat(steps)) if (x.from > today && x.from <= horizon) soon.push({ day: x.from, p, html: stepRow(x) });
+    if (decision && sched.length) {
+      const day = addDays(sched[sched.length - 1].to, 1);
       if (day > today && day <= horizon) soon.push({ day, p, html: `🧭 ${esc(decision.question) || t('agDecide')} <small class="muted">${decision.options.map((o) => esc(o.label)).join(' / ')}</small>` });
     }
   }
@@ -56,11 +57,12 @@ export function renderAgenda(now) {
   const activeHtml = active.map((p) => {
     const sched = P.schedule(p);
     const cur = sched.find((x) => x.from <= today && today <= x.to);
-    const days = P.pathDays(p), idx = Math.min(days, P.dayIndex(p, today)), pct = P.goalPct(p, sched);
+    const days = P.pathDays(p), idx = P.dayIndex(p, today), pct = P.goalPct(p, sched);
+    const line = idx < 1 ? t('agStartsOn', { day: dateOf(p.startDay) }) : t('agDay', { x: Math.min(days, idx), n: days });
     const sub = cur ? stepName(p, cur.block) : P.pendingDecision(p, today) ? t('agPending') : '';
     return `<div class="card pad ag-goal" data-action="ag-detail" data-id="${p.id}">
       <div class="ag-head"><span class="ag-emo">${esc(p.emoji)}</span><div><div class="name">${esc(p.name)}</div>
-        <div class="sub">${t('agDay', { x: idx, n: days })}${sub ? ' · ' + sub : ''}</div></div><b class="ag-pct">${pctText(pct)}</b></div>
+        <div class="sub">${line}${sub ? ' · ' + sub : ''}</div></div><b class="ag-pct">${pctText(pct)}</b></div>
       <div class="bprog"><i style="width:${Math.round(pct * 100)}%"></i></div></div>`;
   }).join('');
 
@@ -69,10 +71,10 @@ export function renderAgenda(now) {
     return `<div class="card pad ag-goal" data-action="ag-edit" data-id="${p.id}">
       <div class="ag-head"><span class="ag-emo">${esc(p.emoji)}</span><div><div class="name">${esc(p.name) || t('agUntitled')}</div>
         <div class="sub">${t('agEstimate', { n: e.days, b: e.steps })}${e.branching ? ' · 🧭' : ''}</div></div></div>
-      <div class="btnrow" style="margin-top:10px"><button class="btn small" data-action="ag-share" data-id="${p.id}">📤</button><button class="btn small" data-action="ag-edit" data-id="${p.id}">✏️ ${t('edit')}</button><button class="btn small primary" data-action="ag-start" data-id="${p.id}">▶️ ${t('agStart')}</button></div></div>`;
+      <div class="btnrow" style="margin-top:10px"><button class="btn small" data-action="ag-share" data-id="${p.id}">📤 ${t('agShare')}</button><button class="btn small" data-action="ag-edit" data-id="${p.id}">✏️ ${t('edit')}</button><button class="btn small primary" data-action="ag-start" data-id="${p.id}">▶️ ${t('agStart')}</button></div></div>`;
   }).join('');
 
-  const doneHtml = done.slice(0, 12).map((p) => `<div class="lrow ag-link" data-action="ag-detail" data-id="${p.id}"><span>${goalTitle(p)} <small class="muted">${fmtDate(p.finished.at)}</small></span><span class="${p.finished.forfeited ? 'neg' : p.finished.flawless ? 'pos' : ''}">${p.finished.forfeited ? t('agForfeited') : pctText(p.finished.pct) + ' · +' + p.finished.pts}</span></div>`).join('');
+  const doneHtml = done.map((p) => `<div class="lrow ag-link" data-action="ag-detail" data-id="${p.id}"><span>${goalTitle(p)} <small class="muted">${fmtDate(p.finished.at)}</small></span><span class="${p.finished.forfeited ? 'neg' : p.finished.flawless ? 'pos' : ''}">${p.finished.forfeited ? t('agForfeited') : pctText(p.finished.pct) + ' · +' + p.finished.pts}</span></div>`).join('');
 
   return `<div class="screen setup agenda">
     <h1>${t('tabAgenda')}</h1>
@@ -87,43 +89,38 @@ export function renderAgenda(now) {
   </div>${tabbar('agenda')}`;
 }
 
-// ---- goal editor ----------------------------------------------------------------
+// ---- quest editor ----------------------------------------------------------------
 // `p` is a draft object owned by the caller; nothing is stored until onSave.
-// A running goal is edited the same way, except the steps already walked stay.
+// A running quest is edited the same way, except the steps already walked stay.
 
 function thenText(p, b) {
   if (b.decision) return '🧭 ' + t('agChoicesN', { n: b.decision.options.length });
   const nx = b.next && P.blockOf(p, b.next);
   return nx ? '→ ' + (p.blocks.indexOf(nx) + 1) : '⏹ ' + t('agEnd');
 }
-function reachable(p, id) {
-  const seen = new Set(), stack = [p.root];
-  while (stack.length) {
-    const x = stack.pop(); if (!x || seen.has(x)) continue;
-    seen.add(x);
-    const b = P.blockOf(p, x); if (!b) continue;
-    if (b.decision) b.decision.options.forEach((o) => stack.push(o.next)); else stack.push(b.next);
-  }
-  return seen.has(id);
-}
-// A new step hangs after the first reachable step that currently ends the goal,
+// A new step hangs after the first reachable step that currently ends the quest,
 // so a linear plan stays linear without touching the "Then" of anything.
 function linkTail(p, b) {
-  const tail = p.blocks.find((x) => x !== b && !x.decision && !x.next && reachable(p, x.id));
+  const reach = P.reachableIds(p);
+  const tail = p.blocks.find((x) => x !== b && !x.decision && !x.next && reach.has(x.id));
   if (tail) tail.next = b.id;
 }
 
 export function openGoalSheet(p, { onSave, onDelete } = {}) {
   const running = p.status === 'active';
+  const reach = P.reachableIds(p);
+  const orphans = p.blocks.some((b) => !reach.has(b.id));
   const el = openSheet(`
     <h2>🎯 ${p.name ? esc(p.name) : t('agNew')}</h2>
     ${running ? `<p class="hint" style="margin-top:6px">${t('agRunEditHint')}</p>` : ''}
     <div class="field"><label>${t('agGoalName')}</label>
-      <div class="row"><input class="input emoji-in" data-f="emoji" value="${esc(p.emoji)}" maxlength="4" aria-label="${t('emoji')}">
+      <div class="row"><input class="input emoji-in" data-f="emoji" value="${esc(p.emoji)}" maxlength="8" aria-label="${t('emoji')}">
       <input class="input" data-f="name" value="${esc(p.name)}" placeholder="${t('agNamePlaceholder')}" autocomplete="off"></div></div>
     <div class="field"><label>${t('agSteps')}</label>
-      <div class="card ladder" style="margin-top:0">${p.blocks.map((b, i) => `<div class="lrow ag-link" data-block="${b.id}"><span>${i + 1}. ${stepName(p, b)} <small class="muted">${daysText(b.days)} · ${t('agTasksN', { n: b.tasks.length })}${running && p.path.includes(b.id) ? ' · ✓' : ''}</small></span><span class="muted">${thenText(p, b)} ›</span></div>`).join('')}</div>
-      <button class="link" data-add-step>➕ ${t('agAddStep')}</button></div>
+      <div class="card ladder" style="margin-top:0">${p.blocks.map((b, i) => `<div class="lrow ag-link" data-block="${b.id}"><span>${reach.has(b.id) ? '' : '⚠️ '}${i + 1}. ${stepName(p, b)} <small class="muted">${daysText(b.days)} · ${t('agTasksN', { n: b.tasks.length })}${running && p.path.includes(b.id) ? ' · ✓' : ''}</small></span><span class="muted">${thenText(p, b)} ›</span></div>`).join('')}</div>
+      <button class="link" data-add-step>➕ ${t('agAddStep')}</button>
+      ${orphans ? `<p class="hint neg">${t('agUnreachable')}</p>` : ''}
+      <p class="hint neg" data-warn hidden>${t('agNoExit')}</p></div>
     <div class="btnrow">
       ${onDelete ? `<button class="btn danger" data-del>🗑️ ${t('delete')}</button>` : `<button class="btn ghost" data-cancel>✖️ ${t('cancel')}</button>`}
       <button class="btn primary" data-save>💾 ${t('save')}</button></div>`);
@@ -142,7 +139,12 @@ export function openGoalSheet(p, { onSave, onDelete } = {}) {
   });
   const cancel = $('[data-cancel]', el); if (cancel) cancel.addEventListener('click', closeSheet);
   const del = $('[data-del]', el); if (del) del.addEventListener('click', () => { if (confirm(t('agDeleteConfirm'))) { closeSheet(); onDelete(); } });
-  $('[data-save]', el).addEventListener('click', () => { keep(); if (!p.name) { shake(nameIn); return; } closeSheet(); onSave(p); });
+  $('[data-save]', el).addEventListener('click', () => {
+    keep();
+    if (!p.name) { shake(nameIn); return; }
+    if (!P.hasExit(p)) { $('[data-warn]', el).hidden = false; shake($('[data-warn]', el)); return; }
+    closeSheet(); onSave(p);
+  });
   if (!p.name) setTimeout(() => nameIn.focus(), 300);
 }
 
@@ -150,7 +152,7 @@ function targetSel(p, b, attr, value) {
   const others = p.blocks.filter((x) => x !== b);
   return `<select ${attr}><option value="" ${!value ? 'selected' : ''}>⏹ ${t('agEnd')}</option>${others.map((x) => `<option value="${x.id}" ${value === x.id ? 'selected' : ''}>→ ${p.blocks.indexOf(x) + 1}. ${stepName(p, x)}</option>`).join('')}</select>`;
 }
-const taskRow = (x) => `<div class="row ag-taskrow" data-t-id="${esc(x.id)}"><input class="input emoji-in" data-t-emoji value="${esc(x.emoji)}" maxlength="4" aria-label="${t('emoji')}"><input class="input" data-t-name value="${esc(x.name)}" placeholder="${t('agTaskPlaceholder')}" autocomplete="off"><button class="iconbtn" data-rm aria-label="${t('delete')}">✕</button></div>`;
+const taskRow = (x) => `<div class="row ag-taskrow" data-t-id="${esc(x.id)}"><input class="input emoji-in" data-t-emoji value="${esc(x.emoji)}" maxlength="8" aria-label="${t('emoji')}"><input class="input" data-t-name value="${esc(x.name)}" placeholder="${t('agTaskPlaceholder')}" autocomplete="off"><button class="iconbtn" data-rm aria-label="${t('delete')}">✕</button></div>`;
 const optionRow = (p, b, o) => `<div class="row ag-opt"><input class="input" data-o-label value="${esc(o.label)}" placeholder="${t('agChoicePlaceholder')}" autocomplete="off">${targetSel(p, b, 'data-o-next', o.next)}<button class="iconbtn" data-rm aria-label="${t('delete')}">✕</button></div>`;
 
 // Task rows: the emoji follows the name as you type, until you pick one yourself.
@@ -185,8 +187,8 @@ function openBlockSheet(p, b, back) {
         <div class="field" style="margin-top:8px"><label>${t('agQuestion')}</label><input class="input" data-f="question" value="${esc(d ? d.question : '')}" placeholder="${t('agQuestionPlaceholder')}" autocomplete="off"></div>
         <div class="field" style="margin-top:8px"><label>${t('agChoices')}</label><div data-options>${options.map((o) => optionRow(p, b, o)).join('')}</div>
         <button class="link" data-add-option>➕ ${t('agAddOption')}</button></div></div></div>
-    <div class="btnrow">${p.blocks.length > 1 && !walked ? `<button class="btn danger" data-del>🗑️</button>` : ''}<button class="btn primary wide" data-save>✓ ${t('ok')}</button></div>`);
-  el.previousElementSibling.addEventListener('click', back, { once: true }); // tapping outside goes back to the goal, not to nothing
+    <div class="btnrow">${p.blocks.length > 1 && !walked ? `<button class="btn danger" data-del>🗑️</button>` : ''}<button class="btn primary wide" data-save>✓ ${t('ok')}</button></div>`,
+  back); // tapping outside or Escape goes back to the quest, not to nothing
   let days = b.days;
   $$('[data-days]', el).forEach((btn) => btn.addEventListener('click', () => {
     days = Math.max(1, Math.min(P.MAX_DAYS, days + Number(btn.dataset.days)));
@@ -208,7 +210,7 @@ function openBlockSheet(p, b, back) {
     $('[data-next]', el).style.display = mode === 'next' ? '' : 'none';
     $('[data-ask]', el).style.display = mode === 'ask' ? '' : 'none';
   });
-  const leave = () => { el.previousElementSibling.removeEventListener('click', back); closeSheet(); back(); };
+  const leave = () => { closeSheet(); back(); };
   $('[data-save]', el).addEventListener('click', () => {
     b.title = $('[data-f="title"]', el).value.trim();
     b.days = days;
@@ -251,11 +253,15 @@ export function openStartSheet(p, onStart) {
     <div class="field"><label>${t('agPickDate')}</label><div class="row"><input class="input" type="date" data-f="date" min="${today}" value="${today}"><button class="btn" data-pick>📅 ${t('agStart')}</button></div></div>
     <div class="btnrow"><button class="btn ghost wide" data-cancel>✖️ ${t('cancel')}</button></div>`);
   $$('[data-day]', el).forEach((btn) => btn.addEventListener('click', () => { closeSheet(); onStart(btn.dataset.day); }));
-  $('[data-pick]', el).addEventListener('click', () => { const v = $('[data-f="date"]', el).value; if (!v) return; closeSheet(); onStart(v); });
+  $('[data-pick]', el).addEventListener('click', () => {
+    const inp = $('[data-f="date"]', el);
+    if (!inp.value || inp.value < today) { shake(inp); return; }
+    closeSheet(); onStart(inp.value);
+  });
   $('[data-cancel]', el).addEventListener('click', closeSheet);
 }
 
-// The whole map of a goal: steps walked (with their tasks, undo for a fresh
+// The whole map of a quest: steps walked (with their tasks, undo for a fresh
 // one), the step running, the steps ahead with their projected dates, and the
 // question that will decide the rest.
 export function openDetailSheet(p, now, { onEdit, onForfeit, onDup, onShare, onDelete, onUndo } = {}) {
@@ -263,28 +269,34 @@ export function openDetailSheet(p, now, { onEdit, onForfeit, onDup, onShare, onD
   const sched = P.schedule(p);
   const pct = p.finished ? p.finished.pct : P.goalPct(p, sched);
   const running = p.status === 'active';
-  const stepHtml = (x, cls, extra = '') => `<div class="ag-dstep ${cls}">
-      <div class="lrow"><span>${stepName(p, x.block)} <small class="muted">${span(x)}</small></span>${extra}</div>
+  const decisionLine = (x) => {
+    const dec = x.block.decision; if (!dec) return '';
+    const chosen = p.decisions[x.i] !== undefined ? dec.options[p.decisions[x.i]] : null;
+    return `<div class="ag-dtask">🧭 ${esc(dec.question) || t('agDecide')}${p.decisions[x.i] !== undefined ? ` → <b>${chosen ? esc(chosen.label) : t('agEnd')}</b>` : ` <small class="muted">${dec.options.map((o) => esc(o.label)).join(' / ')}</small>`}</div>`;
+  };
+  const walked = sched.map((x) => `<div class="ag-dstep ${!p.finished && x.from <= today && today <= x.to ? 'on' : 'past'}">
+      <div class="lrow"><span>${stepName(p, x.block)} <small class="muted">${span(x)}</small></span><span class="${P.blockPct(p, x) >= 1 ? 'pos' : ''}">${pctText(P.blockPct(p, x))}</span></div>
       ${x.block.tasks.map((tk) => {
-        const dn = p.done[P.taskKey(x.block.id, tk.id)];
-        const undo = dn && onUndo && P.canUndo(p, x.block.id, tk.id, now) ? ` <button class="link ag-undo" data-undo="${x.block.id}/${tk.id}">${t('undo')}</button>` : '';
+        const dn = p.done[P.taskKey(x.i, tk.id)];
+        const undo = dn && onUndo && P.canUndo(p, x.i, tk.id, now) ? ` <button class="link ag-undo" data-undo="${x.i}/${esc(tk.id)}">${t('undo')}</button>` : '';
         return `<div class="ag-dtask ${dn ? 'ok' : ''}">${dn ? '✓' : '○'} ${esc(tk.emoji)} ${esc(tk.name)}${dn && dn.late ? ` <small class="muted">${t('agLate')}</small>` : ''}${undo}</div>`;
       }).join('')}
-      ${x.block.decision ? (() => { const dec = x.block.decision, i = p.decisions[x.block.id]; return `<div class="ag-dtask">🧭 ${esc(dec.question) || t('agDecide')}${i !== undefined ? ` → <b>${esc(dec.options[i].label)}</b>` : ` <small class="muted">${dec.options.map((o) => esc(o.label)).join(' / ')}</small>`}</div>`; })() : ''}</div>`;
-  const walked = sched.map((x) => stepHtml(x, !p.finished && x.from <= today && today <= x.to ? 'on' : 'past', `<span class="${P.blockPct(p, x.block) >= 1 ? 'pos' : ''}">${pctText(P.blockPct(p, x.block))}</span>`)).join('');
-  const { steps, decision } = running ? P.projection(p) : { steps: [], decision: null };
+      ${decisionLine(x)}</div>`).join('');
+  const { steps, decision, more } = running ? P.projection(p) : { steps: [], decision: null, more: false };
   const ahead = steps.map((x) => `<div class="ag-dstep next"><div class="lrow"><span>${stepName(p, x.block)} <small class="muted">${span(x)}</small></span><span class="muted">${t('agTasksN', { n: x.block.tasks.length })}</span></div>
       ${x.block.tasks.map((tk) => `<div class="ag-dtask">○ ${esc(tk.emoji)} ${esc(tk.name)}</div>`).join('')}</div>`).join('')
     + (decision ? `<div class="ag-dstep next"><div class="lrow"><span>🧭 ${esc(decision.question) || t('agDecide')}</span></div>
-      ${decision.options.map((o) => `<div class="ag-dtask">↳ <b>${esc(o.label)}</b> → ${o.block ? stepName(p, o.block) + ` <small class="muted">${daysText(o.block.days)}</small>` : t('agEnd')}</div>`).join('')}</div>` : '');
+      ${decision.options.map((o) => `<div class="ag-dtask">↳ <b>${esc(o.label)}</b> → ${o.block ? stepName(p, o.block) + ` <small class="muted">${daysText(o.block.days)}</small>` : t('agEnd')}</div>`).join('')}</div>` : '')
+    + (more ? `<div class="ag-dstep next"><div class="ag-dtask">…</div></div>` : '');
+  const idx = P.dayIndex(p, today), days = P.pathDays(p);
   const line = p.finished
     ? (p.finished.forfeited ? t('agForfeitedLine', { days: p.finished.days }) : t('agFinishedLine', { pts: p.finished.pts, days: p.finished.days }) + (p.finished.flawless ? ' · 💠 ' + t('agFlawless') : ''))
-    : t('agDay', { x: Math.min(P.pathDays(p), P.dayIndex(p, today)), n: P.pathDays(p) });
+    : idx < 1 ? t('agStartsOn', { day: dateOf(p.startDay) }) : t('agDay', { x: Math.min(days, idx), n: days });
   const el = openSheet(`
     <h2>${goalTitle(p)} · ${pctText(pct)}</h2>
     <p class="hint" style="margin-top:6px">${line}</p>
     <div class="card" style="margin-top:10px;padding:0">${walked}</div>
-    ${ahead ? `<div class="hint" style="margin:12px 2px 4px;font-weight:600">${t('agUpcoming')}</div><div class="card" style="padding:0">${ahead}</div>` : ''}
+    ${ahead ? `<div class="hint" style="margin:12px 2px 4px;font-weight:600">${t('agComingUp')}</div><div class="card" style="padding:0">${ahead}</div>` : ''}
     <div class="btnrow wrap">
       ${onShare ? `<button class="btn" data-share>📤 ${t('agShare')}</button>` : ''}
       ${onDup ? `<button class="btn" data-dup>📋 ${t('agDup')}</button>` : ''}
@@ -296,10 +308,10 @@ export function openDetailSheet(p, now, { onEdit, onForfeit, onDup, onShare, onD
   const wire = (sel, fn, ask) => { const b = $(sel, el); if (b) b.addEventListener('click', () => { if (ask && !confirm(ask)) return; closeSheet(); fn(); }); };
   wire('[data-share]', onShare); wire('[data-dup]', onDup); wire('[data-edit]', onEdit);
   wire('[data-forfeit]', onForfeit, t('agForfeitConfirm')); wire('[data-del]', onDelete, t('agDeleteConfirm'));
-  $$('[data-undo]', el).forEach((b) => b.addEventListener('click', () => { const [blockId, taskId] = b.dataset.undo.split('/'); closeSheet(); onUndo(blockId, taskId); }));
+  $$('[data-undo]', el).forEach((b) => b.addEventListener('click', () => { const [i, taskId] = b.dataset.undo.split('/'); closeSheet(); onUndo(Number(i), taskId); }));
 }
 
-// Paste a shared link or code; the goal is previewed before it is added.
+// Paste a shared link or code; the quest is previewed before it is added.
 export function openImportSheet(initial, onImport) {
   const el = openSheet(`
     <h2>📥 ${t('agImportTitle')}</h2>
@@ -315,7 +327,9 @@ export function openImportSheet(initial, onImport) {
     if (!plan) { preview.innerHTML = codeIn.value.trim() ? `<p class="hint neg">${t('agImportBad')}</p>` : ''; return; }
     const e = P.estimate(plan);
     preview.innerHTML = `<div class="card pad ag-goal" style="cursor:default"><div class="ag-head"><span class="ag-emo">${esc(plan.emoji)}</span><div><div class="name">${esc(plan.name)}</div><div class="sub">${t('agEstimate', { n: e.days, b: e.steps })}${e.branching ? ' · 🧭' : ''}</div></div></div>
-      <div class="card ladder" style="margin-top:8px">${plan.blocks.map((b, i) => `<div class="lrow"><span>${i + 1}. ${stepName(plan, b)}</span><span class="muted">${daysText(b.days)} · ${t('agTasksN', { n: b.tasks.length })}</span></div>`).join('')}</div></div>`;
+      <div class="card ladder" style="margin-top:8px">${plan.blocks.map((b, i) => `<div class="ag-dstep"><div class="lrow"><span>${i + 1}. ${stepName(plan, b)}</span><span class="muted">${daysText(b.days)}</span></div>
+        ${b.tasks.map((tk) => `<div class="ag-dtask">○ ${esc(tk.emoji)} ${esc(tk.name)}</div>`).join('')}
+        ${b.decision ? `<div class="ag-dtask">🧭 ${esc(b.decision.question)} <small class="muted">${b.decision.options.map((o) => esc(o.label)).join(' / ')}</small></div>` : ''}</div>`).join('')}</div></div>`;
   };
   codeIn.addEventListener('input', show);
   if (initial) { codeIn.value = initial; show(); }
