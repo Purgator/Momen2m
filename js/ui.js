@@ -7,7 +7,7 @@ import { QUESTIONS, isTriggered, reviewStatus } from './setup.js';
 import { suggestEmoji } from './emoji.js';
 import { BASE_PTS, SNOOZE_PENALTY, PAUSE_MAX, PAUSE_XP, PAUSE_MS, canSnooze, currentOf, todayPoints, boostActive, pausedUntil } from './engine.js';
 import { levelInfo, rankLadder, BADGES, BADGE_PAGE, badgeProgress, tips as gameTips } from './game.js';
-import { pointsOn as agendaPointsOn, dueOn as questsDueOn, reminderAt as questReminderAt } from './plans.js';
+import { pointsOn as agendaPointsOn, dueOn as questsDueOn, reminderHM as questReminderHM } from './plans.js';
 import { fmtClock, fmtCountdown, fmtDuration, fmtAgo, fmtDate, fmtDateTime, fmtWhenShort, nowHM, minutesToHM, parseHM, dayKey, weekday, at } from './time.js';
 import { permission, TONE_NAMES, PATTERN_NAMES } from './notify.js';
 
@@ -437,8 +437,12 @@ function pushRow(p, perm) {
     (p.enabled ? `<div class="row" style="justify-content:flex-end;padding:0 0 8px"><button class="btn small" data-action="push-sync">${t('pushSyncNow')}</button></div>` : '');
 }
 
-function toggleRow(label, sub, control) {
-  return `<div class="toggle"><div><div class="t">${label}</div>${sub ? `<div class="s">${sub}</div>` : ''}</div>${control}</div>`;
+function toggleRow(label, sub, control, cls = '') {
+  return `<div class="toggle ${cls}"><div><div class="t">${label}</div>${sub ? `<div class="s">${sub}</div>` : ''}</div>${control}</div>`;
+}
+// A clock input with a one-word caption under it (Setup's "Your day").
+function timeIn(setting, value, caption) {
+  return `<label class="tin"><input class="input" type="time" data-setting="${setting}" value="${esc(value)}" aria-label="${caption}"><small>${caption}</small></label>`;
 }
 function sw(setting, on) {
   return `<label class="switch"><input type="checkbox" data-setting="${setting}" ${on ? 'checked' : ''}><span></span></label>`;
@@ -515,8 +519,8 @@ export function renderSetup(opts) {
         ${toggleRow(t('language'), '', sel('lang', [['en', 'English'], ['fr', 'Français']], state.lang))}
         ${toggleRow(t('notifications'), perm === 'granted' ? t('notifOn') : perm === 'denied' ? t('notifBlocked') : t('notifOff'), notifControl)}
         ${toggleRow(t('reminderBefore'), '', sel('reminderBefore', [[0, '–'], [2, t('minutes', { n: 2 })], [5, t('minutes', { n: 5 })], [10, t('minutes', { n: 10 })], [15, t('minutes', { n: 15 })]], s.reminderBefore))}
-        ${toggleRow(t('yourDay'), t('yourDayHint'), `<span class="row" style="gap:6px"><input class="input" type="time" data-setting="dayStart" value="${esc(s.dayStart || '07:00')}" style="width:auto" aria-label="${t('obWake')}"><span class="muted">→</span><input class="input" type="time" data-setting="dayEnd" value="${esc(s.dayEnd || '22:30')}" style="width:auto" aria-label="${t('obBed')}"></span>`)}
-        ${s.agenda !== false ? toggleRow('🗺️ ' + t('questReminder'), t('questReminderHint', { t: fmtClock(questReminderAt(dayKey())) }), `<input class="input" type="time" data-setting="questReminder" value="${esc(s.questReminder || '')}" style="width:auto" aria-label="${t('questReminder')}">`) : ''}
+        ${toggleRow('🌅 ' + t('yourDay'), '', `<span class="times">${timeIn('dayStart', s.dayStart || '07:00', t('wakeShort'))}<span class="muted">→</span>${timeIn('dayEnd', s.dayEnd || '22:30', t('bedShort'))}</span>`, 'times-row')}
+        ${s.agenda !== false ? toggleRow('🗺️ ' + t('questReminder'), s.questReminder ? '' : t('questReminderAuto'), `<span class="times"><input class="input" type="time" data-setting="questReminder" value="${esc(s.questReminder || questReminderHM(s.dayStart))}" aria-label="${t('questReminder')}">${s.questReminder ? `<button class="iconbtn" data-action="quest-reminder-auto" title="${t('questReminderReset')}" aria-label="${t('questReminderReset')}">↺</button>` : ''}</span>`, 'times-row') : ''}
       </div>
       ${opts.push ? pushRow(opts.push, perm) : ''}
       <p class="hint" style="margin-top:10px">${opts.push ? t('notifBackgroundNotePush') : t('notifBackgroundNote')}</p>
@@ -698,18 +702,24 @@ function teardown() {
   s.classList.remove('open'); b.classList.remove('open');
   setTimeout(() => { s.remove(); b.remove(); }, 260);
 }
-// A sheet is one history entry, so the phone's back button closes it instead
-// of the app (app.js handles popstate → dismissSheet). Closing from a button
-// pops that entry — a moment later, so a sheet opened right after (Edit,
-// Share, back to the parent sheet) takes the entry over instead of being
-// swept away by the pop. Closing from popstate finds it already gone.
-let backTimer = 0;
+// Sheets and the phone's back button. A sheet owns one history entry, so back
+// closes it instead of the app; a child sheet (the step editor over the quest
+// editor) owns one more, so back returns to its parent. Two rules keep Android
+// happy: an entry is only pushed right after a tap (Chrome flags entries the
+// page adds on its own as skippable, and then a later back skips the tab under
+// them and leaves the app), and the back handler never pushes — returning to a
+// parent reuses the parent's entry. Our own history.go() calls are counted so
+// the popstate they cause is ignored, and a close from a button pops a moment
+// later, so a sheet opened right after (Edit, Share) takes the entry over.
+let depth = 0;        // sheet entries on the history stack, as far as we know
+let dropTimer = 0;    // pending pop of the entry a just-closed sheet left behind
+let ownPops = 0;      // traversals we started, whose popstate is still to come
+const tapped = () => !navigator.userActivation || navigator.userActivation.isActive;
+function go(n) { if (!n) return; ownPops++; depth += n; history.go(n); }
 export function closeSheet() {
   if (!sheetEl) return;
   teardown();
-  if (history.state && history.state.sheet && !backTimer) {
-    backTimer = setTimeout(() => { backTimer = 0; if (!sheetEl && history.state && history.state.sheet) history.back(); }, 0);
-  }
+  if (depth > 0 && !dropTimer) dropTimer = setTimeout(() => { dropTimer = 0; if (!sheetEl) go(-depth); }, 0);
 }
 // Leaving a sheet without choosing (tap outside, Escape): the sheet may have
 // something to do about it (go back to a parent sheet, record a checkbox).
@@ -718,11 +728,31 @@ export function dismissSheet() {
   closeSheet();
   if (cb) cb();
 }
+// app.js calls this on popstate; true means the event was about a sheet.
+export function handlePop() {
+  if (ownPops > 0) { ownPops--; return true; }
+  if (depth > 0) { // the phone's back: the top sheet's entry is already gone
+    depth--;
+    const cb = dismissCb; if (sheetEl) teardown();
+    if (cb) cb();
+    return true;
+  }
+  if (sheetEl) { // a sheet with no entry (opened on its own, not after a tap): close it, stay on this tab
+    const cb = dismissCb; teardown();
+    if (cb) cb();
+    go(1);
+    return true;
+  }
+  return false;
+}
 export function openSheet(html, onDismiss = null) {
-  if (backTimer) { clearTimeout(backTimer); backTimer = 0; } // keep the entry the closing sheet was about to pop
+  const child = !!sheetEl && !!onDismiss; // opened over a parent it returns to: its own entry
+  if (dropTimer) { clearTimeout(dropTimer); dropTimer = 0; }
   if (sheetEl) teardown();
   dismissCb = onDismiss;
-  if (!(history.state && history.state.sheet)) history.pushState({ ...(history.state || {}), sheet: true }, '');
+  const target = child ? depth + 1 : Math.min(depth, 1) || (tapped() ? 1 : 0);
+  if (target > depth) { history.pushState({ ...(history.state || {}), sheet: target }, ''); depth = target; }
+  else if (target < depth) go(target - depth);
   backdropEl = document.createElement('div'); backdropEl.className = 'backdrop';
   sheetEl = document.createElement('div'); sheetEl.className = 'sheet';
   sheetEl.setAttribute('role', 'dialog'); sheetEl.setAttribute('aria-modal', 'true');
@@ -1045,7 +1075,7 @@ export function openTemplateSheet(tpl, onSave, onDelete) {
   });
   const del = $('[data-del]', el); if (del) del.addEventListener('click', () => { closeSheet(); onDelete(); });
   nameIn.addEventListener('keydown', (e) => { if (e.key === 'Enter') $('[data-save]', el).click(); });
-  setTimeout(() => nameIn.focus(), 300);
+  if (!tpl) setTimeout(() => nameIn.focus(), 300); // editing: the sheet shows whole, no keyboard first
 }
 
 // A plain Cancel/Confirm sheet for a single destructive decision (used by Import).
