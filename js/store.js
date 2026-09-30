@@ -80,11 +80,14 @@ function mergeWithDefaults(raw) {
 }
 
 function load() {
+  let raw = null;
+  try { raw = localStorage.getItem(KEY); } catch { return defaults(); }
+  if (!raw) return defaults();
   try {
-    const raw = localStorage.getItem(KEY);
-    if (!raw) return defaults();
     return mergeWithDefaults(JSON.parse(raw));
   } catch {
+    // Keep the unreadable blob aside instead of overwriting it on the next save.
+    try { localStorage.setItem(KEY + '.corrupt', raw); } catch { /* ignore */ }
     return defaults();
   }
 }
