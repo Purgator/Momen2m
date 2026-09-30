@@ -3,6 +3,12 @@
 // exhaustive (the detailed notes live on the GitHub release). Both languages.
 export const CHANGELOG = {
   en: {
+    '1.23.0': [
+      '🔁 A quest step walked twice (a question answering "again") is fresh each time and pays in full.',
+      '🛌 Rest steps (no task) no longer count in a quest\'s completion; a quest must have a way to its end to be saved.',
+      '↩️ Undoing a moment gives back exactly what it earned — pause progress included; a late completion can no longer be undone.',
+      '🐛 Fixes: premade delete button, quest start toast for a later day, Escape in the step editor, paused days in the history chart, light-theme colours.',
+    ],
     '1.22.0': [
       '🗺️ The Agenda is now called Quests.',
       '📤 Share a quest as a link — no file: whoever opens it gets a preview and adds it in one tap. Import also takes a pasted link or code.',
@@ -77,6 +83,12 @@ export const CHANGELOG = {
     '1.8.1': ['🔔 More reliable background reminders.'],
   },
   fr: {
+    '1.23.0': [
+      '🔁 Une étape de quête parcourue deux fois (une question qui répond « encore ») repart de zéro et paie en entier.',
+      '🛌 Les étapes de repos (sans tâche) ne comptent plus dans l’avancement ; une quête doit avoir une issue pour être enregistrée.',
+      '↩️ Annuler un moment rend exactement ce qu’il avait rapporté — progression des pauses comprise ; un moment fait en retard ne s’annule plus.',
+      '🐛 Corrections : bouton de suppression des prédéfinis, message de départ d’une quête pour un autre jour, Échap dans l’éditeur d’étape, jours en pause dans l’historique, couleurs du thème clair.',
+    ],
     '1.22.0': [
       '🗺️ L’Agenda s’appelle maintenant Quêtes.',
       '📤 Partage une quête par un lien — sans fichier : qui l’ouvre en voit l’aperçu et l’ajoute d’un geste. L’import accepte aussi un lien ou un code collé.',
