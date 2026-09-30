@@ -3,6 +3,11 @@
 // exhaustive (the detailed notes live on the GitHub release). Both languages.
 export const CHANGELOG = {
   en: {
+    '1.27.0': [
+      '◀️ The phone\'s back button closes the step editor and returns to the quest — it no longer leaves the app.',
+      '⌨️ Editing a step or a premade shows the sheet whole; no keyboard pops up first.',
+      '🌅 Setup: "Your day" shows both times with their minutes; the quest reminder shows its hour, with a ↺ to go back to an hour after getting up.',
+    ],
     '1.26.0': [
       '🗺️ Four example quests (moving flat, exam week, race prep, spring-clean weekend) appear in "Ready to start" the first time you open Quests.',
       '🌅 Your wake and bed times from the setup are kept and shown in Setup ("Your day"); the quest reminder follows your real morning.',
@@ -100,6 +105,11 @@ export const CHANGELOG = {
     '1.8.1': ['🔔 More reliable background reminders.'],
   },
   fr: {
+    '1.27.0': [
+      '◀️ Le bouton retour du téléphone ferme l’éditeur d’étape et revient à la quête — il ne quitte plus l’app.',
+      '⌨️ Modifier une étape ou un moment prêt affiche la fiche entière ; plus de clavier qui surgit.',
+      '🌅 Configuration : « Ta journée » affiche les deux heures avec leurs minutes ; le rappel des quêtes affiche son heure, avec un ↺ pour revenir à une heure après le lever.',
+    ],
     '1.26.0': [
       '🗺️ Quatre quêtes d’exemple (déménager, semaine d’examen, préparer une course, week-end grand ménage) apparaissent dans « Prêtes à démarrer » à la première ouverture des Quêtes.',
       '🌅 Tes heures de lever et de coucher de la configuration sont gardées et visibles dans les Réglages (« Ta journée ») ; le rappel des quêtes suit ton vrai matin.',
