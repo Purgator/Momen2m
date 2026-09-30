@@ -364,6 +364,27 @@ input[type="time"] { font-variant-numeric: tabular-nums; }
 /* offline / update banner */
 .banner { background: var(--card); border: 1px solid var(--accent); border-radius: 14px; padding: 10px 14px; display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 12px; font-size: 14px; }
 .banner.boost { border-color: #f5b301; background: linear-gradient(90deg, rgba(245,179,1,.14), var(--card)); font-weight: 600; cursor: pointer; }
+.ag-goal { margin-top: 10px; cursor: pointer; }
+.ag-head { display: flex; align-items: center; gap: 12px; }
+.ag-head > div { flex: 1; min-width: 0; }
+.ag-head .name { font-weight: 700; }
+.ag-head .sub { font-size: 13px; color: var(--muted); }
+.ag-emo { font-size: 28px; line-height: 1; }
+.ag-pct { font-size: 15px; color: var(--accent2); }
+.ag-goal .bprog { margin-top: 10px; height: 6px; }
+.ag-task { margin-top: 8px; }
+.ag-decide { margin-top: 8px; border-color: var(--accent); }
+.ag-q { font-weight: 700; font-size: 15px; }
+.btnrow.wrap { flex-wrap: wrap; }
+.ag-step { cursor: pointer; }
+.ag-dstep { padding: 8px 14px; border-bottom: 1px solid var(--line); }
+.ag-dstep:last-child { border-bottom: 0; }
+.ag-dstep.on { background: var(--card2); }
+.ag-dstep .lrow { border-bottom: 0; padding: 4px 0; }
+.ag-dtask { font-size: 13px; color: var(--muted); padding: 2px 0 2px 8px; }
+.ag-dtask.ok { color: var(--text); }
+.ag-taskrow, .ag-opt { margin-top: 6px; }
+.ag-taskrow .iconbtn, .ag-opt .iconbtn { flex: 0 0 40px; }
 .greet { display: flex; gap: 14px; align-items: center; padding: 14px 16px; margin-bottom: 12px; border-radius: 16px; cursor: pointer;
   background: linear-gradient(135deg, rgba(108,112,255,.22), var(--card) 70%); border: 1px solid var(--line); animation: greetin .5s ease; }
 .greet .emo { font-size: 30px; line-height: 1; flex: none; }

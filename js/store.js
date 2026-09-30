@@ -29,8 +29,10 @@ function defaults() {
       maxSnoozes: 2,
       updateSummaries: true, // show a "what's new" popup right after the app updates
       backupSingleFile: true, // overwrite momen2m-backup.json; false = a new dated file per backup
+      agenda: true,           // show the Agenda tab (goals planned in steps)
     },
     habits: [],
+    plans: [],              // agenda goals, see plans.js
     templates: [],          // premade one-time moments: {id, name, emoji, minutes, importance}
     days: {},               // dayKey -> occKey -> record
     game: {
