@@ -3,6 +3,12 @@
 // exhaustive (the detailed notes live on the GitHub release). Both languages.
 export const CHANGELOG = {
   en: {
+    '1.25.0': [
+      '🔔 A daily quest reminder, an hour after your day starts (or the hour you pick in Setup), on days when tasks or a question wait — through the relay too.',
+      '🔴 A dot on the Quests tab when something waits today; the active tab is highlighted.',
+      '◀️ The phone\'s back button closes a sheet or returns to the previous tab instead of leaving the app.',
+      '📌 The app reopens on the tab you left.',
+    ],
     '1.24.0': [
       '💎 The quest sheet shows a progress bar with what the quest is worth right now and at most.',
       '🗺️ Lifetime quest points on the Progress tab.',
@@ -89,6 +95,12 @@ export const CHANGELOG = {
     '1.8.1': ['🔔 More reliable background reminders.'],
   },
   fr: {
+    '1.25.0': [
+      '🔔 Un rappel de quêtes par jour, une heure après le début de ta journée (ou à l’heure choisie dans les Réglages), les jours où des tâches ou une question attendent — via le relais aussi.',
+      '🔴 Un point sur l’onglet Quêtes quand quelque chose attend aujourd’hui ; l’onglet actif est mis en évidence.',
+      '◀️ Le bouton retour du téléphone ferme une fenêtre ou revient à l’onglet précédent au lieu de quitter l’appli.',
+      '📌 L’appli se rouvre sur l’onglet que tu as quitté.',
+    ],
     '1.24.0': [
       '💎 La fiche d’une quête montre une barre d’avancement avec ce qu’elle vaut maintenant et au mieux.',
       '🗺️ Les points de quêtes cumulés dans l’onglet Progrès.',
