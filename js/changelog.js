@@ -3,6 +3,15 @@
 // exhaustive (the detailed notes live on the GitHub release). Both languages.
 export const CHANGELOG = {
   en: {
+    '1.22.0': [
+      '🗺️ The Agenda is now called Quests.',
+      '📤 Share a quest as a link — no file: whoever opens it gets a preview and adds it in one tap. Import also takes a pasted link or code.',
+      '▶️ Starting a quest runs a copy: the saved one stays in "Ready to start". A running quest can be edited without touching it.',
+      '🏳️ A running quest can be given up (no points) but not finished early; it pays when it ends.',
+      '🔭 The quest sheet shows everything: steps done, the one running, the ones ahead with dates, and the next question. A "Coming up" list covers the week.',
+      '↩️ A quest task just ticked can be taken back for 5 minutes.',
+      '✨ Task emojis fill in as you type; the question editor is clearer.',
+    ],
     '1.21.0': [
       '🗓️ New Agenda tab: plan a goal in steps of one or more days, each with its tasks, then start it on the day you choose.',
       '🧭 A step can end with a question whose answer decides the next step — your goal can branch.',
@@ -68,6 +77,15 @@ export const CHANGELOG = {
     '1.8.1': ['🔔 More reliable background reminders.'],
   },
   fr: {
+    '1.22.0': [
+      '🗺️ L’Agenda s’appelle maintenant Quêtes.',
+      '📤 Partage une quête par un lien — sans fichier : qui l’ouvre en voit l’aperçu et l’ajoute d’un geste. L’import accepte aussi un lien ou un code collé.',
+      '▶️ Démarrer une quête en lance une copie : celle enregistrée reste dans « Prêtes à démarrer ». Une quête en cours se modifie sans y toucher.',
+      '🏳️ Une quête en cours peut être abandonnée (aucun point) mais pas terminée en avance ; elle paie à sa fin.',
+      '🔭 La fiche d’une quête montre tout : étapes faites, celle en cours, celles à venir avec leurs dates, et la prochaine question. Une liste « À venir » couvre la semaine.',
+      '↩️ Une tâche de quête tout juste cochée peut être annulée pendant 5 minutes.',
+      '✨ L’emoji des tâches se remplit pendant la saisie ; l’éditeur de question est plus clair.',
+    ],
     '1.21.0': [
       '🗓️ Nouvel onglet Agenda : planifie un objectif par étapes d’un ou plusieurs jours, chacune avec ses tâches, puis lance-le le jour de ton choix.',
       '🧭 Une étape peut se terminer par une question dont la réponse décide de la suite — ton objectif peut se ramifier.',
