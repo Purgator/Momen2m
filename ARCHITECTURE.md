@@ -89,14 +89,26 @@ row's own action (unless the stopper is the tapped button itself);
 `openSheet(html, onDismiss)` — `onDismiss` runs on tap-outside / Escape /
 phone back (`dismissSheet`), not on the sheet's own buttons; `sheetOpen()`
 lets a timer avoid tearing down an editor. History: the boot entry is
-`{view}`, `showView()` pushes `{view}`, an open sheet is one more entry
-(`{sheet:true}`), and `popstate` dismisses the sheet or restores the tab —
-so the phone's back button never leaves the app from a sheet or a sub-tab.
-`closeSheet` pops its entry on a 0 ms timer so a sheet opened right after
-(Edit, Share, back to a parent sheet) takes the entry over — never call
-`history.back()` synchronously there. `settings.dayStart/dayEnd` come from
+`{view}`, `showView()` pushes `{view}`, a sheet owns one more entry
+(`{sheet:1}`), a child sheet opened over a parent it returns to (the step
+editor over the quest editor, i.e. `openSheet` while a sheet is open with an
+`onDismiss`) owns a second one (`{sheet:2}`); `popstate` goes through
+`U.handlePop()` first, which closes the top sheet (running its `onDismiss`)
+or swallows the popstate of a pop `ui.js` itself started. Android rules
+baked in there: an entry is pushed only right after a tap
+(`navigator.userActivation.isActive` — Chrome flags entries a page adds on
+its own as skippable and a later back then jumps past the tab under them,
+out of the app), so a sheet opened by a timer (update note, boost) has no
+entry and phone-back closes it then `history.go(1)` back to the tab; and the
+back handler never pushes — returning to a parent sheet reuses the parent's
+entry. `closeSheet` pops on a 0 ms timer so a sibling opened right after
+(Edit, Share) takes the entry over. Never call `history.back()` or
+`pushState` directly around sheets. Editors of existing things don't focus a
+field (the sheet shows whole before the keyboard); only brand-new ones do. `settings.dayStart/dayEnd` come from
 the setup's wake/bed answers (back-filled from the `wake`/`sleep` preset
-moments for older saves) and are editable in Setup › "Your day".
+moments for older saves) and are editable in Setup › "Your day" (two clock inputs with one-word
+captions; the quest reminder row shows the effective hour, `P.reminderHM`,
+with a ↺ back to "an hour after you get up" once a custom hour is set).
 `js/questPresets.js` seeds four example quests once (`game.questsSeeded`)
 when the Quests tab is first rendered.
 Tabs: live, progress, moments, agenda (Quests, hideable), setup; the last

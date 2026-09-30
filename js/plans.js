@@ -326,10 +326,12 @@ export function dueOn(day) {
   return { tasks, questions };
 }
 // One daily reminder, at the chosen hour or an hour after the day starts.
+export function reminderHM(dayStart = state.settings.dayStart) {
+  return minutesToHM((parseHM(dayStart || '07:00') + 60) % 1440);
+}
 export function reminderAt(day) {
   const s = state.settings;
-  const hm = s.questReminder || minutesToHM((parseHM(s.dayStart || '07:00') + 60) % 1440);
-  return at(day, hm);
+  return at(day, s.questReminder || reminderHM(s.dayStart));
 }
 export function reminderText(due) {
   const parts = [];
