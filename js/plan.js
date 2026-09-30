@@ -8,6 +8,7 @@ import { occurrencesOfDay, BASE_PTS, canSnooze } from './engine.js';
 import { t, pick } from './i18n.js';
 import { isStrong, vibrationPattern } from './notify.js';
 import { dayKey, addDays, fmtDuration } from './time.js';
+import { dueOn, reminderAt, reminderText } from './plans.js';
 
 export const PLAN_DAYS = 7;
 export const PLAN_MAX = 600;
@@ -42,6 +43,15 @@ export function buildPlan(now, days = PLAN_DAYS) {
         push(o, o.end - before, 'ending', t('nStart', { emoji, name }), t('nEndingBody', { t: fmtDuration(before, state.lang) }), actions);
       }
       push(o, o.end, 'missed', t('nMissed', { name }), t('nMissedBody'));
+    }
+  }
+  // Quests: one gentle note a day, only on days where something waits.
+  if (state.settings.agenda !== false) {
+    for (let i = 0; i < days; i++) {
+      const day = addDays(today, i);
+      const due = dueOn(day), when = reminderAt(day);
+      if (when <= now + 2000 || !(due.tasks || due.questions)) continue;
+      items.push({ at: when, kind: 'start', tag: 'quest|' + day, title: t('nQuestTitle'), body: reminderText(due), strong: false, silent, vibrate: s.vibrate && !silent ? vibrationPattern(false) : [], actions: [] });
     }
   }
   items.sort((a, b) => a.at - b.at);

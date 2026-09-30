@@ -29,8 +29,11 @@ function defaults() {
       maxSnoozes: 2,
       updateSummaries: true, // show a "what's new" popup right after the app updates
       backupSingleFile: true, // overwrite momen2m-backup.json; false = a new dated file per backup
-      agenda: true,           // show the Agenda tab (goals planned in steps)
+      agenda: true,           // show the Quests tab (goals planned in steps)
+      dayStart: '07:00',      // wake time from the setup; anchors the quest reminder
+      questReminder: '',      // HH:MM of the daily quest reminder; '' = an hour after dayStart
     },
+    lastView: 'live',       // tab to reopen on
     habits: [],
     plans: [],              // agenda goals, see plans.js
     templates: [],          // premade one-time moments: {id, name, emoji, minutes, importance}
@@ -45,7 +48,8 @@ function defaults() {
       boostUntil: 0,      // ms epoch until which every gain is worth +50 % (granted with the encouragement)
       pauseTokens: 0,     // pauses in stock (see engine PAUSE_*)
       pauseXp: 0,         // points earned towards the next pause
-      pauseLog: [],       // { from, until } of pauses taken, last two days kept
+      pauseLog: [],       // { from, until } of pauses taken, kept a month
+      questRemindedDay: '', // dayKey of the last in-app quest reminder
       badges: {},   // badge id -> ms epoch when unlocked (kept even if history is pruned)
       badgesInit: false, // set once badges already earned from old history were persisted quietly
     },

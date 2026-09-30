@@ -692,6 +692,36 @@ globalThis.window = globalThis;
     S.state.plans = [];
   });
 
+  await test('quest reminder: what waits per day, an hour after the day starts, one relay item a day', async () => {
+    const P = await import(url('plans.js'));
+    const PL = await import(url('plan.js'));
+    S.state.plans = []; S.state.habits = []; S.state.days = {};
+    Object.assign(S.state.settings, { notifications: true, dayStart: '07:30', questReminder: '', agenda: true });
+    const tpl = P.newPlan(); tpl.name = 'Trip';
+    const [a] = tpl.blocks; a.tasks = [{ id: 'a1', name: 'Tickets', emoji: '' }, { id: 'a2', name: 'Hotel', emoji: '' }];
+    const b = P.newBlock(); b.days = 2; b.tasks = [{ id: 'b1', name: 'Pack', emoji: '' }];
+    tpl.blocks.push(b); a.next = b.id;
+    b.decision = { question: 'Ready?', options: [{ label: 'Yes', next: null }, { label: 'One more day', next: a.id }] };
+    const p = P.start(tpl, today, D(0, '06:00'));
+    assert.strictEqual(P.reminderAt(today), D(0, '08:30'), 'an hour after the day starts');
+    S.state.settings.questReminder = '12:15';
+    assert.strictEqual(P.reminderAt(today), D(0, '12:15'), 'or the chosen hour');
+    S.state.settings.questReminder = '';
+    assert.deepStrictEqual(P.dueOn(today), { tasks: 2, questions: 0 });
+    assert.ok(P.completeTask(p, 0, p.blocks[0].tasks[0].id, D(0, '09:00')));
+    assert.deepStrictEqual(P.dueOn(today), { tasks: 1, questions: 0 }, 'a done task no longer waits');
+    assert.deepStrictEqual(P.dueOn(T.addDays(today, 1)), { tasks: 2, questions: 0 }, 'tomorrow: the open task, still late-doable, plus the next step');
+    assert.deepStrictEqual(P.dueOn(T.addDays(today, 3)), { tasks: 2, questions: 1 }, 'after the second step: its question waits');
+    assert.strictEqual(P.reminderText({ tasks: 1, questions: 1 }).includes('·'), true);
+    const plan = PL.buildPlan(D(0, '06:00'), 4);
+    const quest = plan.filter((x) => x.tag.startsWith('quest|'));
+    assert.deepStrictEqual(quest.map((x) => x.at), [D(0, '08:30'), D(1, '08:30'), D(2, '08:30'), D(3, '08:30')], 'one item a day, when something waits');
+    assert.strictEqual(quest[0].kind, 'start');
+    S.state.settings.agenda = false;
+    assert.strictEqual(PL.buildPlan(D(0, '06:00'), 4).filter((x) => x.tag.startsWith('quest|')).length, 0, 'nothing when the tab is hidden');
+    S.state.settings.agenda = true; S.state.plans = [];
+  });
+
   await test('qr: every version is consistent, a link fits, a novel does not, the matrix has its finders', async () => {
     const Q = await import(url('qr.js'));
     for (let v = 1; v <= 40; v++) assert.ok(Q.dataCodewords(v) > 0 && Q.rawDataModules(v) % 8 < 8, 'version ' + v);
