@@ -35,9 +35,16 @@ while one runs), `pausedUntil(now)`; `game.pauseLog` keeps the intervals and
 `occurrencesOfDay` leaves out open moments overlapping one, so they are
 neither shown, notified, nor missed, and don't block a perfect day.
 
-**Agenda** (`js/plans.js` rules, `js/agenda.js` rendering + sheets, tab
-hideable via `settings.agenda`): `state.plans[]` — a goal is `{ blocks, root,
-status: draft|active|done, startDay, path, done, decisions, finished }`. A
+**Quests** (called "agenda" in code: `js/plans.js` rules, `js/agenda.js`
+rendering + sheets, tab hideable via `settings.agenda`): `state.plans[]` — a
+quest is `{ blocks, root, status: draft|active|done, startDay, path, done,
+decisions, finished, templateId }`. `start(template)` runs a *copy* (the
+draft stays in "Ready to start"); `forfeit` ends a run for 0 pts;
+`undoTask` within `UNDO_MS`; `projection(p)` dates the steps ahead up to
+the first unanswered question. Sharing is file-less: `exportCode(p)` packs
+the quest as base64url JSON into `APP_URL#quest=…`, `importCode(str)` reads
+a link or bare code back into a fresh draft (the boot code in `app.js`
+catches the hash). A
 block = `{ title, days, tasks[], next | decision: { question, options[{label,
 next}] } }`, so blocks form a graph walked from `root`. `schedule(p)` dates
 the `path` (each step starts right after the previous one, whatever day its

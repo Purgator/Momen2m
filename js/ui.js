@@ -25,7 +25,7 @@ export function tabbar(view) {
     <button class="tab ${view === 'live' ? 'on' : ''}" data-action="tab" data-view="live"><span class="ico">⏱️</span>${t('tabNow')}</button>
     <button class="tab ${view === 'progress' ? 'on' : ''}" data-action="tab" data-view="progress"><span class="ico">🏆</span>${t('tabProgress')}</button>
     <button class="tab ${view === 'moments' ? 'on' : ''}" data-action="tab" data-view="moments"><span class="ico">📋</span>${t('tabMoments')}</button>
-    ${state.settings.agenda !== false ? `<button class="tab ${view === 'agenda' ? 'on' : ''}" data-action="tab" data-view="agenda"><span class="ico">🗓️</span>${t('tabAgenda')}</button>` : ''}
+    ${state.settings.agenda !== false ? `<button class="tab ${view === 'agenda' ? 'on' : ''}" data-action="tab" data-view="agenda"><span class="ico">🗺️</span>${t('tabAgenda')}</button>` : ''}
     <button class="tab ${view === 'setup' ? 'on' : ''}" data-action="tab" data-view="setup"><span class="ico">🎛️</span>${t('tabSetup')}</button>
   </nav>`;
 }
@@ -349,7 +349,7 @@ export function openExplainSheet(topic, s, todayOccs = []) {
     html = `<h2>${t('today')} · ${signed(s.today.pts)} pts</h2>
       <p class="hint" style="margin-top:6px">${t('explainToday')}</p>
       ${boostActive(Date.now()) ? `<p class="hint boost-hint" style="margin-top:6px">⚡ ${t('boostBanner', { until: fmtClock(state.game.boostUntil) })}</p>` : ''}
-      ${rows || agendaPointsOn(today) ? `<div class="card ladder" style="margin-top:10px">${rows}${agendaPointsOn(today) ? `<div class="lrow"><span>🗓️ ${t('tabAgenda')}</span><span class="pos">+${agendaPointsOn(today)}</span></div>` : ''}</div>` : ''}
+      ${rows || agendaPointsOn(today) ? `<div class="card ladder" style="margin-top:10px">${rows}${agendaPointsOn(today) ? `<div class="lrow"><span>🗺️ ${t('tabAgenda')}</span><span class="pos">+${agendaPointsOn(today)}</span></div>` : ''}</div>` : ''}
       <div class="card ladder" style="margin-top:10px">
         <div class="lrow"><span>${t('ruleDone')}</span><span class="pos">+${BASE_PTS[1]} / +${BASE_PTS[2]} / +${BASE_PTS[3]}</span></div>
         <div class="lrow"><span>${t('ruleEarly')}</span><span class="pos">+50%</span></div>
@@ -578,7 +578,7 @@ export function renderSetup(opts) {
           ? `<button class="btn small primary" data-action="apply-update">${t('updateNow')}</button>`
           : `<button class="btn small" data-action="check-update" ${opts.checkingUpdate ? 'disabled' : ''}>${opts.checkingUpdate ? '<span class="spinner"></span>' : ''}${t('checkUpdate')}</button>`)}
         ${toggleRow(t('updateSummaries'), t('updateSummariesHint'), sw('updateSummaries', s.updateSummaries))}
-        ${toggleRow('🗓️ ' + t('agSetting'), t('agSettingHint'), sw('agenda', s.agenda !== false))}
+        ${toggleRow('🗺️ ' + t('agSetting'), t('agSettingHint'), sw('agenda', s.agenda !== false))}
         ${opts.canInstall ? toggleRow(t('install'), '', `<button class="btn small primary" data-action="install">${t('install')}</button>`) : ''}
         ${opts.isIosBrowser ? `<p class="hint" style="padding:10px 0">${t('obIosInstall')}</p>` : ''}
         <div class="toggle"><div><div class="t"><button class="link" style="padding:0" data-action="restart-ob">${t('onboardingRestart')}</button></div><div class="s">${t('obRestartHint')}</div></div></div>
