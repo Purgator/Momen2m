@@ -19,6 +19,7 @@ import { drawShareCard, share } from './share.js';
 import * as Push from './push.js';
 import * as P from './plans.js';
 import * as A from './agenda.js';
+import { seedOnce as seedQuestPresets } from './questPresets.js';
 
 // Ask the browser not to garbage-collect this origin's storage under pressure.
 // Silent and best-effort: it cannot be forced, and some browsers ignore it.
@@ -52,6 +53,8 @@ const ob = { step: 0, a: defaultAnswers(), proposals: [], selected: new Set(), s
 const OB_LAST = 5;
 function resetOb() {
   Object.assign(ob, { step: 0, a: defaultAnswers(), proposals: [], selected: new Set(), snapshotted: false });
+  // A re-run starts from the day the user already described.
+  if (state.onboarded) { ob.a.wake = state.settings.dayStart || ob.a.wake; ob.a.bed = state.settings.dayEnd || ob.a.bed; }
 }
 
 setLang(state.lang);
@@ -95,6 +98,8 @@ function render(now = Date.now()) {
     });
   } else if (view === 'agenda') {
     renderedDay = dayKey(new Date(now));
+    const seeded = seedQuestPresets();
+    if (seeded) setTimeout(() => U.toast('🗺️ ' + t('agSeeded', { n: seeded }), 'good', { ms: 6000 }), 400);
     app.innerHTML = A.renderAgenda(now);
   } else if (view === 'progress') {
     occs = E.buildOccurrences(now);
@@ -234,6 +239,7 @@ function finishSetup() {
     if (existing) { existing.slots = x.slots; touchHabits(); } else addPreset(x.preset, x.slots);
   }
   if (ob.a.wake) state.settings.dayStart = ob.a.wake;
+  if (ob.a.bed) state.settings.dayEnd = ob.a.bed;
   save();
 }
 
@@ -999,12 +1005,12 @@ app.addEventListener('change', (e) => {
   save();
   // Some rows depend on others (critical toggle, pattern lock): redraw them.
   if (key === 'alertStyle' || key === 'vibSync' || key === 'agenda') render();
-  if (key === 'agenda' || key === 'questReminder') Push.syncSoon();
+  if (key === 'agenda' || key === 'questReminder' || key === 'dayStart') { Push.syncSoon(); if (view === 'setup') render(); }
   // Preview as you go, so picking a tone or a volume is immediate.
   if (key === 'soundName' || key === 'volume') { N.unlockAudio(); N.playTone(false); N.vibrate(N.vibrationPattern(false)); }
   if (key === 'vibPattern') N.testVibration();
 });
-const STRING_SETTINGS = new Set(['alertStyle', 'soundName', 'soundOutput', 'vibPattern', 'questReminder', 'dayStart']);
+const STRING_SETTINGS = new Set(['alertStyle', 'soundName', 'soundOutput', 'vibPattern', 'questReminder', 'dayStart', 'dayEnd']);
 
 document.addEventListener('keydown', (e) => { if (e.key === 'Escape') U.dismissSheet(); });
 

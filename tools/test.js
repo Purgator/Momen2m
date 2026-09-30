@@ -722,6 +722,31 @@ globalThis.window = globalThis;
     S.state.settings.agenda = true; S.state.plans = [];
   });
 
+  await test('quest presets: every example builds, ends, is reachable, in both languages; seeded once', async () => {
+    const P = await import(url('plans.js'));
+    const QP = await import(url('questPresets.js'));
+    const I = await import(url('i18n.js'));
+    for (const lang of ['en', 'fr']) {
+      I.setLang(lang);
+      for (const def of QP.QUEST_PRESETS) {
+        const p = QP.buildPreset(def);
+        assert.ok(p.name && p.blocks.length === def.steps.length, def.id + ' ' + lang);
+        assert.ok(P.hasExit(p), def.id + ' has an exit');
+        assert.strictEqual(P.reachableIds(p).size, p.blocks.length, def.id + ': every step reachable');
+        assert.ok(P.estimate(p).days >= 2, def.id + ' spans days');
+        assert.ok(p.blocks.every((b) => b.tasks.every((x) => x.name && x.emoji)), def.id + ': tasks named with emoji');
+        const back = P.importCode(P.exportCode(p));
+        assert.strictEqual(back.blocks.length, p.blocks.length, def.id + ' survives sharing');
+      }
+    }
+    I.setLang('fr');
+    S.state.plans = []; S.state.game.questsSeeded = false;
+    assert.strictEqual(QP.seedOnce(), QP.QUEST_PRESETS.length);
+    assert.strictEqual(QP.seedOnce(), 0, 'only once');
+    assert.strictEqual(S.state.plans.filter((p) => p.status === 'draft' && p.preset).length, QP.QUEST_PRESETS.length);
+    S.state.plans = [];
+  });
+
   await test('qr: every version is consistent, a link fits, a novel does not, the matrix has its finders', async () => {
     const Q = await import(url('qr.js'));
     for (let v = 1; v <= 40; v++) assert.ok(Q.dataCodewords(v) > 0 && Q.rawDataModules(v) % 8 < 8, 'version ' + v);

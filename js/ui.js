@@ -515,6 +515,7 @@ export function renderSetup(opts) {
         ${toggleRow(t('language'), '', sel('lang', [['en', 'English'], ['fr', 'Français']], state.lang))}
         ${toggleRow(t('notifications'), perm === 'granted' ? t('notifOn') : perm === 'denied' ? t('notifBlocked') : t('notifOff'), notifControl)}
         ${toggleRow(t('reminderBefore'), '', sel('reminderBefore', [[0, '–'], [2, t('minutes', { n: 2 })], [5, t('minutes', { n: 5 })], [10, t('minutes', { n: 10 })], [15, t('minutes', { n: 15 })]], s.reminderBefore))}
+        ${toggleRow(t('yourDay'), t('yourDayHint'), `<span class="row" style="gap:6px"><input class="input" type="time" data-setting="dayStart" value="${esc(s.dayStart || '07:00')}" style="width:auto" aria-label="${t('obWake')}"><span class="muted">→</span><input class="input" type="time" data-setting="dayEnd" value="${esc(s.dayEnd || '22:30')}" style="width:auto" aria-label="${t('obBed')}"></span>`)}
         ${s.agenda !== false ? toggleRow('🗺️ ' + t('questReminder'), t('questReminderHint', { t: fmtClock(questReminderAt(dayKey())) }), `<input class="input" type="time" data-setting="questReminder" value="${esc(s.questReminder || '')}" style="width:auto" aria-label="${t('questReminder')}">`) : ''}
       </div>
       ${opts.push ? pushRow(opts.push, perm) : ''}
@@ -699,11 +700,16 @@ function teardown() {
 }
 // A sheet is one history entry, so the phone's back button closes it instead
 // of the app (app.js handles popstate → dismissSheet). Closing from a button
-// pops that entry; closing from popstate finds it already gone.
+// pops that entry — a moment later, so a sheet opened right after (Edit,
+// Share, back to the parent sheet) takes the entry over instead of being
+// swept away by the pop. Closing from popstate finds it already gone.
+let backTimer = 0;
 export function closeSheet() {
   if (!sheetEl) return;
   teardown();
-  if (history.state && history.state.sheet) history.back();
+  if (history.state && history.state.sheet && !backTimer) {
+    backTimer = setTimeout(() => { backTimer = 0; if (!sheetEl && history.state && history.state.sheet) history.back(); }, 0);
+  }
 }
 // Leaving a sheet without choosing (tap outside, Escape): the sheet may have
 // something to do about it (go back to a parent sheet, record a checkbox).
@@ -713,10 +719,10 @@ export function dismissSheet() {
   if (cb) cb();
 }
 export function openSheet(html, onDismiss = null) {
-  const replacing = !!sheetEl;
-  if (replacing) teardown(); // same history entry, no back-and-push dance
+  if (backTimer) { clearTimeout(backTimer); backTimer = 0; } // keep the entry the closing sheet was about to pop
+  if (sheetEl) teardown();
   dismissCb = onDismiss;
-  if (!replacing) history.pushState({ ...(history.state || {}), sheet: true }, '');
+  if (!(history.state && history.state.sheet)) history.pushState({ ...(history.state || {}), sheet: true }, '');
   backdropEl = document.createElement('div'); backdropEl.className = 'backdrop';
   sheetEl = document.createElement('div'); sheetEl.className = 'sheet';
   sheetEl.setAttribute('role', 'dialog'); sheetEl.setAttribute('aria-modal', 'true');

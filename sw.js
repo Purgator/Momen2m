@@ -30,6 +30,7 @@ const ASSETS = [
   './js/plans.js',
   './js/agenda.js',
   './js/qr.js',
+  './js/questPresets.js',
   './js/push.js',
   './relay.config.js',
   './js/diff.js',
