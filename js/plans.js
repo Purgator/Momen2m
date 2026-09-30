@@ -8,7 +8,8 @@
 // % behind.
 import { state, save, uid } from './store.js';
 import { addPlainXp } from './engine.js';
-import { dayKey, addDays } from './time.js';
+import { dayKey, addDays, at, parseHM, minutesToHM } from './time.js';
+import { t } from './i18n.js';
 
 export const TASK_PTS = 5;          // a task done during its step
 export const LATE_DIV = 4;          // done after the step: a quarter
@@ -303,6 +304,38 @@ export function pointsOn(day) {
     if (p.finished && p.finished.day === day) sum += p.finished.pts;
   }
   return sum;
+}
+
+// ---- reminders -------------------------------------------------------------------
+// What waits on a day, across running quests: tasks of the steps covering it
+// (open ones for steps walked, all for steps ahead), earlier steps' tasks
+// still open, and a question that will be waiting by then.
+export function dueOn(day) {
+  let tasks = 0, questions = 0;
+  for (const p of state.plans || []) {
+    if (p.status !== 'active') continue;
+    const sched = schedule(p);
+    const { steps, decision } = projection(p);
+    for (const x of sched) if (x.from <= day) tasks += x.block.tasks.filter((task) => !isDone(p, x.i, task)).length;
+    for (const x of steps) if (x.from <= day) tasks += x.block.tasks.length; // by then, still doable (late at worst)
+    if (decision && sched.length) {
+      const end = steps.length ? steps[steps.length - 1].to : sched[sched.length - 1].to;
+      if (day > end) questions++;
+    }
+  }
+  return { tasks, questions };
+}
+// One daily reminder, at the chosen hour or an hour after the day starts.
+export function reminderAt(day) {
+  const s = state.settings;
+  const hm = s.questReminder || minutesToHM((parseHM(s.dayStart || '07:00') + 60) % 1440);
+  return at(day, hm);
+}
+export function reminderText(due) {
+  const parts = [];
+  if (due.tasks) parts.push(t(due.tasks === 1 ? 'nQuestTask' : 'nQuestTasks', { n: due.tasks }));
+  if (due.questions) parts.push(t('nQuestQuestion'));
+  return parts.join(' · ');
 }
 
 export function stats() {
