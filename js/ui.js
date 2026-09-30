@@ -7,7 +7,7 @@ import { QUESTIONS, isTriggered, reviewStatus } from './setup.js';
 import { suggestEmoji } from './emoji.js';
 import { BASE_PTS, SNOOZE_PENALTY, PAUSE_MAX, PAUSE_XP, PAUSE_MS, canSnooze, currentOf, todayPoints, boostActive, pausedUntil } from './engine.js';
 import { levelInfo, rankLadder, BADGES, BADGE_PAGE, badgeProgress, tips as gameTips } from './game.js';
-import { pointsOn as agendaPointsOn } from './plans.js';
+import { pointsOn as agendaPointsOn, dueOn as questsDueOn, reminderAt as questReminderAt } from './plans.js';
 import { fmtClock, fmtCountdown, fmtDuration, fmtAgo, fmtDate, fmtDateTime, fmtWhenShort, nowHM, minutesToHM, parseHM, dayKey, weekday, at } from './time.js';
 import { permission, TONE_NAMES, PATTERN_NAMES } from './notify.js';
 
@@ -25,7 +25,7 @@ export function tabbar(view) {
     <button class="tab ${view === 'live' ? 'on' : ''}" data-action="tab" data-view="live"><span class="ico">⏱️</span>${t('tabNow')}</button>
     <button class="tab ${view === 'progress' ? 'on' : ''}" data-action="tab" data-view="progress"><span class="ico">🏆</span>${t('tabProgress')}</button>
     <button class="tab ${view === 'moments' ? 'on' : ''}" data-action="tab" data-view="moments"><span class="ico">📋</span>${t('tabMoments')}</button>
-    ${state.settings.agenda !== false ? `<button class="tab ${view === 'agenda' ? 'on' : ''}" data-action="tab" data-view="agenda"><span class="ico">🗺️</span>${t('tabAgenda')}</button>` : ''}
+    ${state.settings.agenda !== false ? (() => { const due = questsDueOn(dayKey()); return `<button class="tab ${view === 'agenda' ? 'on' : ''}" data-action="tab" data-view="agenda"><span class="ico">🗺️${due.tasks || due.questions ? '<i class="dot-badge"></i>' : ''}</span>${t('tabAgenda')}</button>`; })() : ''}
     <button class="tab ${view === 'setup' ? 'on' : ''}" data-action="tab" data-view="setup"><span class="ico">🎛️</span>${t('tabSetup')}</button>
   </nav>`;
 }
@@ -515,6 +515,7 @@ export function renderSetup(opts) {
         ${toggleRow(t('language'), '', sel('lang', [['en', 'English'], ['fr', 'Français']], state.lang))}
         ${toggleRow(t('notifications'), perm === 'granted' ? t('notifOn') : perm === 'denied' ? t('notifBlocked') : t('notifOff'), notifControl)}
         ${toggleRow(t('reminderBefore'), '', sel('reminderBefore', [[0, '–'], [2, t('minutes', { n: 2 })], [5, t('minutes', { n: 5 })], [10, t('minutes', { n: 10 })], [15, t('minutes', { n: 15 })]], s.reminderBefore))}
+        ${s.agenda !== false ? toggleRow('🗺️ ' + t('questReminder'), t('questReminderHint', { t: fmtClock(questReminderAt(dayKey())) }), `<input class="input" type="time" data-setting="questReminder" value="${esc(s.questReminder || '')}" style="width:auto" aria-label="${t('questReminder')}">`) : ''}
       </div>
       ${opts.push ? pushRow(opts.push, perm) : ''}
       <p class="hint" style="margin-top:10px">${opts.push ? t('notifBackgroundNotePush') : t('notifBackgroundNote')}</p>
@@ -690,12 +691,19 @@ export function renderOnboarding(step, data) {
 
 let sheetEl = null, backdropEl = null, dismissCb = null;
 export function sheetOpen() { return !!sheetEl; }
-export function closeSheet() {
-  if (!sheetEl) return;
+function teardown() {
   const s = sheetEl, b = backdropEl;
   sheetEl = backdropEl = null; dismissCb = null;
   s.classList.remove('open'); b.classList.remove('open');
   setTimeout(() => { s.remove(); b.remove(); }, 260);
+}
+// A sheet is one history entry, so the phone's back button closes it instead
+// of the app (app.js handles popstate → dismissSheet). Closing from a button
+// pops that entry; closing from popstate finds it already gone.
+export function closeSheet() {
+  if (!sheetEl) return;
+  teardown();
+  if (history.state && history.state.sheet) history.back();
 }
 // Leaving a sheet without choosing (tap outside, Escape): the sheet may have
 // something to do about it (go back to a parent sheet, record a checkbox).
@@ -705,8 +713,10 @@ export function dismissSheet() {
   if (cb) cb();
 }
 export function openSheet(html, onDismiss = null) {
-  closeSheet();
+  const replacing = !!sheetEl;
+  if (replacing) teardown(); // same history entry, no back-and-push dance
   dismissCb = onDismiss;
+  if (!replacing) history.pushState({ ...(history.state || {}), sheet: true }, '');
   backdropEl = document.createElement('div'); backdropEl.className = 'backdrop';
   sheetEl = document.createElement('div'); sheetEl.className = 'sheet';
   sheetEl.setAttribute('role', 'dialog'); sheetEl.setAttribute('aria-modal', 'true');

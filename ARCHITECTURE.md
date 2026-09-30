@@ -86,10 +86,18 @@ confirm — never loses points, snapshots to recovery first.
 handler on `#app` is keyed by `data-action` (`app.js`); `data-stop` blocks a
 row's own action (unless the stopper is the tapped button itself);
 `data-setting` is the generic settings-change handler. Sheets:
-`openSheet(html, onDismiss)` — `onDismiss` runs on tap-outside / Escape
-(`dismissSheet`), not on the sheet's own buttons; `sheetOpen()` lets a timer
-avoid tearing down an editor. Tabs: live, progress, moments, agenda
-(Quests, hideable), setup.
+`openSheet(html, onDismiss)` — `onDismiss` runs on tap-outside / Escape /
+phone back (`dismissSheet`), not on the sheet's own buttons; `sheetOpen()`
+lets a timer avoid tearing down an editor. History: the boot entry is
+`{view}`, `showView()` pushes `{view}`, an open sheet is one more entry
+(`{sheet:true}`), and `popstate` dismisses the sheet or restores the tab —
+so the phone's back button never leaves the app from a sheet or a sub-tab.
+Tabs: live, progress, moments, agenda (Quests, hideable), setup; the last
+one is kept in `state.lastView`. Quest reminder: `plans.reminderAt(day)` =
+`settings.questReminder` or `dayStart` (wake time from the setup) + 1 h;
+`plan.js` adds one relay item per day with something due (`dueOn`), `app.js
+remindQuests` shows it in-app when open at that hour; the Quests tab carries
+a dot while `dueOn(today)` is non-empty.
 
 **i18n** (`js/i18n.js`): `t(key, vars)` with `{var}` interpolation, `en`/`fr`
 objects side by side — every new user-facing string needs both, French uses

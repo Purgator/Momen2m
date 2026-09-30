@@ -168,8 +168,10 @@ h2 { font-size: 20px; font-weight: 700; }
   flex: 1; border: 0; background: none; color: var(--muted); font-weight: 700; font-size: 12px;
   display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; cursor: pointer;
 }
-.tab .ico { font-size: 22px; line-height: 1; }
-.tab.on { color: var(--text); }
+.tab .ico { font-size: 22px; line-height: 1; position: relative; padding: 3px 14px; border-radius: 12px; transition: background .2s; }
+.tab.on { color: var(--accent2); }
+.tab.on .ico { background: rgba(108, 112, 255, .22); }
+.dot-badge { position: absolute; top: 1px; right: 8px; width: 9px; height: 9px; border-radius: 50%; background: var(--danger); border: 2px solid var(--bg2); }
 
 /* ---- empty states -------------------------------------------------------- */
 .empty { text-align: center; padding: 36px 12px; color: var(--muted); }

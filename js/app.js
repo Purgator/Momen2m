@@ -31,7 +31,9 @@ const isIos = /iphone|ipad|ipod/i.test(navigator.userAgent);
 const standalone = matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
 const isIosBrowser = isIos && !standalone;
 
-let view = state.onboarded ? 'live' : 'ob';
+const VIEWS = ['live', 'progress', 'moments', 'agenda', 'setup'];
+const viewAllowed = (v) => VIEWS.includes(v) && (v !== 'agenda' || state.settings.agenda !== false);
+let view = !state.onboarded ? 'ob' : viewAllowed(state.lastView) ? state.lastView : 'live';
 let occs = [];
 const phases = new Map();       // occurrence key -> last seen phase
 const fresh = new Set();        // keys that just changed phase (animate once)
@@ -124,6 +126,7 @@ function frame() {
   checkRoughPatch(now);
   const { finished, changed: plansMoved } = P.advance(now);
   if (plansMoved) dirty = true;
+  remindQuests(now);
   if (finished.length) {
     finished.forEach((e, i) => setTimeout(() => {
       N.feedback('levelup'); U.celebrate(['🎯', '🏁', '✨', '💠']);
@@ -230,6 +233,7 @@ function finishSetup() {
     const existing = state.habits.find((h) => h.preset === x.preset.id);
     if (existing) { existing.slots = x.slots; touchHabits(); } else addPreset(x.preset, x.slots);
   }
+  if (ob.a.wake) state.settings.dayStart = ob.a.wake;
   save();
 }
 
@@ -299,12 +303,42 @@ function celebrateBadges(delay = 0) {
   return fresh.length;
 }
 
-function showProgress() { view = 'progress'; dirty = true; render(); scrollTo(0, 0); }
+// Switching tabs is a history entry (back returns to the previous tab) and is
+// remembered for the next launch.
+function showView(v, { push = true } = {}) {
+  if (!viewAllowed(v)) v = 'live';
+  view = v; dirty = true;
+  state.lastView = v; save();
+  if (push) history.pushState({ view: v }, '');
+  refresh(); scrollTo(0, 0);
+}
+function showProgress() { showView('progress'); }
+addEventListener('popstate', (e) => {
+  if (U.sheetOpen()) { U.dismissSheet(); return; }
+  const v = e.state && e.state.view;
+  if (v && v !== view && state.onboarded) showView(v, { push: false });
+});
 const findPlan = (id) => (state.plans || []).find((p) => p.id === id);
 
 function announceGoalEnd(p, r) {
   N.feedback('levelup'); U.celebrate(['🎯', '🏁', '✨', '💠']);
   U.toast(p.emoji + ' ' + t('agFinished', { name: p.name, pct: Math.round(r.pct * 100), pts: r.pts }), 'good', { ms: 6000 });
+}
+
+// The daily quest note, when the app happens to be open at that hour (the
+// relay covers it otherwise, see plan.js). Once a day, only while fresh.
+function remindQuests(now) {
+  const today = dayKey(new Date(now));
+  if (state.settings.agenda === false || state.game.questRemindedDay === today) return;
+  const when = P.reminderAt(today);
+  if (now < when) return;
+  state.game.questRemindedDay = today; save();
+  if (now - when > 15 * 60000) return; // long past: the relay had it, or nobody was there
+  const due = P.dueOn(today);
+  if (!due.tasks && !due.questions) return;
+  N.notify(t('nQuestTitle'), P.reminderText(due), 'quest|' + today);
+  N.feedback('start');
+  if (view !== 'agenda') U.toast('🗺️ ' + P.reminderText(due), '', { ms: 6000, action: { label: t('see'), fn: () => showView('agenda') } });
 }
 
 // Edits happen on a copy and only the content comes back — never the
@@ -613,7 +647,7 @@ app.addEventListener('click', async (e) => {
   const now = Date.now();
 
   switch (a) {
-    case 'tab': view = btn.dataset.view; dirty = true; refresh(); scrollTo(0, 0); break;
+    case 'tab': showView(btn.dataset.view); break;
     case 'explain': U.openExplainSheet(btn.dataset.topic, G.computeStats(now, occs), occs); N.feedback('tap'); break;
     case 'badge': {
       const b = G.BADGES.find((x) => x.id === btn.dataset.id); if (!b) break;
@@ -965,11 +999,12 @@ app.addEventListener('change', (e) => {
   save();
   // Some rows depend on others (critical toggle, pattern lock): redraw them.
   if (key === 'alertStyle' || key === 'vibSync' || key === 'agenda') render();
+  if (key === 'agenda' || key === 'questReminder') Push.syncSoon();
   // Preview as you go, so picking a tone or a volume is immediate.
   if (key === 'soundName' || key === 'volume') { N.unlockAudio(); N.playTone(false); N.vibrate(N.vibrationPattern(false)); }
   if (key === 'vibPattern') N.testVibration();
 });
-const STRING_SETTINGS = new Set(['alertStyle', 'soundName', 'soundOutput', 'vibPattern']);
+const STRING_SETTINGS = new Set(['alertStyle', 'soundName', 'soundOutput', 'vibPattern', 'questReminder', 'dayStart']);
 
 document.addEventListener('keydown', (e) => { if (e.key === 'Escape') U.dismissSheet(); });
 
@@ -993,7 +1028,9 @@ initUpdates(() => {
 });
 
 // ---- boot -------------------------------------------------------------------------------
-if (view === 'live') startTicker(); else render();
+history.replaceState({ view }, ''); // the base entry: back from a tab returns here
+startTicker();
+if (view !== 'live') render();
 
 // This boot landed on a different version than the last one (the service
 // worker applied an update, in the background or via "Update now", and
