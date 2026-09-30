@@ -75,11 +75,110 @@ export function dayIndex(p, today) {
   return Math.round((new Date(today + 'T12:00') - new Date(p.startDay + 'T12:00')) / 86400000) + 1;
 }
 
-export function start(p, day) {
-  if (p.status !== 'draft' || !blockOf(p, p.root)) return false;
-  Object.assign(p, { status: 'active', startDay: day, path: [p.root], done: {}, decisions: {}, startedAt: Date.now() });
+// Starting runs a copy: the saved goal stays in "Ready to start", and editing
+// the run never touches it.
+export function start(template, day) {
+  if (template.status !== 'draft' || !blockOf(template, template.root)) return null;
+  const run = { ...clonePlan(template), status: 'active', startDay: day, done: {}, decisions: {}, startedAt: Date.now(), templateId: template.id };
+  run.path = [run.root];
+  state.plans.push(run);
+  save();
+  return run;
+}
+
+// Gives a running goal up: it ends where it stands and pays nothing.
+export function forfeit(p, now) {
+  if (p.status !== 'active') return null;
+  const sched = schedule(p);
+  p.status = 'done';
+  p.finished = { at: now, day: dayKey(new Date(now)), pct: goalPct(p, sched), pts: 0, days: sched.reduce((n, x) => n + x.block.days, 0), flawless: false, forfeited: true };
+  save();
+  return p.finished;
+}
+
+export const UNDO_MS = 5 * 60 * 1000;
+export function canUndo(p, blockId, taskId, now) {
+  const rec = p.done[taskKey(blockId, taskId)];
+  return !!rec && p.status === 'active' && now - rec.at < UNDO_MS;
+}
+// Takes a just-completed task back (mis-tap protection), points included; a
+// step bonus that no longer holds goes with it.
+export function undoTask(p, blockId, taskId, now) {
+  if (!canUndo(p, blockId, taskId, now)) return false;
+  const b = blockOf(p, blockId);
+  const rec = p.done[taskKey(blockId, taskId)];
+  let back = (rec.pts || 0) + (rec.bonus || 0);
+  delete p.done[taskKey(blockId, taskId)];
+  for (const y of b.tasks) { const o = p.done[taskKey(b.id, y.id)]; if (o && o.bonus) { back += o.bonus; delete o.bonus; } }
+  addPlainXp(-back);
+  state.game.goalTasks = Math.max(0, (state.game.goalTasks || 0) - 1);
   save();
   return true;
+}
+
+// What lies ahead: the steps that will follow the path as it stands, dated,
+// up to the first unanswered question (returned with its choices).
+export function projection(p) {
+  const sched = schedule(p);
+  const steps = [];
+  let day = sched.length ? addDays(sched[sched.length - 1].to, 1) : p.startDay;
+  let b = sched.length ? sched[sched.length - 1].block : null;
+  let decision = null;
+  for (let guard = 0; b && guard < 30; guard++) {
+    let next;
+    if (b.decision) {
+      const i = p.decisions[b.id];
+      if (i === undefined) { decision = { after: b, question: b.decision.question, options: b.decision.options.map((o) => ({ label: o.label, block: blockOf(p, o.next) })) }; break; }
+      next = (b.decision.options[i] || {}).next;
+    } else next = b.next;
+    b = blockOf(p, next);
+    if (!b) break;
+    steps.push({ block: b, from: day, to: addDays(day, b.days - 1) });
+    day = addDays(day, b.days);
+  }
+  return { steps, decision };
+}
+
+// ---- sharing ----------------------------------------------------------------------
+// A goal travels as one URL-safe code (a compact JSON, base64url): no file.
+const b64 = (s) => btoa(String.fromCharCode(...new TextEncoder().encode(s))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+const unb64 = (s) => new TextDecoder().decode(Uint8Array.from(atob(s.replace(/-/g, '+').replace(/_/g, '/')), (c) => c.charCodeAt(0)));
+export function exportCode(p) {
+  const idx = (id) => p.blocks.findIndex((b) => b.id === id);
+  const data = {
+    v: 1, n: p.name, e: p.emoji, r: idx(p.root),
+    b: p.blocks.map((b) => ({
+      t: b.title, d: b.days, k: b.tasks.map((x) => [x.emoji, x.name]), x: idx(b.next),
+      q: b.decision ? [b.decision.question, b.decision.options.map((o) => [o.label, idx(o.next)])] : 0,
+    })),
+  };
+  return b64(JSON.stringify(data));
+}
+// Accepts the code alone or a whole shared link. Returns a fresh draft, or null.
+export function importCode(str) {
+  const m = String(str || '').match(/quest=([A-Za-z0-9_-]+)/);
+  const code = m ? m[1] : String(str || '').trim();
+  let d;
+  try { d = JSON.parse(unb64(code)); } catch { return null; }
+  if (!d || d.v !== 1 || typeof d.n !== 'string' || !Array.isArray(d.b) || !d.b.length || d.b.length > 60) return null;
+  const p = newPlan();
+  p.name = d.n.slice(0, 80);
+  p.emoji = String(d.e || '🎯').slice(0, 4);
+  p.blocks = d.b.map(() => newBlock());
+  const ref = (i) => (Number.isInteger(i) && p.blocks[i] ? p.blocks[i].id : null);
+  d.b.forEach((s, i) => {
+    const b = p.blocks[i];
+    b.title = String(s.t || '').slice(0, 80);
+    b.days = Math.max(1, Math.min(MAX_DAYS, Number(s.d) || 1));
+    b.tasks = (Array.isArray(s.k) ? s.k : []).slice(0, 40).map((x) => ({ id: uid(), emoji: String((x && x[0]) || '').slice(0, 4), name: String((x && x[1]) || '').slice(0, 80) })).filter((x) => x.name);
+    b.next = ref(s.x);
+    if (Array.isArray(s.q) && Array.isArray(s.q[1])) {
+      const options = s.q[1].slice(0, MAX_OPTIONS).map((o) => ({ label: String((o && o[0]) || '').slice(0, 40), next: ref(o && o[1]) })).filter((o) => o.label);
+      if (options.length >= 2) { b.decision = { question: String(s.q[0] || '').slice(0, 120), options }; b.next = null; }
+    }
+  });
+  p.root = ref(d.r) || p.blocks[0].id;
+  return p;
 }
 
 // The last step, when its days are over and its question is still unanswered.

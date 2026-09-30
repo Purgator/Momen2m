@@ -380,6 +380,11 @@ input[type="time"] { font-variant-numeric: tabular-nums; }
 .ag-dstep { padding: 8px 14px; border-bottom: 1px solid var(--line); }
 .ag-dstep:last-child { border-bottom: 0; }
 .ag-dstep.on { background: var(--card2); }
+.ag-dstep.past { opacity: .75; }
+.ag-dstep.next { border-left: 3px solid var(--accent2); }
+.ag-link { cursor: pointer; }
+.ag-undo { font-size: 12px; padding: 0 6px; }
+textarea.input { resize: vertical; }
 .ag-dstep .lrow { border-bottom: 0; padding: 4px 0; }
 .ag-dtask { font-size: 13px; color: var(--muted); padding: 2px 0 2px 8px; }
 .ag-dtask.ok { color: var(--text); }
