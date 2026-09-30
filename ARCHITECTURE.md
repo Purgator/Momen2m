@@ -92,6 +92,13 @@ lets a timer avoid tearing down an editor. History: the boot entry is
 `{view}`, `showView()` pushes `{view}`, an open sheet is one more entry
 (`{sheet:true}`), and `popstate` dismisses the sheet or restores the tab —
 so the phone's back button never leaves the app from a sheet or a sub-tab.
+`closeSheet` pops its entry on a 0 ms timer so a sheet opened right after
+(Edit, Share, back to a parent sheet) takes the entry over — never call
+`history.back()` synchronously there. `settings.dayStart/dayEnd` come from
+the setup's wake/bed answers (back-filled from the `wake`/`sleep` preset
+moments for older saves) and are editable in Setup › "Your day".
+`js/questPresets.js` seeds four example quests once (`game.questsSeeded`)
+when the Quests tab is first rendered.
 Tabs: live, progress, moments, agenda (Quests, hideable), setup; the last
 one is kept in `state.lastView`. Quest reminder: `plans.reminderAt(day)` =
 `settings.questReminder` or `dayStart` (wake time from the setup) + 1 h;
