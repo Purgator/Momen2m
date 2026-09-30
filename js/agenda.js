@@ -2,9 +2,10 @@
 // sheets only — the rules live in plans.js, behaviour in app.js via data-action.
 import { t } from './i18n.js';
 import { state } from './store.js';
-import { esc, $, $$, openSheet, closeSheet, tabbar } from './ui.js';
+import { esc, $, $$, openSheet, closeSheet, tabbar, toast } from './ui.js';
 import { suggestEmoji } from './emoji.js';
 import { dayKey, addDays, fmtDate } from './time.js';
+import { drawQR } from './qr.js';
 import * as P from './plans.js';
 
 const pctText = (x) => Math.round(x * 100) + '%';
@@ -152,7 +153,7 @@ function targetSel(p, b, attr, value) {
   const others = p.blocks.filter((x) => x !== b);
   return `<select ${attr}><option value="" ${!value ? 'selected' : ''}>⏹ ${t('agEnd')}</option>${others.map((x) => `<option value="${x.id}" ${value === x.id ? 'selected' : ''}>→ ${p.blocks.indexOf(x) + 1}. ${stepName(p, x)}</option>`).join('')}</select>`;
 }
-const taskRow = (x) => `<div class="row ag-taskrow" data-t-id="${esc(x.id)}"><input class="input emoji-in" data-t-emoji value="${esc(x.emoji)}" maxlength="8" aria-label="${t('emoji')}"><input class="input" data-t-name value="${esc(x.name)}" placeholder="${t('agTaskPlaceholder')}" autocomplete="off"><button class="iconbtn" data-rm aria-label="${t('delete')}">✕</button></div>`;
+const taskRow = (x, frozen = false) => `<div class="row ag-taskrow" data-t-id="${esc(x.id)}"><input class="input emoji-in" data-t-emoji value="${esc(x.emoji)}" maxlength="8" aria-label="${t('emoji')}"><input class="input" data-t-name value="${esc(x.name)}" placeholder="${t('agTaskPlaceholder')}" autocomplete="off">${frozen ? '' : `<button class="iconbtn" data-rm aria-label="${t('delete')}">✕</button>`}</div>`;
 const optionRow = (p, b, o) => `<div class="row ag-opt"><input class="input" data-o-label value="${esc(o.label)}" placeholder="${t('agChoicePlaceholder')}" autocomplete="off">${targetSel(p, b, 'data-o-next', o.next)}<button class="iconbtn" data-rm aria-label="${t('delete')}">✕</button></div>`;
 
 // Task rows: the emoji follows the name as you type, until you pick one yourself.
@@ -164,7 +165,7 @@ function wireTaskRows(box) {
     let auto = !emojiIn.value.trim();
     nameIn.addEventListener('input', () => { if (auto) emojiIn.value = suggestEmoji(nameIn.value); });
     emojiIn.addEventListener('input', () => { auto = !emojiIn.value.trim(); });
-    $('[data-rm]', row).addEventListener('click', () => row.remove());
+    const rm = $('[data-rm]', row); if (rm) rm.addEventListener('click', () => row.remove());
   });
 }
 
@@ -177,8 +178,8 @@ function openBlockSheet(p, b, back) {
     <div class="field"><label>${t('agStepTitle')}</label><input class="input" data-f="title" value="${esc(b.title)}" placeholder="${t('agStepPlaceholder')}" autocomplete="off"></div>
     <div class="field"><label>${t('agLength')}</label>
       <div class="stepper" style="padding:0"><button data-days="-1" aria-label="−">−</button><b data-days-n>${b.days}</b><span data-days-label>${daysText(b.days)}</span><button data-days="1" aria-label="+">+</button></div></div>
-    <div class="field"><label>${t('agTasks')}</label><div data-tasks>${b.tasks.map(taskRow).join('')}</div>
-      <button class="link" data-add-task>➕ ${t('agAddTask')}</button><p class="hint">${t('agNoTasksHint')}</p></div>
+    <div class="field"><label>${t('agTasks')}</label><div data-tasks>${b.tasks.map((x) => taskRow(x, walked)).join('')}</div>
+      ${walked ? `<p class="hint">🔒 ${t('agFrozenHint')}</p>` : `<button class="link" data-add-task>➕ ${t('agAddTask')}</button><p class="hint">${t('agNoTasksHint')}</p>`}</div>
     <div class="field"><label>${t('agThen')}</label>
       <div class="chips" data-mode><button class="chip ${d ? '' : 'on'}" data-m="next">→ ${t('agGoOn')}</button><button class="chip ${d ? 'on' : ''}" data-m="ask">🧭 ${t('agAsk')}</button></div>
       <div data-next style="margin-top:8px;${d ? 'display:none' : ''}">${targetSel(p, b, 'data-f="next"', b.next)}</div>
@@ -197,7 +198,8 @@ function openBlockSheet(p, b, back) {
   const tasksBox = $('[data-tasks]', el), optBox = $('[data-options]', el);
   const wireOpts = () => $$('[data-rm]', optBox).forEach((x) => { x.onclick = () => x.closest('.row').remove(); });
   wireTaskRows(tasksBox); wireOpts();
-  $('[data-add-task]', el).addEventListener('click', () => { tasksBox.insertAdjacentHTML('beforeend', taskRow(P.newTask())); wireTaskRows(tasksBox); $$('[data-t-name]', tasksBox).pop().focus(); });
+  const addTask = $('[data-add-task]', el);
+  if (addTask) addTask.addEventListener('click', () => { tasksBox.insertAdjacentHTML('beforeend', taskRow(P.newTask())); wireTaskRows(tasksBox); $$('[data-t-name]', tasksBox).pop().focus(); });
   $('[data-add-option]', el).addEventListener('click', () => {
     if ($$('.ag-opt', optBox).length >= P.MAX_OPTIONS) return;
     optBox.insertAdjacentHTML('beforeend', optionRow(p, b, { label: '', next: null })); wireOpts();
@@ -215,9 +217,10 @@ function openBlockSheet(p, b, back) {
     b.title = $('[data-f="title"]', el).value.trim();
     b.days = days;
     b.tasks = $$('.ag-taskrow', tasksBox).map((row) => {
-      const name = $('[data-t-name]', row).value.trim();
-      return name ? { id: row.dataset.tId || P.newTask().id, name, emoji: $('[data-t-emoji]', row).value.trim() || suggestEmoji(name) } : null;
-    }).filter(Boolean);
+      const id = row.dataset.tId || P.newTask().id;
+      const name = $('[data-t-name]', row).value.trim() || (walked ? (b.tasks.find((x) => x.id === id) || {}).name : '');
+      return name ? { id, name, emoji: $('[data-t-emoji]', row).value.trim() || suggestEmoji(name) } : null;
+    }).filter(Boolean); // a started step keeps its list: a blanked name falls back to the old one
     if (mode === 'ask') {
       const opts = $$('.ag-opt', optBox).map((row) => ({ label: $('[data-o-label]', row).value.trim(), next: $('[data-o-next]', row).value || null })).filter((o) => o.label);
       if (opts.length < 2) { shake($('[data-f="question"]', el)); return; }
@@ -292,9 +295,14 @@ export function openDetailSheet(p, now, { onEdit, onForfeit, onDup, onShare, onD
   const line = p.finished
     ? (p.finished.forfeited ? t('agForfeitedLine', { days: p.finished.days }) : t('agFinishedLine', { pts: p.finished.pts, days: p.finished.days }) + (p.finished.flawless ? ' · 💠 ' + t('agFlawless') : ''))
     : idx < 1 ? t('agStartsOn', { day: dateOf(p.startDay) }) : t('agDay', { x: Math.min(days, idx), n: days });
+  const pay = running ? P.payout(p) : null;
+  const payHtml = pay ? `<div class="ag-payout">
+      <div class="bprog big"><i style="width:${Math.round(pct * 100)}%"></i></div>
+      <div class="ag-paylegend"><span>${pctText(pct)}</span><span>💎 ${t('agPayoutNow', { pts: pay.now })}</span><span class="muted">${t('agPayoutMax', { pts: pay.max })}</span></div></div>` : '';
   const el = openSheet(`
     <h2>${goalTitle(p)} · ${pctText(pct)}</h2>
     <p class="hint" style="margin-top:6px">${line}</p>
+    ${payHtml}
     <div class="card" style="margin-top:10px;padding:0">${walked}</div>
     ${ahead ? `<div class="hint" style="margin:12px 2px 4px;font-weight:600">${t('agComingUp')}</div><div class="card" style="padding:0">${ahead}</div>` : ''}
     <div class="btnrow wrap">
@@ -311,15 +319,38 @@ export function openDetailSheet(p, now, { onEdit, onForfeit, onDup, onShare, onD
   $$('[data-undo]', el).forEach((b) => b.addEventListener('click', () => { const [i, taskId] = b.dataset.undo.split('/'); closeSheet(); onUndo(Number(i), taskId); }));
 }
 
+// The link as a QR code for the phone next to you, plus the share sheet and
+// a copy button for everything else.
+export function openShareSheet(p, url, onShare) {
+  const e = P.estimate(p);
+  const el = openSheet(`
+    <h2>📤 ${goalTitle(p)}</h2>
+    <p class="hint" style="margin-top:6px">${t('agEstimate', { n: e.days, b: e.steps })} · ${t('agShareQrHint')}</p>
+    <div class="qrwrap"><canvas data-qr aria-label="QR"></canvas></div>
+    <p class="hint ag-url">${esc(url)}</p>
+    <div class="btnrow"><button class="btn" data-copy>📋 ${t('agCopyLink')}</button><button class="btn primary" data-share>📤 ${t('agShareLink')}</button></div>
+    <div class="btnrow" style="margin-top:8px"><button class="btn ghost wide" data-close>${t('close')}</button></div>`);
+  if (!drawQR($('[data-qr]', el), url)) $('.qrwrap', el).innerHTML = `<p class="hint neg">${t('agQrTooLong')}</p>`;
+  $('[data-close]', el).addEventListener('click', closeSheet);
+  $('[data-share]', el).addEventListener('click', () => { closeSheet(); onShare(); });
+  $('[data-copy]', el).addEventListener('click', async () => {
+    try { await navigator.clipboard.writeText(url); toast(t('sharedCopied'), 'good'); } catch { toast(t('shareFailed'), 'bad'); }
+  });
+}
+
 // Paste a shared link or code; the quest is previewed before it is added.
 export function openImportSheet(initial, onImport) {
   const el = openSheet(`
     <h2>📥 ${t('agImportTitle')}</h2>
     <p class="hint" style="margin-top:6px">${t('agImportHint')}</p>
-    <textarea class="input" data-f="code" rows="3" style="margin-top:10px;width:100%;font-family:monospace;font-size:12px" placeholder="https://…#quest=…"></textarea>
+    <div class="row" style="margin-top:10px;align-items:stretch"><textarea class="input" data-f="code" rows="3" style="font-family:monospace;font-size:12px" placeholder="https://…#quest=…"></textarea>
+      <button class="btn" data-paste style="flex:0 0 auto">📋 ${t('agPaste')}</button></div>
     <div data-preview style="margin-top:10px"></div>
     <div class="btnrow"><button class="btn ghost" data-cancel>✖️ ${t('cancel')}</button><button class="btn primary" data-add disabled>➕ ${t('agImportAdd')}</button></div>`);
   const codeIn = $('[data-f="code"]', el), preview = $('[data-preview]', el), add = $('[data-add]', el);
+  $('[data-paste]', el).addEventListener('click', async () => {
+    try { const v = await navigator.clipboard.readText(); if (!v || !v.trim()) throw new Error('empty'); codeIn.value = v; show(); if (!plan) shake(codeIn); } catch { toast(t('agPasteFail'), 'bad'); }
+  });
   let plan = null;
   const show = () => {
     plan = codeIn.value.trim() ? P.importCode(codeIn.value) : null;

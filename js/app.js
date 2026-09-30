@@ -325,12 +325,14 @@ function undoPlanTask(p, i, taskId) {
   U.toast('↩️ ' + t('agUndone'));
 }
 
-async function shareQuest(p) {
+function shareQuest(p) {
   const e = P.estimate(p);
   const url = APP_URL + '#quest=' + P.exportCode(p);
-  const res = await share({ text: t('agShareText', { emoji: p.emoji, name: p.name, n: e.steps, d: e.days }), url });
-  if (res === 'shared' || res === 'copied') U.toast(t(res === 'shared' ? 'shared' : 'sharedCopied'), 'good');
-  else if (res === false) U.toast(t('shareFailed'), 'bad');
+  A.openShareSheet(p, url, async () => {
+    const res = await share({ text: t('agShareText', { emoji: p.emoji, name: p.name, n: e.steps, d: e.days }), url });
+    if (res === 'shared' || res === 'copied') U.toast(t(res === 'shared' ? 'shared' : 'sharedCopied'), 'good');
+    else if (res === false) U.toast(t('shareFailed'), 'bad');
+  });
 }
 
 function addImportedPlan(p) {
