@@ -53,7 +53,9 @@ next}] } }`, so blocks form a graph walked from `root`. `schedule(p)` dates
 the `path` (each step starts right after the previous one, whatever day its
 question was answered); `advance(now)` runs every tick: follows `next` when a
 step's days are over, waits on an unanswered question (`pendingDecision`),
-`finish`es at a dead end. Points bypass boost and pause tokens
+`finish`es at a dead end — right away once the final step (no `next`, no
+question) has every task done, else when its days are over. Points bypass
+boost and pause tokens
 (`engine.addPlainXp`): `TASK_PTS` 5 (÷`LATE_DIV` 4 after the step),
 `BLOCK_BONUS` 10 when every task is done on time, goal = pct × 
 `GOAL_PTS_PER_DAY` 50 × planned days, ×2 at 100 %. `pointsOn(day)` feeds
