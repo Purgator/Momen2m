@@ -3,6 +3,9 @@
 // exhaustive (the detailed notes live on the GitHub release). Both languages.
 export const CHANGELOG = {
   en: {
+    '1.27.1': [
+      '🏁 A quest ends as soon as the last task of its last step is done — no more waiting for the step\'s remaining days.',
+    ],
     '1.27.0': [
       '◀️ The phone\'s back button closes the step editor and returns to the quest — it no longer leaves the app.',
       '⌨️ Editing a step or a premade shows the sheet whole; no keyboard pops up first.',
@@ -105,6 +108,9 @@ export const CHANGELOG = {
     '1.8.1': ['🔔 More reliable background reminders.'],
   },
   fr: {
+    '1.27.1': [
+      '🏁 Une quête se termine dès que la dernière tâche de sa dernière étape est faite — plus d’attente jusqu’à la fin des jours de l’étape.',
+    ],
     '1.27.0': [
       '◀️ Le bouton retour du téléphone ferme l’éditeur d’étape et revient à la quête — il ne quitte plus l’app.',
       '⌨️ Modifier une étape ou un moment prêt affiche la fiche entière ; plus de clavier qui surgit.',
