@@ -219,8 +219,11 @@ export function advance(now) {
     for (let guard = 0; guard < 60; guard++) {
       const sched = schedule(p);
       const last = sched[sched.length - 1];
-      if (!last || today <= last.to) break;
+      if (!last) break;
       const b = last.block;
+      // The final step with every task done: the quest is over, whatever days it had left.
+      if (!b.decision && !b.next && b.tasks.length && blockPct(p, last) >= 1) { changed = true; finished.push({ plan: p, ...finish(p, now) }); break; }
+      if (today <= last.to) break;
       let next;
       if (b.decision) { const i = p.decisions[last.i]; if (i === undefined) break; next = (b.decision.options[i] || {}).next || null; }
       else next = b.next;
