@@ -3,6 +3,10 @@
 // exhaustive (the detailed notes live on the GitHub release). Both languages.
 export const CHANGELOG = {
   en: {
+    '1.29.0': [
+      '📅 A late quest task says since when ("late since Thu 1 Oct"), so two runs of the same quest are no longer a puzzle.',
+      '🧽 The spring-clean example quest names its steps "Clear out" and "Finish up" instead of Saturday / Sunday — steps follow the day you start, not the calendar.',
+    ],
     '1.28.0': [
       '🔓 A running quest\'s current step can be edited: slide the lock to add or remove tasks.',
       '📱 The tab bar stays at the bottom on iPhone (the page can no longer be pinch-zoomed).',
@@ -112,6 +116,10 @@ export const CHANGELOG = {
     '1.8.1': ['🔔 More reliable background reminders.'],
   },
   fr: {
+    '1.29.0': [
+      '📅 Une tâche de quête en retard dit depuis quand (« en retard depuis le jeu. 1 oct. ») : deux lancements de la même quête ne se confondent plus.',
+      '🧽 La quête d’exemple du grand ménage nomme ses étapes « Désencombrer » et « Finitions » au lieu de Samedi / Dimanche — les étapes suivent le jour où tu démarres, pas le calendrier.',
+    ],
     '1.28.0': [
       '🔓 L’étape en cours d’une quête lancée se modifie : glisse le verrou pour ajouter ou retirer des tâches.',
       '📱 La barre d’onglets reste en bas sur iPhone (la page ne se zoome plus au pincement).',
