@@ -39,7 +39,7 @@ body {
   overscroll-behavior-y: none;
   -webkit-font-smoothing: antialiased;
   -webkit-user-select: none; user-select: none;
-  touch-action: manipulation;
+  touch-action: pan-x pan-y; /* no pinch zoom: a zoomed page left the fixed tab bar mid-screen on iOS */
 }
 input, textarea { -webkit-user-select: text; user-select: text; }
 button { font: inherit; color: inherit; }
@@ -398,6 +398,15 @@ textarea.input { resize: vertical; }
 .ag-dtask { font-size: 13px; color: var(--muted); padding: 2px 0 2px 8px; }
 .ag-dtask.ok { color: var(--text); }
 .ag-taskrow, .ag-opt { margin-top: 6px; }
+/* Slide to unlock the current step of a running quest. */
+.slider { margin-top: 10px; touch-action: none; --slid: 0; }
+.slider-track { position: relative; height: 50px; border-radius: 25px; background: var(--card2); border: 1px solid var(--line); overflow: hidden; display: flex; align-items: center; justify-content: center; }
+.slider-track::before { content: ''; position: absolute; inset: 0; background: var(--ok); opacity: calc(var(--slid) * .35); transition: opacity .1s; }
+.slider-label { position: relative; font-size: 14px; font-weight: 600; color: var(--muted); padding-left: 36px; opacity: calc(1 - var(--slid) * 1.6); }
+.slider-knob { position: absolute; left: 4px; top: 4px; width: 42px; height: 42px; border-radius: 50%; background: var(--accent); display: flex; align-items: center; justify-content: center; font-size: 20px; box-shadow: 0 2px 8px rgba(0, 0, 0, .3); cursor: grab; transition: transform .25s; user-select: none; -webkit-user-select: none; }
+.slider.dragging .slider-knob { transition: none; cursor: grabbing; }
+.slider.unlocked .slider-track::before { opacity: .6; }
+.slider.unlocked .slider-knob { background: var(--ok); }
 .ag-payout { margin-top: 12px; }
 .ag-payout .bprog.big { max-width: none; margin: 6px 0 8px; height: 10px; }
 .ag-paylegend { display: flex; justify-content: space-between; gap: 8px; font-size: 13px; font-weight: 600; flex-wrap: wrap; }
