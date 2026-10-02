@@ -3,6 +3,10 @@
 // exhaustive (the detailed notes live on the GitHub release). Both languages.
 export const CHANGELOG = {
   en: {
+    '1.28.0': [
+      '🔓 A running quest\'s current step can be edited: slide the lock to add or remove tasks.',
+      '📱 The tab bar stays at the bottom on iPhone (the page can no longer be pinch-zoomed).',
+    ],
     '1.27.1': [
       '🏁 A quest ends as soon as the last task of its last step is done — no more waiting for the step\'s remaining days.',
     ],
@@ -108,6 +112,10 @@ export const CHANGELOG = {
     '1.8.1': ['🔔 More reliable background reminders.'],
   },
   fr: {
+    '1.28.0': [
+      '🔓 L’étape en cours d’une quête lancée se modifie : glisse le verrou pour ajouter ou retirer des tâches.',
+      '📱 La barre d’onglets reste en bas sur iPhone (la page ne se zoome plus au pincement).',
+    ],
     '1.27.1': [
       '🏁 Une quête se termine dès que la dernière tâche de sa dernière étape est faite — plus d’attente jusqu’à la fin des jours de l’étape.',
     ],
