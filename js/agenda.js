@@ -2,18 +2,19 @@
 // sheets only — the rules live in plans.js, behaviour in app.js via data-action.
 import { t } from './i18n.js';
 import { state } from './store.js';
-import { esc, $, $$, openSheet, closeSheet, tabbar, toast } from './ui.js';
+import { esc, $, $$, shake, pctText } from './dom.js';
+import { openSheet, closeSheet, confirmDialog } from './sheet.js';
+import { toast } from './toast.js';
+import { tabbar } from './ui.js';
 import { suggestEmoji } from './emoji.js';
-import { dayKey, addDays, fmtDate, dayStart } from './time.js';
+import { dayKey, addDays, fmtDate, fmtDay, dayStart } from './time.js';
 import { drawQR } from './qr.js';
 import * as P from './plans.js';
 
-const pctText = (x) => Math.round(x * 100) + '%';
 const stepName = (p, b) => esc(b.title) || t('agStep', { n: p.blocks.indexOf(b) + 1 });
 const daysText = (n) => t(n === 1 ? 'agOneDay' : 'agDays', { n });
-const dateOf = (day) => fmtDate(new Date(day + 'T12:00'));
+const dateOf = fmtDay;
 const span = (x) => dateOf(x.from) + (x.block.days > 1 ? ' – ' + dateOf(x.to) : '');
-const shake = (el) => { el.classList.add('shake'); setTimeout(() => el.classList.remove('shake'), 500); };
 const goalTitle = (p) => esc(p.emoji) + ' ' + (esc(p.name) || t('agUntitled'));
 
 export function renderAgenda(now) {
@@ -139,7 +140,7 @@ export function openGoalSheet(p, { onSave, onDelete } = {}) {
     openBlockSheet(p, b, reopen);
   });
   const cancel = $('[data-cancel]', el); if (cancel) cancel.addEventListener('click', closeSheet);
-  const del = $('[data-del]', el); if (del) del.addEventListener('click', () => { if (confirm(t('agDeleteConfirm'))) { closeSheet(); onDelete(); } });
+  const del = $('[data-del]', el); if (del) del.addEventListener('click', async () => { if (await confirmDialog(t('agDeleteConfirm'), { okLabel: t('delete'), danger: true })) { closeSheet(); onDelete(); } });
   $('[data-save]', el).addEventListener('click', () => {
     keep();
     if (!p.name) { shake(nameIn); return; }
@@ -342,7 +343,7 @@ export function openDetailSheet(p, now, { onEdit, onForfeit, onDup, onShare, onD
       ${onDelete ? `<button class="btn danger" data-del>🗑️ ${t('delete')}</button>` : ''}
       <button class="btn primary" data-close>${t('close')}</button></div>`);
   $('[data-close]', el).addEventListener('click', closeSheet);
-  const wire = (sel, fn, ask) => { const b = $(sel, el); if (b) b.addEventListener('click', () => { if (ask && !confirm(ask)) return; closeSheet(); fn(); }); };
+  const wire = (sel, fn, ask) => { const b = $(sel, el); if (b) b.addEventListener('click', async () => { if (ask && !(await confirmDialog(ask, { danger: true }))) return; closeSheet(); fn(); }); };
   wire('[data-share]', onShare); wire('[data-dup]', onDup); wire('[data-edit]', onEdit);
   wire('[data-forfeit]', onForfeit, t('agForfeitConfirm')); wire('[data-del]', onDelete, t('agDeleteConfirm'));
   $$('[data-undo]', el).forEach((b) => b.addEventListener('click', () => { const [i, taskId] = b.dataset.undo.split('/'); closeSheet(); onUndo(Number(i), taskId); }));
