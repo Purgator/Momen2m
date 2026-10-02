@@ -169,9 +169,29 @@ function wireTaskRows(box) {
   });
 }
 
+// Slide-to-unlock: the knob follows the finger; letting go near the end calls
+// onUnlock, anywhere else it slides back.
+function slideToUnlock(root, onUnlock) {
+  const knob = $('.slider-knob', root), track = $('.slider-track', root);
+  let startX = 0, x = 0, dragging = false;
+  const max = () => track.clientWidth - knob.offsetWidth - 8;
+  const place = (v) => { x = Math.max(0, Math.min(max(), v)); knob.style.transform = `translateX(${x}px)`; root.style.setProperty('--slid', (x / max()).toFixed(3)); };
+  knob.addEventListener('pointerdown', (e) => { dragging = true; startX = e.clientX - x; knob.setPointerCapture(e.pointerId); root.classList.add('dragging'); });
+  knob.addEventListener('pointermove', (e) => { if (dragging) place(e.clientX - startX); });
+  const end = () => {
+    if (!dragging) return;
+    dragging = false; root.classList.remove('dragging');
+    if (x >= max() * 0.9) { place(max()); root.classList.add('unlocked'); knob.textContent = '🔓'; setTimeout(onUnlock, 350); }
+    else place(0);
+  };
+  knob.addEventListener('pointerup', end); knob.addEventListener('pointercancel', end);
+}
+
 function openBlockSheet(p, b, back) {
   const d = b.decision;
   const walked = p.status === 'active' && p.path.includes(b.id);
+  const current = walked && p.path[p.path.length - 1] === b.id; // the step under way: editable once unlocked
+  let frozen = walked;
   const options = d ? d.options : [{ label: '', next: null }, { label: '', next: null }];
   const el = openSheet(`
     <h2>${p.blocks.indexOf(b) + 1}. ${stepName(p, b)}</h2>
@@ -179,7 +199,9 @@ function openBlockSheet(p, b, back) {
     <div class="field"><label>${t('agLength')}</label>
       <div class="stepper" style="padding:0"><button data-days="-1" aria-label="−">−</button><b data-days-n>${b.days}</b><span data-days-label>${daysText(b.days)}</span><button data-days="1" aria-label="+">+</button></div></div>
     <div class="field"><label>${t('agTasks')}</label><div data-tasks>${b.tasks.map((x) => taskRow(x, walked)).join('')}</div>
-      ${walked ? `<p class="hint">🔒 ${t('agFrozenHint')}</p>` : `<button class="link" data-add-task>➕ ${t('agAddTask')}</button><p class="hint">${t('agNoTasksHint')}</p>`}</div>
+      <div data-edit-tools ${walked ? 'hidden' : ''}><button class="link" data-add-task>➕ ${t('agAddTask')}</button><p class="hint">${t('agNoTasksHint')}</p></div>
+      ${current ? `<div class="slider" data-unlock><div class="slider-track"><span class="slider-label">${t('agUnlockSlide')}</span><div class="slider-knob">🔒</div></div></div><p class="hint" data-unlocked hidden>🔓 ${t('agUnlocked')}</p>`
+        : walked ? `<p class="hint">🔒 ${t('agFrozenHint')}</p>` : ''}</div>
     <div class="field"><label>${t('agThen')}</label>
       <div class="chips" data-mode><button class="chip ${d ? '' : 'on'}" data-m="next">→ ${t('agGoOn')}</button><button class="chip ${d ? 'on' : ''}" data-m="ask">🧭 ${t('agAsk')}</button></div>
       <div data-next style="margin-top:8px;${d ? 'display:none' : ''}">${targetSel(p, b, 'data-f="next"', b.next)}</div>
@@ -200,6 +222,13 @@ function openBlockSheet(p, b, back) {
   wireTaskRows(tasksBox); wireOpts();
   const addTask = $('[data-add-task]', el);
   if (addTask) addTask.addEventListener('click', () => { tasksBox.insertAdjacentHTML('beforeend', taskRow(P.newTask())); wireTaskRows(tasksBox); $$('[data-t-name]', tasksBox).pop().focus(); });
+  const slider = $('[data-unlock]', el);
+  if (slider) slideToUnlock(slider, () => {
+    frozen = false;
+    slider.remove(); $('[data-unlocked]', el).hidden = false; $('[data-edit-tools]', el).hidden = false;
+    $$('.ag-taskrow', tasksBox).forEach((row) => { if (!$('[data-rm]', row)) { row.insertAdjacentHTML('beforeend', `<button class="iconbtn" data-rm aria-label="${t('delete')}">✕</button>`); delete row.dataset.wired; } });
+    wireTaskRows(tasksBox);
+  });
   $('[data-add-option]', el).addEventListener('click', () => {
     if ($$('.ag-opt', optBox).length >= P.MAX_OPTIONS) return;
     optBox.insertAdjacentHTML('beforeend', optionRow(p, b, { label: '', next: null })); wireOpts();
@@ -218,7 +247,7 @@ function openBlockSheet(p, b, back) {
     b.days = days;
     b.tasks = $$('.ag-taskrow', tasksBox).map((row) => {
       const id = row.dataset.tId || P.newTask().id;
-      const name = $('[data-t-name]', row).value.trim() || (walked ? (b.tasks.find((x) => x.id === id) || {}).name : '');
+      const name = $('[data-t-name]', row).value.trim() || (frozen ? (b.tasks.find((x) => x.id === id) || {}).name : '');
       return name ? { id, name, emoji: $('[data-t-emoji]', row).value.trim() || suggestEmoji(name) } : null;
     }).filter(Boolean); // a started step keeps its list: a blanked name falls back to the old one
     if (mode === 'ask') {
