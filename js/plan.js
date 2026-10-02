@@ -38,9 +38,9 @@ export function buildPlan(now, days = PLAN_DAYS) {
       const pts = BASE_PTS[o.habit.importance] || 20;
       const actions = [{ action: 'done', title: '✓ ' + t('done') }];
       if (canSnooze(o) === 'ok') actions.push({ action: 'snooze', title: '💤 ' + t('snoozeMin', { n: s.snoozeMinutes }) });
-      push(o, o.start, 'start', t('nStart', { emoji, name }), t('nStartBody', { t: fmtDuration(o.end - o.start, state.lang), pts }), actions);
+      push(o, o.start, 'start', t('nStart', { emoji, name }), t('nStartBody', { t: fmtDuration(o.end - o.start), pts }), actions);
       if (before > 0 && o.end - o.start > before * 2) {
-        push(o, o.end - before, 'ending', t('nStart', { emoji, name }), t('nEndingBody', { t: fmtDuration(before, state.lang) }), actions);
+        push(o, o.end - before, 'ending', t('nStart', { emoji, name }), t('nEndingBody', { t: fmtDuration(before) }), actions);
       }
       push(o, o.end, 'missed', t('nMissed', { name }), t('nMissedBody'));
     }

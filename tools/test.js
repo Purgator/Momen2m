@@ -796,5 +796,62 @@ globalThis.window = globalThis;
     assert.deepStrictEqual(G.timingAdvice(now), []);
   });
 
+  await test('DST switch days: a 02:30 slot still yields one sane occurrence', () => {
+    // 2026-03-29 (clocks forward) and 2026-10-25 (clocks back) in Europe; in any
+    // other zone these are ordinary days and the invariants still hold.
+    for (const day of ['2026-03-29', '2026-10-25']) {
+      S.state.habits = [habit('dst', '02:30', '03:30', { createdAt: T.at('2026-01-01', '00:00') })]; // created before either day
+      S.state.days = {};
+      const occs = E.occurrencesOfDay(day);
+      assert.strictEqual(occs.length, 1, day + ': one occurrence');
+      const [o] = occs;
+      assert.ok(Number.isFinite(o.start) && Number.isFinite(o.end), 'real timestamps');
+      assert.ok(o.end > o.start && o.end - o.start <= 2 * 3600000, 'a window that ends after it starts, within two hours');
+      assert.strictEqual(T.dayKey(new Date(o.start)), day, 'and that stays on its day');
+      assert.ok(Number.isFinite(T.at(day, '02:30')), 'at() never returns NaN for a skipped hour');
+    }
+  });
+
+  await test('settlePastDays after a 46-day gap: catches up on the recent window only', () => {
+    S.state.habits = [habit('gap', '10:00', '10:30', { createdAt: T.at(T.addDays(today, -60), '00:00') })];
+    S.state.days = {}; S.state.game.xp = 0; S.state.game.streak = 5; S.state.game.lastEvaluated = T.addDays(today, -60);
+    E.tick(D(0, '09:00'), hooks);
+    assert.strictEqual(S.state.game.lastEvaluated, T.addDays(today, -1), 'cursor lands on yesterday');
+    assert.strictEqual(S.state.game.streak, 0, 'missed days break the streak');
+    assert.strictEqual(S.state.days[T.addDays(today, -50)], undefined, 'nothing older than the 45-day window is touched');
+    assert.ok(S.state.days[T.addDays(today, -1)] && S.state.days[T.addDays(today, -1)]['gap#0'].status === 'missed', 'yesterday is settled');
+    assert.ok(Object.keys(S.state.days).length <= 46, 'storage stays bounded');
+  });
+
+  await test('mergeWithDefaults on an old save: migrations run, every field has a default', () => {
+    S.importJSON(JSON.stringify({
+      v: 1, lang: 'fr', onboarded: true,
+      habits: [{ id: 'w', preset: 'wake', name: 'Lever', emoji: '⏰', slots: [{ start: '06:45', end: '07:15' }], days: [0, 1, 2, 3, 4, 5, 6], importance: 2 }],
+      settings: { soundOutput: 'app' }, game: { xp: 12 },
+    }));
+    const s = S.state;
+    assert.strictEqual(s.v, 2, 'v1 → v2');
+    assert.strictEqual(s.settings.soundOutput, 'both', '"in-app only" became "both" once');
+    assert.strictEqual(s.settings.dayStart, '06:45', 'day start read back from the wake moment');
+    assert.strictEqual(s.settings.dayEnd, '22:30', 'bed time falls back to the default');
+    assert.deepStrictEqual([s.game.xp, s.game.pauseTokens, s.game.badges && typeof s.game.badges], [12, 0, 'object'], 'game fields filled in');
+    assert.deepStrictEqual([Array.isArray(s.plans), Array.isArray(s.templates), typeof s.push.enabled, s.lastView], [true, true, 'boolean', 'live']);
+    S.importJSON(JSON.stringify({ habits: [], lang: 'en', game: { xp: 0, lastEvaluated: T.addDays(today, -1), badges: {} } })); // clean slate for the next tests
+  });
+
+  await test('missRun: consecutive misses across yesterday and today, cut by any done or skip', () => {
+    S.state.habits = ['a', 'b', 'c', 'd'].map((id, i) => habit(id, `${String(8 + i).padStart(2, '0')}:00`, `${String(8 + i).padStart(2, '0')}:30`));
+    S.state.days = {}; S.state.game.xp = 500; S.state.game.lastEvaluated = T.addDays(today, -1);
+    E.tick(D(0, '10:31'), hooks); // a, b, c missed; d (11:00) still ahead
+    const r = E.missRun(D(0, '10:31'));
+    assert.strictEqual(r.run, 3);
+    assert.strictEqual(r.last.occ, 'c#0', 'the latest resolved moment is the one the greeting keys on');
+    const d = E.buildOccurrences(D(0, '11:05')).find((o) => o.habit.id === 'd');
+    E.complete(d, D(0, '11:05'));
+    assert.strictEqual(E.missRun(D(0, '11:06')).run, 0, 'a completion ends the run');
+    E.tick(D(1, '08:31'), hooks);
+    assert.strictEqual(E.missRun(D(1, '08:31')).run, 1, 'a fresh miss the next day starts a new count');
+  });
+
   console.log(`\n${passed} tests passed`);
 })().catch((e) => { console.error(e); process.exit(1); });

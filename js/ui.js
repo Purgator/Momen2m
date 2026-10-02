@@ -1,19 +1,23 @@
-// Rendering. Pure functions from state to HTML strings, plus a few DOM helpers
-// (bottom sheet, toasts, sparkles). Behaviour lives in app.js via data-action.
+// Rendering: pure functions from state to HTML strings for the five tabs and
+// the setup. Behaviour lives in app.js via data-action. The DOM helpers, the
+// sheet, the toasts and the shared widgets have their own modules; they are
+// re-exported here so `import * as U from './ui.js'` stays one door.
+export * from './dom.js';
+export * from './toast.js';
+export * from './sheet.js';
+export * from './sheets.js';
+export { durationOf } from './widgets.js';
+import { $, esc, cssEsc, pctText, signed } from './dom.js';
+import { habitName, habitDesc, slotsText, daysText, slotOf, dayLetter, toggleRow, timeIn, sw, sel } from './widgets.js';
 import { t, pick, getLang } from './i18n.js';
-import { state, save } from './store.js';
+import { state } from './store.js';
 import { PRESETS } from './presets.js';
 import { QUESTIONS, isTriggered, reviewStatus } from './setup.js';
-import { suggestEmoji } from './emoji.js';
-import { BASE_PTS, SNOOZE_PENALTY, PAUSE_MAX, PAUSE_XP, PAUSE_MS, canSnooze, currentOf, todayPoints, boostActive, pausedUntil } from './engine.js';
-import { levelInfo, rankLadder, BADGES, BADGE_PAGE, badgeProgress, tips as gameTips } from './game.js';
+import { BASE_PTS, PAUSE_MAX, canSnooze, currentOf, todayPoints, boostActive, pausedUntil } from './engine.js';
+import { levelInfo, BADGES, BADGE_PAGE, badgeProgress, tips as gameTips } from './game.js';
 import { pointsOn as agendaPointsOn, dueOn as questsDueOn, reminderHM as questReminderHM } from './plans.js';
-import { fmtClock, fmtCountdown, fmtDuration, fmtAgo, fmtDate, fmtDateTime, fmtWhenShort, nowHM, minutesToHM, parseHM, dayKey, weekday, at } from './time.js';
+import { fmtClock, fmtCountdown, fmtDuration, fmtAgo, fmtDay, fmtDateTime, fmtWhenShort, dayKey } from './time.js';
 import { permission, TONE_NAMES, PATTERN_NAMES } from './notify.js';
-
-export const $ = (sel, root = document) => root.querySelector(sel);
-export const $$ = (sel, root = document) => Array.from(root.querySelectorAll(sel));
-export const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
 const RING_R = 70;
 const RING_C = 2 * Math.PI * RING_R;
@@ -21,37 +25,27 @@ const RING_C = 2 * Math.PI * RING_R;
 // ---- shared bits ------------------------------------------------------------
 
 export function tabbar(view) {
-  return `<nav class="tabbar">
-    <button class="tab ${view === 'live' ? 'on' : ''}" data-action="tab" data-view="live"><span class="ico">⏱️</span>${t('tabNow')}</button>
-    <button class="tab ${view === 'progress' ? 'on' : ''}" data-action="tab" data-view="progress"><span class="ico">🏆</span>${t('tabProgress')}</button>
-    <button class="tab ${view === 'moments' ? 'on' : ''}" data-action="tab" data-view="moments"><span class="ico">📋</span>${t('tabMoments')}</button>
-    ${state.settings.agenda !== false ? (() => { const due = questsDueOn(dayKey()); return `<button class="tab ${view === 'agenda' ? 'on' : ''}" data-action="tab" data-view="agenda"><span class="ico">🗺️${due.tasks || due.questions ? '<i class="dot-badge"></i>' : ''}</span>${t('tabAgenda')}</button>`; })() : ''}
-    <button class="tab ${view === 'setup' ? 'on' : ''}" data-action="tab" data-view="setup"><span class="ico">🎛️</span>${t('tabSetup')}</button>
+  const tab = (v, ico, label) => `<button class="tab ${view === v ? 'on' : ''}" data-action="tab" data-view="${v}" ${view === v ? 'aria-current="page"' : ''}><span class="ico">${ico}</span><span class="lbl">${label}</span></button>`;
+  const due = state.settings.agenda !== false ? questsDueOn(dayKey()) : null;
+  return `<nav class="tabbar" aria-label="${t('tabs')}">
+    ${tab('live', '⏱️', t('tabNow'))}
+    ${tab('progress', '🏆', t('tabProgress'))}
+    ${tab('moments', '📋', t('tabMoments'))}
+    ${due ? tab('agenda', '🗺️' + (due.tasks || due.questions ? '<i class="dot-badge"></i>' : ''), t('tabAgenda')) : ''}
+    ${tab('setup', '🎛️', t('tabSetup'))}
   </nav>`;
 }
-
-function habitName(h) { return esc(pick(h.name)); }
-function habitDesc(h) { return esc(pick(h.desc || '')); }
-
-function slotsText(h) {
-  return esc((h.slots || []).map((s) => s.start + '–' + s.end).join(' · '));
+// Rows and cards that react to a tap are divs: make them reachable from a
+// keyboard too (app.js turns Enter / Space on them into a click).
+export function a11y(root) {
+  for (const el of root.querySelectorAll('[data-action]:not(button):not(a):not(input):not(select):not(label):not([tabindex])')) {
+    el.tabIndex = 0; el.setAttribute('role', 'button');
+  }
 }
-
-function daysText(h) {
-  if (h.once) return t('today');
-  const d = h.days || [];
-  if (d.length === 7) return t('everyDay');
-  if (d.length === 5 && !d.includes(0) && !d.includes(6)) return t('weekdays');
-  if (d.length === 2 && d.includes(0) && d.includes(6)) return t('weekends');
-  const names = t('days');
-  return d.slice().sort().map((i) => names[i]).join(' ');
-}
-
 // ---- live ---------------------------------------------------------------------
 
 function pastSide(o) {
-  const lang = getLang();
-  const time = o.at ? fmtClock(o.at, lang) : '';
+  const time = o.at ? fmtClock(o.at) : '';
   const pts = o.pts ? (o.pts > 0 ? '+' : '') + o.pts : '';
   const undo = (o.status === 'done' || o.status === 'skipped') && Date.now() - o.at < 5 * 60000
     ? `<button class="btn small ghost undo" data-action="undo" data-key="${esc(o.key)}">${t('undo')}</button>` : '';
@@ -65,11 +59,6 @@ function occRow(o, cls, side, extra = '', action = null) {
     <div><div class="name">${habitName(o.habit)}</div><div class="when">${slotOf(o)}</div></div>
     ${side}
   </div>`;
-}
-
-function slotOf(o) {
-  const lang = getLang();
-  return fmtClock(o.start, lang) + ' – ' + fmtClock(o.end, lang);
 }
 
 // The one big "current" card. `collapsible` is true for a second (or third…)
@@ -102,7 +91,6 @@ function currentCard(o, now, collapsible = false) {
 }
 
 export function renderLive(occs, now, opts) {
-  const lang = getLang();
   const g = state.game;
   const ranks = t('rankNames');
   const li = levelInfo(g.xp, ranks.length);
@@ -158,7 +146,7 @@ export function renderLive(occs, now, opts) {
   if (upcoming.length) {
     body += `<div class="group-title">${t('upcoming')}</div>`;
     for (const o of upcoming.slice(0, 6)) {
-      body += occRow(o, 'upcoming', `<div class="side">${o.snoozes ? '💤 ' : ''}<span data-in="${esc(o.key)}">${t('in', { t: fmtDuration(o.start - now, lang) })}</span></div>`, '', 'upcoming-detail');
+      body += occRow(o, 'upcoming', `<div class="side">${o.snoozes ? '💤 ' : ''}<span data-in="${esc(o.key)}">${t('in', { t: fmtDuration(o.start - now) })}</span></div>`, '', 'upcoming-detail');
     }
   }
   // One-time moments set for tomorrow have no other place to show up; a tap opens them for editing.
@@ -177,7 +165,7 @@ export function renderLive(occs, now, opts) {
 
   return `<div class="screen live">
     <div class="topbar">
-      <div class="clock" data-clock>${fmtClock(now, lang)}</div>
+      <div class="clock" data-clock>${fmtClock(now)}</div>
       <div class="stats">
         <button class="stat" data-action="explain" data-topic="level" data-tip="${esc(t('tipLevel', { rank, n: hi - g.xp }))}">⭐ ${t('level', { n: level })}</button>
         ${g.streak ? `<button class="stat" data-action="explain" data-topic="streak" data-tip="${esc(t('tipStreak', { n: g.streak, best: g.bestStreak }))}">🔥 ${g.streak}</button>` : ''}
@@ -198,7 +186,7 @@ export function renderLive(occs, now, opts) {
 // Cheap per-second refresh: countdowns, ring, clock. No re-render.
 export function updateCountdowns(occs, now) {
   const clock = $('[data-clock]');
-  if (clock) { const s = fmtClock(now, getLang()); if (clock.textContent !== s) clock.textContent = s; }
+  if (clock) { const s = fmtClock(now); if (clock.textContent !== s) clock.textContent = s; }
   for (const o of occs) {
     if (o.phase === 'active') {
       const el = $(`[data-cd="${cssEsc(o.key)}"]`);
@@ -214,17 +202,12 @@ export function updateCountdowns(occs, now) {
       }
     } else if (o.phase === 'upcoming') {
       const el = $(`[data-in="${cssEsc(o.key)}"]`);
-      if (el) { const s = t('in', { t: fmtDuration(o.start - now, getLang()) }); if (el.textContent !== s) el.textContent = s; }
+      if (el) { const s = t('in', { t: fmtDuration(o.start - now) }); if (el.textContent !== s) el.textContent = s; }
     }
   }
 }
-const cssEsc = (s) => (window.CSS && CSS.escape ? CSS.escape(s) : s.replace(/["\\]/g, '\\$&'));
 
 // ---- progress -----------------------------------------------------------------
-
-const pctText = (r) => (r === null || r === undefined ? '–' : Math.round(r * 100) + '%');
-const signed = (n) => (n > 0 ? '+' : '') + n;
-const dayLetter = (day) => t('dayLetters')[weekday(day)];
 
 // Seven small bars: points per day, today highlighted, negatives in red.
 function weekChart(week, now) {
@@ -282,7 +265,7 @@ export function renderProgress(s, now, page = 0) {
     <div class="section">
       <h2>${t('last7')}</h2>
       <div class="card pad">${weekChart(s.week, now)}
-        <p class="hint" style="margin-top:8px">${bestDay ? t('bestDay', { pts: signed(bestDay.pts), d: fmtDate(new Date(bestDay.day + 'T12:00').getTime()) }) : t('noHistoryYet')}</p>
+        <p class="hint" style="margin-top:8px">${bestDay ? t('bestDay', { pts: signed(bestDay.pts), d: fmtDay(bestDay.day) }) : t('noHistoryYet')}</p>
       </div>
     </div>
 
@@ -324,102 +307,6 @@ export function renderProgress(s, now, page = 0) {
   ${tabbar('progress')}`;
 }
 
-// Explanations behind the numbers, opened by a tap on any stat.
-export function openExplainSheet(topic, s, todayOccs = []) {
-  const ranks = t('rankNames');
-  let html = '';
-  if (topic === 'level') {
-    const li = s.level;
-    html = `<h2>⭐ ${t('level', { n: li.level })} · ${esc(ranks[li.rankIdx])}</h2>
-      <p class="hint" style="margin-top:6px">${t('explainLevel', { xp: li.xp, n: li.toNext, l: li.level + 1 })}</p>
-      <div class="xpbar" style="margin:12px 2px"><div class="xpfill" style="width:${li.pct}%"></div></div>
-      <div class="card ladder">${rankLadder(ranks.length).map((r) => `<div class="lrow ${r.rankIdx === li.rankIdx ? 'on' : ''}"><span>${esc(ranks[r.rankIdx])}</span><span class="muted">${t('fromLevel', { l: r.fromLevel, xp: r.fromXp })}</span></div>`).join('')}</div>`;
-  } else if (topic === 'streak') {
-    const dots = s.week.map((d) => `<span class="dot-day ${d.perfect === true ? 'ok' : d.perfect === false ? 'ko' : ''}" title="${esc(d.day)}">${d.perfect === true ? '✓' : d.perfect === false ? '✗' : '·'}<small>${esc(dayLetter(d.day))}</small></span>`).join('');
-    html = `<h2>🔥 ${t('streak', { n: s.streak })}</h2>
-      <p class="hint" style="margin-top:6px">${t('explainStreak', { best: s.bestStreak })}</p>
-      <div class="dots-week">${dots}</div>`;
-  } else if (topic === 'rate') {
-    const p = s.period;
-    html = `<h2>🎯 ${t('successRate')} · ${pctText(p.rate)}</h2>
-      <p class="hint" style="margin-top:6px">${t('explainRate', { done: p.done, missed: p.missed, skipped: p.skipped })}</p>`;
-  } else {
-    const today = dayKey(new Date());
-    const rows = todayOccs.filter((o) => o.day === today && o.status !== 'open').sort((a, b) => a.at - b.at)
-      .map((o) => `<div class="lrow"><span>${esc(o.habit.emoji)} ${habitName(o.habit)} <small class="muted">${o.status === 'done' ? t('completed') : o.status === 'missed' ? t('missed') : t('skipped')}${o.snoozes ? ' · 💤×' + o.snoozes : ''}</small></span><span class="${o.pts >= 0 ? 'pos' : 'neg'}">${signed(o.pts)}</span></div>`).join('');
-    html = `<h2>${t('today')} · ${signed(s.today.pts)} pts</h2>
-      <p class="hint" style="margin-top:6px">${t('explainToday')}</p>
-      ${boostActive(Date.now()) ? `<p class="hint boost-hint" style="margin-top:6px">⚡ ${t('boostBanner', { until: fmtClock(state.game.boostUntil) })}</p>` : ''}
-      ${rows || agendaPointsOn(today) ? `<div class="card ladder" style="margin-top:10px">${rows}${agendaPointsOn(today) ? `<div class="lrow"><span>🗺️ ${t('tabAgenda')}</span><span class="pos">+${agendaPointsOn(today)}</span></div>` : ''}</div>` : ''}
-      <div class="card ladder" style="margin-top:10px">
-        <div class="lrow"><span>${t('ruleDone')}</span><span class="pos">+${BASE_PTS[1]} / +${BASE_PTS[2]} / +${BASE_PTS[3]}</span></div>
-        <div class="lrow"><span>${t('ruleEarly')}</span><span class="pos">+50%</span></div>
-        <div class="lrow"><span>${t('ruleMissed')}</span><span class="neg">−${BASE_PTS[1]} / −${BASE_PTS[2]} / −${BASE_PTS[3]}</span></div>
-        <div class="lrow"><span>${t('ruleSkipped')}</span><span class="neg">−50%</span></div>
-        <div class="lrow"><span>${t('ruleSnooze')}</span><span class="neg">−${SNOOZE_PENALTY}</span></div>
-        <div class="lrow"><span>${t('ruleLate')}</span><span class="pos">+25%</span></div>
-        <div class="lrow"><span>${t('ruleBoost')}</span><span class="pos">×1.5</span></div>
-      </div>`;
-  }
-  const el = openSheet(html + `<div class="btnrow"><button class="btn primary wide" data-close>${t('close')}</button></div>`);
-  $('[data-close]', el).addEventListener('click', closeSheet);
-}
-
-export function openBadgeSheet(b, p, { onShare } = {}) {
-  const names = t('badgeNames'), descs = t('badgeDescs');
-  const el = openSheet(`
-    <div class="center"><div class="badge-hero ${p.earned ? 'earned' : 'locked'}">${b.emoji}</div>
-    <h2>${esc(names[b.id])}</h2>
-    <p class="hint" style="margin-top:6px">${esc(descs[b.id])}</p>
-    ${p.earned ? `<p class="hint" style="margin-top:8px">🏅 ${t('earnedOn', { t: p.unlockedAt ? fmtDateTime(p.unlockedAt) : '—' })}</p>`
-      : `<div class="bprog big"><i style="width:${Math.round((p.n / p.of) * 100)}%"></i></div><p class="hint">${t('badgeProgress', { n: p.n, of: p.of })}</p>`}</div>
-    <div class="btnrow">
-      ${p.earned && onShare ? `<button class="btn" data-share>📤 ${t('share')}</button>` : ''}
-      <button class="btn ${p.earned && onShare ? '' : 'primary wide'}" data-close>${t('close')}</button>
-    </div>`);
-  $('[data-close]', el).addEventListener('click', closeSheet);
-  if (p.earned && onShare) $('[data-share]', el).addEventListener('click', () => { closeSheet(); onShare(); });
-}
-
-// The pause stock: what it is, progress to the next one, and — when some are
-// in stock and none is running — buttons to spend one to three at once.
-export function openPauseSheet({ tokens, xp, until }, onPause) {
-  const lang = getLang();
-  const hours = (n) => fmtDuration(n * PAUSE_MS, lang);
-  const pct = Math.min(100, Math.round((xp / PAUSE_XP) * 100));
-  const el = openSheet(`
-    <h2>⏸️ ${t('pauseTitle', { n: tokens, max: PAUSE_MAX })}</h2>
-    <p class="hint" style="margin-top:6px">${t('pauseExplain', { h: hours(1), pts: PAUSE_XP, max: PAUSE_MAX })}</p>
-    ${tokens < PAUSE_MAX
-      ? `<div class="xpbar" style="margin:12px 2px"><div class="xpfill" style="width:${pct}%"></div></div><p class="hint">${t('pauseProgress', { n: PAUSE_XP - xp })}</p>`
-      : `<p class="hint" style="margin-top:8px">${t('pauseFull')}</p>`}
-    ${until ? `<p class="hint boost-hint" style="margin-top:12px">⏸️ ${t('pausedBanner', { until: fmtClock(until) })}</p>`
-      : tokens ? `<p class="hint" style="margin-top:12px">${t('pauseUseHint')}</p>
-        <div class="btnrow" style="margin-top:8px">${[1, 2, 3].filter((n) => n <= tokens).map((n) => `<button class="btn" data-pause="${n}">${t('pauseBtn', { h: hours(n), n })}</button>`).join('')}</div>`
-      : ''}
-    <div class="btnrow"><button class="btn primary wide" data-close>${t('close')}</button></div>`);
-  $('[data-close]', el).addEventListener('click', closeSheet);
-  $$('[data-pause]', el).forEach((b) => b.addEventListener('click', () => { closeSheet(); onPause(Number(b.dataset.pause)); }));
-}
-
-// Announces a freshly granted boost. Closes on OK or a tap outside.
-export function openBoostSheet(until) {
-  const el = openSheet(`
-    <div class="center"><div class="badge-hero earned">⚡</div>
-    <h2>${t('boostTitle')}</h2>
-    <p class="hint" style="margin-top:6px">${t('boostBody', { until: fmtClock(until) })}</p></div>
-    <div class="btnrow"><button class="btn primary wide" data-close>${t('ok')}</button></div>`);
-  $('[data-close]', el).addEventListener('click', closeSheet);
-}
-
-// A bigger burst than sparkles(): centred, for level-ups and badges.
-export function celebrate(emojis) {
-  const x = innerWidth / 2, y = innerHeight / 2.6;
-  sparkles(x, y, emojis);
-  setTimeout(() => sparkles(x - 60, y + 40, emojis), 150);
-  setTimeout(() => sparkles(x + 60, y + 40, emojis), 300);
-}
-
 // ---- setup --------------------------------------------------------------------
 
 // Background reminders through the relay: one switch plus an honest status line.
@@ -437,20 +324,6 @@ function pushRow(p, perm) {
     (p.enabled ? `<div class="row" style="justify-content:flex-end;padding:0 0 8px"><button class="btn small" data-action="push-sync">${t('pushSyncNow')}</button></div>` : '');
 }
 
-function toggleRow(label, sub, control, cls = '') {
-  return `<div class="toggle ${cls}"><div><div class="t">${label}</div>${sub ? `<div class="s">${sub}</div>` : ''}</div>${control}</div>`;
-}
-// A clock input with a one-word caption under it (Setup's "Your day").
-function timeIn(setting, value, caption) {
-  return `<label class="tin"><input class="input" type="time" data-setting="${setting}" value="${esc(value)}" aria-label="${caption}"><small>${caption}</small></label>`;
-}
-function sw(setting, on) {
-  return `<label class="switch"><input type="checkbox" data-setting="${setting}" ${on ? 'checked' : ''}><span></span></label>`;
-}
-function sel(setting, options, value, disabled = false) {
-  return `<select data-setting="${setting}" ${disabled ? 'disabled' : ''}>${options.map(([v, l]) => `<option value="${v}" ${String(v) === String(value) ? 'selected' : ''}>${l}</option>`).join('')}</select>`;
-}
-
 // The Moments tab: what the user has set up (repeating moments, suggestions,
 // premade one-time moments). Everything about *how the app behaves* stays in
 // Setup, so each tab has one job.
@@ -460,7 +333,7 @@ export function renderMoments(opts = {}) {
   const list = habits.length
     ? habits.map((h) => `<div class="item ${h.enabled === false ? 'off' : ''}" data-action="edit" data-id="${esc(h.id)}">
         <div class="emo">${esc(h.emoji)}</div>
-        <div><div class="name">${habitName(h)}</div><div class="sub"><span class="dot i${h.importance}"></span>${slotsText(h)} · ${daysText(h)}</div></div>
+        <div><div class="name">${habitName(h)}</div><div class="sub"><span class="dot i${h.importance}" role="img" aria-label="${[null, t('impLow'), t('impNormal'), t('impHigh')][h.importance] || ''}" title="${[null, t('impLow'), t('impNormal'), t('impHigh')][h.importance] || ''}"></span>${slotsText(h)} · ${daysText(h)}</div></div>
         <label class="switch" data-stop><input type="checkbox" data-action="toggle" data-id="${esc(h.id)}" ${h.enabled !== false ? 'checked' : ''}><span></span></label>
       </div>`).join('')
     : `<p class="hint">${t('liveNoHabitsHint')}</p>`;
@@ -485,7 +358,7 @@ export function renderMoments(opts = {}) {
       <p class="hint" style="margin:0 0 10px">${t('templatesHint')}</p>
       ${state.templates.length ? `<div class="list">${state.templates.map((x) => `<div class="item" data-action="tpl-edit" data-id="${esc(x.id)}">
         <div class="emo">${esc(x.emoji)}</div>
-        <div><div class="name">${esc(x.name)}</div><div class="sub">${fmtDuration(x.minutes * 60000, getLang())} · ${[null, t('impLow'), t('impNormal'), t('impHigh')][x.importance]}</div></div>
+        <div><div class="name">${esc(x.name)}</div><div class="sub">${fmtDuration(x.minutes * 60000)} · ${[null, t('impLow'), t('impNormal'), t('impHigh')][x.importance]}</div></div>
         <button class="iconbtn" data-stop data-action="tpl-del" data-id="${esc(x.id)}" aria-label="${t('delete')}">✕</button>
       </div>`).join('')}</div>`
         : `<p class="hint">${t('templatesEmpty')}</p>`}
@@ -692,492 +565,6 @@ export function renderOnboarding(step, data) {
   return `<div class="ob"><div class="body">${body}</div>${dots}<div class="foot">${foot}</div></div>`;
 }
 
-// ---- sheets -------------------------------------------------------------------
-
-let sheetEl = null, backdropEl = null, dismissCb = null;
-export function sheetOpen() { return !!sheetEl; }
-function teardown() {
-  const s = sheetEl, b = backdropEl;
-  sheetEl = backdropEl = null; dismissCb = null;
-  s.classList.remove('open'); b.classList.remove('open');
-  setTimeout(() => { s.remove(); b.remove(); }, 260);
-}
-// Sheets and the phone's back button. A sheet owns one history entry, so back
-// closes it instead of the app; a child sheet (the step editor over the quest
-// editor) owns one more, so back returns to its parent. Two rules keep Android
-// happy: an entry is only pushed right after a tap (Chrome flags entries the
-// page adds on its own as skippable, and then a later back skips the tab under
-// them and leaves the app), and the back handler never pushes — returning to a
-// parent reuses the parent's entry. Our own history.go() calls are counted so
-// the popstate they cause is ignored, and a close from a button pops a moment
-// later, so a sheet opened right after (Edit, Share) takes the entry over.
-let depth = 0;        // sheet entries on the history stack, as far as we know
-let dropTimer = 0;    // pending pop of the entry a just-closed sheet left behind
-let ownPops = 0;      // traversals we started, whose popstate is still to come
-const tapped = () => !navigator.userActivation || navigator.userActivation.isActive;
-function go(n) { if (!n) return; ownPops++; depth += n; history.go(n); }
-export function closeSheet() {
-  if (!sheetEl) return;
-  teardown();
-  if (depth > 0 && !dropTimer) dropTimer = setTimeout(() => { dropTimer = 0; if (!sheetEl) go(-depth); }, 0);
-}
-// Leaving a sheet without choosing (tap outside, Escape): the sheet may have
-// something to do about it (go back to a parent sheet, record a checkbox).
-export function dismissSheet() {
-  const cb = dismissCb;
-  closeSheet();
-  if (cb) cb();
-}
-// app.js calls this on popstate; true means the event was about a sheet.
-export function handlePop() {
-  if (ownPops > 0) { ownPops--; return true; }
-  if (depth > 0) { // the phone's back: the top sheet's entry is already gone
-    depth--;
-    const cb = dismissCb; if (sheetEl) teardown();
-    if (cb) cb();
-    return true;
-  }
-  if (sheetEl) { // a sheet with no entry (opened on its own, not after a tap): close it, stay on this tab
-    const cb = dismissCb; teardown();
-    if (cb) cb();
-    go(1);
-    return true;
-  }
-  return false;
-}
-export function openSheet(html, onDismiss = null) {
-  const child = !!sheetEl && !!onDismiss; // opened over a parent it returns to: its own entry
-  if (dropTimer) { clearTimeout(dropTimer); dropTimer = 0; }
-  if (sheetEl) teardown();
-  dismissCb = onDismiss;
-  const target = child ? depth + 1 : Math.min(depth, 1) || (tapped() ? 1 : 0);
-  if (target > depth) { history.pushState({ ...(history.state || {}), sheet: target }, ''); depth = target; }
-  else if (target < depth) go(target - depth);
-  backdropEl = document.createElement('div'); backdropEl.className = 'backdrop';
-  sheetEl = document.createElement('div'); sheetEl.className = 'sheet';
-  sheetEl.setAttribute('role', 'dialog'); sheetEl.setAttribute('aria-modal', 'true');
-  sheetEl.innerHTML = `<div class="grab"></div>${html}`;
-  document.body.append(backdropEl, sheetEl);
-  backdropEl.addEventListener('click', dismissSheet);
-  const b = backdropEl, sh = sheetEl;
-  requestAnimationFrame(() => { b.classList.add('open'); sh.classList.add('open'); });
-  return sheetEl;
-}
-
-const dayNames = () => t('days');
-
-// Minutes between start and end, across midnight if needed (a 0-length slot counts as a full day).
-export function durationOf(s) {
-  return ((parseHM(s.end) - parseHM(s.start)) % 1440 + 1440) % 1440 || 1440;
-}
-
-// One time slot, either "start → end" or "start + duration". Both read back as
-// {start, end}: the stored model never changes, only the way it is typed.
-function slotRow(s, i, mode = state.settings.slotMode) {
-  if (mode === 'dur') {
-    return `<div class="slot dur" data-slot="${i}">
-      <input class="input" type="time" value="${esc(s.start)}" data-f="start" required>
-      <div class="durctl"><input class="input" type="number" inputmode="numeric" min="1" max="1440" step="5" value="${durationOf(s)}" data-f="dur" required><span class="unit">min</span></div>
-      <button class="iconbtn" data-rm="${i}" aria-label="${t('delete')}">✕</button>
-    </div>`;
-  }
-  return `<div class="slot" data-slot="${i}">
-    <input class="input" type="time" value="${esc(s.start)}" data-f="start" required>
-    <span class="arrow">→</span>
-    <input class="input" type="time" value="${esc(s.end)}" data-f="end" required>
-    <button class="iconbtn" data-rm="${i}" aria-label="${t('delete')}">✕</button>
-  </div>`;
-}
-
-// Habit editor. `habit` is null for a new one. onSave(habitData), onDelete().
-export function openHabitSheet(habit, onSave, onDelete) {
-  const h = habit ? JSON.parse(JSON.stringify(habit)) : {
-    name: '', emoji: '', desc: '', slots: [{ start: '09:00', end: '10:00' }], days: [0, 1, 2, 3, 4, 5, 6], importance: 2, snooze: true, enabled: true,
-  };
-  if (typeof h.name === 'object') h.name = pick(h.name);
-  if (typeof h.desc === 'object') h.desc = pick(h.desc);
-  let autoEmoji = !h.emoji;
-
-  const daysOf = (d) => d.slice().sort().join(',');
-  const repeatMode = () => {
-    const k = daysOf(h.days);
-    return k === '0,1,2,3,4,5,6' ? 'all' : k === '1,2,3,4,5' ? 'wd' : k === '0,6' ? 'we' : 'custom';
-  };
-
-  const el = openSheet(`
-    <h2>${habit ? t('edit') : t('addMoment')}</h2>
-    <div class="field"><label>${t('name')}</label>
-      <div class="row"><input class="input emoji-in" data-f="emoji" value="${esc(h.emoji || suggestEmoji(h.name))}" maxlength="4" aria-label="${t('emoji')}">
-      <input class="input" data-f="name" value="${esc(h.name)}" placeholder="${t('namePlaceholder')}" autocomplete="off" enterkeyhint="next"></div></div>
-    <div class="field"><label>${t('description')}</label><input class="input" data-f="desc" value="${esc(h.desc || '')}" placeholder="${t('descriptionPlaceholder')}" autocomplete="off"></div>
-    <div class="field"><div class="fieldhead"><label>${t('timeRange')}</label>
-        <div class="seg mini" data-slotmode>
-          <button data-mode="dur" class="${state.settings.slotMode === 'dur' ? 'on' : ''}">${t('slotModeDur')}</button>
-          <button data-mode="end" class="${state.settings.slotMode !== 'dur' ? 'on' : ''}">${t('slotModeEnd')}</button>
-        </div></div>
-      <div data-slots>${h.slots.map((s, i) => slotRow(s, i)).join('')}</div>
-      <button class="link" data-add-slot>+ ${t('addTime')}</button></div>
-    ${h.once ? '' : `<div class="field"><label>${t('repeat')}</label>
-      <div class="seg" data-repeat>
-        <button data-mode="all" class="${repeatMode() === 'all' ? 'on' : ''}">${t('everyDay')}</button>
-        <button data-mode="wd" class="${repeatMode() === 'wd' ? 'on' : ''}">${t('weekdays')}</button>
-        <button data-mode="we" class="${repeatMode() === 'we' ? 'on' : ''}">${t('weekends')}</button>
-        <button data-mode="custom" class="${repeatMode() === 'custom' ? 'on' : ''}">${t('custom')}</button>
-      </div>
-      <div class="chips" data-days style="margin-top:10px; ${repeatMode() === 'custom' ? '' : 'display:none'}">
-        ${[1, 2, 3, 4, 5, 6, 0].map((d) => `<button class="chip day ${h.days.includes(d) ? 'on' : ''}" data-day="${d}">${dayNames()[d]}</button>`).join('')}
-      </div></div>`}
-    <div class="field"><label>${t('importance')}</label>
-      <div class="seg" data-imp>${[1, 2, 3].map((i) => `<button data-imp="${i}" class="${h.importance === i ? 'on' : ''}">${[null, t('impLow'), t('impNormal'), t('impHigh')][i]}</button>`).join('')}</div></div>
-    <div class="card" style="margin-top:14px">
-      ${toggleRow(t('allowSnooze'), '', `<label class="switch"><input type="checkbox" data-f="snooze" ${h.snooze !== false ? 'checked' : ''}><span></span></label>`)}
-      ${habit ? toggleRow(t('enabled'), '', `<label class="switch"><input type="checkbox" data-f="enabled" ${h.enabled !== false ? 'checked' : ''}><span></span></label>`) : ''}
-    </div>
-    <div class="btnrow">
-      ${habit ? `<button class="btn danger" data-del>${t('delete')}</button>` : `<button class="btn ghost" data-cancel>${t('cancel')}</button>`}
-      <button class="btn primary" data-save>${t('save')}</button>
-    </div>`);
-
-  const nameIn = $('[data-f="name"]', el), emojiIn = $('[data-f="emoji"]', el);
-  nameIn.addEventListener('input', () => { if (autoEmoji) emojiIn.value = suggestEmoji(nameIn.value); });
-  emojiIn.addEventListener('input', () => { autoEmoji = !emojiIn.value.trim(); if (autoEmoji) emojiIn.value = suggestEmoji(nameIn.value); });
-
-  const slotsEl = $('[data-slots]', el);
-  const readSlots = () => $$('.slot', slotsEl).map((r) => {
-    const start = $('[data-f="start"]', r).value || '09:00';
-    const durIn = $('[data-f="dur"]', r);
-    if (durIn) {
-      const mins = Math.min(1440, Math.max(1, Math.round(Number(durIn.value) || 30)));
-      return { start, end: minutesToHM((parseHM(start) + mins) % 1440) };
-    }
-    return { start, end: $('[data-f="end"]', r).value || start };
-  });
-  const renderSlots = (cur) => { slotsEl.innerHTML = cur.map((s, i) => slotRow(s, i)).join(''); };
-  $('[data-slotmode]', el).addEventListener('click', (e) => {
-    const b = e.target.closest('[data-mode]'); if (!b) return;
-    const cur = readSlots(); // keep what was typed, re-express it in the other form
-    state.settings.slotMode = b.dataset.mode; save();
-    $$('button', e.currentTarget).forEach((x) => x.classList.toggle('on', x === b));
-    renderSlots(cur);
-  });
-  $('[data-add-slot]', el).addEventListener('click', () => {
-    const cur = readSlots();
-    const last = cur[cur.length - 1];
-    const len = last ? durationOf(last) : 60;
-    const startMin = last ? parseHM(last.end) + 60 : parseHM(nowHM());
-    cur.push({ start: minutesToHM(startMin % 1440), end: minutesToHM((startMin + len) % 1440) });
-    renderSlots(cur);
-  });
-  slotsEl.addEventListener('click', (e) => {
-    const rm = e.target.closest('[data-rm]');
-    if (!rm) return;
-    const cur = readSlots();
-    if (cur.length <= 1) return;
-    cur.splice(Number(rm.dataset.rm), 1);
-    renderSlots(cur);
-  });
-
-  const rep = $('[data-repeat]', el), daysEl = $('[data-days]', el);
-  if (rep) {
-    rep.addEventListener('click', (e) => {
-      const b = e.target.closest('[data-mode]'); if (!b) return;
-      $$('button', rep).forEach((x) => x.classList.toggle('on', x === b));
-      const m = b.dataset.mode;
-      if (m === 'all') h.days = [0, 1, 2, 3, 4, 5, 6];
-      else if (m === 'wd') h.days = [1, 2, 3, 4, 5];
-      else if (m === 'we') h.days = [0, 6];
-      daysEl.style.display = m === 'custom' ? '' : 'none';
-      $$('[data-day]', daysEl).forEach((c) => c.classList.toggle('on', h.days.includes(Number(c.dataset.day))));
-    });
-    daysEl.addEventListener('click', (e) => {
-      const c = e.target.closest('[data-day]'); if (!c) return;
-      const d = Number(c.dataset.day);
-      h.days = h.days.includes(d) ? h.days.filter((x) => x !== d) : h.days.concat(d);
-      c.classList.toggle('on', h.days.includes(d));
-    });
-  }
-  $('[data-imp]', el).addEventListener('click', (e) => {
-    const b = e.target.closest('[data-imp]'); if (!b || !b.dataset.imp) return;
-    h.importance = Number(b.dataset.imp);
-    $$('button', $('[data-imp]', el)).forEach((x) => x.classList.toggle('on', x === b));
-  });
-
-  const cancel = $('[data-cancel]', el); if (cancel) cancel.addEventListener('click', closeSheet);
-  const del = $('[data-del]', el); if (del) del.addEventListener('click', () => { if (confirm(t('confirmDelete'))) { closeSheet(); onDelete(); } });
-  $('[data-save]', el).addEventListener('click', () => {
-    const slots = readSlots().filter((s) => s.start && s.end);
-    const name = nameIn.value.trim();
-    if (!name || !slots.length || (!h.once && !h.days.length)) { nameIn.classList.add('shake'); setTimeout(() => nameIn.classList.remove('shake'), 500); toast(t('invalidTime'), 'bad'); return; }
-    h.name = name;
-    h.emoji = emojiIn.value.trim() || suggestEmoji(name);
-    h.desc = $('[data-f="desc"]', el).value.trim();
-    h.slots = slots;
-    h.snooze = $('[data-f="snooze"]', el).checked;
-    const en = $('[data-f="enabled"]', el); if (en) h.enabled = en.checked;
-    if (onSave(h) === false) return; // refused (duplicate name): keep editing
-    closeSheet();
-  });
-  setTimeout(() => { if (!habit) nameIn.focus(); }, 300);
-}
-
-// One-off task. onAdd({ name, emoji, minutes, importance })
-// `templates` are premade one-time moments: a tap fills the form; the "Save as
-// premade" switch turns Add into Save + Add (onSaveTemplate gets the same data).
-export function openQuickSheet(onAdd, { templates = [], onSaveTemplate } = {}) {
-  let minutes = 30, importance = 2;
-  let startOffset = 0;      // minutes from now (chips), or
-  let startHM = null;       // an explicit clock time ("At…")
-  const lang = getLang();
-  const el = openSheet(`
-    <h2>⚡ ${t('quickTaskTitle')}</h2>
-    ${templates.length ? `<div class="field"><label>${t('templates')}</label>
-      <div class="chips" data-templates>${templates.map((x) => `<button class="chip" data-tpl="${esc(x.id)}" title="${fmtDuration(x.minutes * 60000, lang)}">${esc(x.emoji)} ${esc(x.name)}</button>`).join('')}</div></div>` : ''}
-    <div class="field"><label>${t('quickTaskName')}</label>
-      <div class="row"><input class="input emoji-in" data-f="emoji" value="✅" maxlength="4" aria-label="${t('emoji')}">
-      <input class="input" data-f="name" placeholder="${t('namePlaceholder')}" autocomplete="off" enterkeyhint="done"></div></div>
-    <div class="field"><label>${t('quickWhen')}</label>
-      <div class="chips" data-when>
-        <button class="chip on" data-off="0">${t('now')}</button>
-        ${[15, 30, 60, 120].map((m) => `<button class="chip" data-off="${m}">+${fmtDuration(m * 60000, lang)}</button>`).join('')}
-        <button class="chip" data-at>⏰ ${t('atTime')}</button>
-      </div>
-      <input class="input" type="time" data-f="startat" style="margin-top:8px;display:none">
-      <p class="hint" data-summary style="margin-top:8px"></p></div>
-    <div class="field"><label>${t('quickTaskDuration')}</label>
-      <div class="chips" data-dur>${[10, 15, 30, 45, 60, 120].map((m) => `<button class="chip ${m === minutes ? 'on' : ''}" data-min="${m}">${fmtDuration(m * 60000, lang)}</button>`).join('')}</div></div>
-    <div class="field"><label>${t('importance')}</label>
-      <div class="seg" data-imp>${[1, 2, 3].map((i) => `<button data-imp="${i}" class="${importance === i ? 'on' : ''}">${[null, t('impLow'), t('impNormal'), t('impHigh')][i]}</button>`).join('')}</div></div>
-    ${onSaveTemplate ? `<label class="dontshow"><input type="checkbox" data-f="template">${t('saveAsTemplate')}</label>` : ''}
-    <div class="btnrow"><button class="btn ghost" data-cancel>✖️ ${t('cancel')}</button><button class="btn" data-save-tpl hidden>💾 ${t('save')}</button><button class="btn primary" data-save><span data-add-icon>➕</span> ${t('quickAdd')}</button></div>`);
-  const nameIn = $('[data-f="name"]', el), emojiIn = $('[data-f="emoji"]', el);
-  let autoEmoji = true;
-  nameIn.addEventListener('input', () => { if (autoEmoji) emojiIn.value = suggestEmoji(nameIn.value); });
-  emojiIn.addEventListener('input', () => { autoEmoji = !emojiIn.value.trim(); });
-  // Resolves the chosen start into {start, tomorrow}: an explicit time already
-  // behind us means tomorrow; "+N min" is relative to the moment of the tap.
-  const resolveStart = () => {
-    const nowMin = parseHM(nowHM());
-    if (startHM) return { start: startHM, tomorrow: parseHM(startHM) < nowMin };
-    return { start: minutesToHM((nowMin + startOffset) % 1440), tomorrow: nowMin + startOffset >= 1440 };
-  };
-  const summary = $('[data-summary]', el);
-  const updateSummary = () => {
-    const { start, tomorrow } = resolveStart();
-    const end = minutesToHM((parseHM(start) + minutes) % 1440);
-    const fmt = (hm) => fmtClock(at(dayKey(), hm), lang);
-    summary.textContent = tomorrow ? t('quickSummaryTomorrow', { t1: fmt(start), t2: fmt(end) })
-      : startOffset === 0 && !startHM ? t('quickSummaryNow', { t2: fmt(end) })
-      : t('quickSummaryAt', { t1: fmt(start), t2: fmt(end) });
-  };
-  const startIn = $('[data-f="startat"]', el);
-  $('[data-when]', el).addEventListener('click', (e) => {
-    const c = e.target.closest('.chip'); if (!c) return;
-    $$('.chip', e.currentTarget).forEach((x) => x.classList.toggle('on', x === c));
-    if (c.hasAttribute('data-at')) {
-      startIn.style.display = '';
-      if (!startIn.value) startIn.value = minutesToHM((parseHM(nowHM()) + 60) % 1440);
-      startHM = startIn.value;
-      startIn.focus();
-    } else {
-      startIn.style.display = 'none';
-      startHM = null;
-      startOffset = Number(c.dataset.off);
-    }
-    updateSummary();
-  });
-  startIn.addEventListener('input', () => { if (startIn.value) { startHM = startIn.value; updateSummary(); } });
-  $('[data-dur]', el).addEventListener('click', (e) => {
-    const c = e.target.closest('[data-min]'); if (!c) return;
-    minutes = Number(c.dataset.min);
-    $$('.chip', e.currentTarget).forEach((x) => x.classList.toggle('on', x === c));
-    updateSummary();
-  });
-  updateSummary();
-  $('[data-imp]', el).addEventListener('click', (e) => {
-    const b = e.target.closest('[data-imp]'); if (!b || !b.dataset.imp) return;
-    importance = Number(b.dataset.imp);
-    $$('button', e.currentTarget).forEach((x) => x.classList.toggle('on', x === b));
-  });
-  const tplBox = $('[data-f="template"]', el), tplBtn = $('[data-save-tpl]', el);
-  const addIcon = $('[data-add-icon]', el);
-  // Checked: Add also saves a premade, so its icon says both at a glance.
-  if (tplBox) tplBox.addEventListener('change', () => { tplBtn.hidden = !tplBox.checked; addIcon.textContent = tplBox.checked ? '💾➕' : '➕'; });
-  const tplChips = $('[data-templates]', el);
-  if (tplChips) tplChips.addEventListener('click', (e) => {
-    const c = e.target.closest('[data-tpl]'); if (!c) return;
-    const x = templates.find((y) => y.id === c.dataset.tpl); if (!x) return;
-    $$('.chip', tplChips).forEach((y) => y.classList.toggle('on', y === c));
-    nameIn.value = x.name; emojiIn.value = x.emoji; autoEmoji = false;
-    minutes = x.minutes; importance = x.importance;
-    $$('[data-dur] .chip', el).forEach((y) => y.classList.toggle('on', Number(y.dataset.min) === minutes));
-    $$('[data-imp] button', el).forEach((y) => y.classList.toggle('on', Number(y.dataset.imp) === importance));
-    updateSummary();
-  });
-  // Returns the form's data, or null (with a shake) when there is no name.
-  const read = () => {
-    const name = nameIn.value.trim();
-    if (!name) { nameIn.classList.add('shake'); setTimeout(() => nameIn.classList.remove('shake'), 500); return null; }
-    return { name, emoji: emojiIn.value.trim() || suggestEmoji(name), minutes, importance };
-  };
-  const submit = () => {
-    const d = read(); if (!d) return;
-    // onAdd may back out (premade replacement declined): the sheet stays open.
-    if (onAdd({ ...d, ...resolveStart(), saveTemplate: !!(tplBox && tplBox.checked) }) === false) return;
-    closeSheet();
-  };
-  $('[data-cancel]', el).addEventListener('click', closeSheet);
-  $('[data-save]', el).addEventListener('click', submit);
-  tplBtn.addEventListener('click', () => { const d = read(); if (!d) return; if (onSaveTemplate(d) === false) return; closeSheet(); });
-  nameIn.addEventListener('keydown', (e) => { if (e.key === 'Enter') submit(); });
-  setTimeout(() => nameIn.focus(), 300);
-}
-
-// Create or edit a premade one-time moment, from Setup. `tpl` is null for a new
-// one. onSave may return false (replacing another premade was declined) to
-// keep editing; onDelete is only wired when editing an existing one.
-export function openTemplateSheet(tpl, onSave, onDelete) {
-  const x = tpl || { name: '', emoji: '⭐', minutes: 30, importance: 2 };
-  const lang = getLang();
-  let minutes = x.minutes, importance = x.importance;
-  const el = openSheet(`
-    <h2>⭐ ${t('templates')}</h2>
-    <div class="field"><label>${t('quickTaskName')}</label>
-      <div class="row"><input class="input emoji-in" data-f="emoji" value="${esc(x.emoji)}" maxlength="4" aria-label="${t('emoji')}">
-      <input class="input" data-f="name" value="${esc(x.name)}" placeholder="${t('namePlaceholder')}" autocomplete="off" enterkeyhint="done"></div></div>
-    <div class="field"><label>${t('quickTaskDuration')}</label>
-      <div class="chips" data-dur>${[10, 15, 30, 45, 60, 120].map((m) => `<button class="chip ${m === minutes ? 'on' : ''}" data-min="${m}">${fmtDuration(m * 60000, lang)}</button>`).join('')}</div></div>
-    <div class="field"><label>${t('importance')}</label>
-      <div class="seg" data-imp>${[1, 2, 3].map((i) => `<button data-imp="${i}" class="${importance === i ? 'on' : ''}">${[null, t('impLow'), t('impNormal'), t('impHigh')][i]}</button>`).join('')}</div></div>
-    <div class="btnrow">
-      ${tpl ? `<button class="btn danger" data-del>🗑️ ${t('delete')}</button>` : `<button class="btn ghost" data-cancel>✖️ ${t('cancel')}</button>`}
-      <button class="btn primary" data-save>💾 ${t('save')}</button>
-    </div>`);
-  const nameIn = $('[data-f="name"]', el), emojiIn = $('[data-f="emoji"]', el);
-  let autoEmoji = !x.name;
-  nameIn.addEventListener('input', () => { if (autoEmoji) emojiIn.value = suggestEmoji(nameIn.value); });
-  emojiIn.addEventListener('input', () => { autoEmoji = !emojiIn.value.trim(); });
-  $('[data-dur]', el).addEventListener('click', (e) => {
-    const c = e.target.closest('[data-min]'); if (!c) return;
-    minutes = Number(c.dataset.min);
-    $$('.chip', e.currentTarget).forEach((y) => y.classList.toggle('on', y === c));
-  });
-  $('[data-imp]', el).addEventListener('click', (e) => {
-    const b = e.target.closest('[data-imp]'); if (!b) return;
-    importance = Number(b.dataset.imp);
-    $$('button', e.currentTarget).forEach((y) => y.classList.toggle('on', y === b));
-  });
-  const cancel = $('[data-cancel]', el); if (cancel) cancel.addEventListener('click', closeSheet);
-  $('[data-save]', el).addEventListener('click', () => {
-    const name = nameIn.value.trim();
-    if (!name) { nameIn.classList.add('shake'); setTimeout(() => nameIn.classList.remove('shake'), 500); return; }
-    if (onSave({ name, emoji: emojiIn.value.trim() || suggestEmoji(name), minutes, importance }) === false) return;
-    closeSheet();
-  });
-  const del = $('[data-del]', el); if (del) del.addEventListener('click', () => { closeSheet(); onDelete(); });
-  nameIn.addEventListener('keydown', (e) => { if (e.key === 'Enter') $('[data-save]', el).click(); });
-  if (!tpl) setTimeout(() => nameIn.focus(), 300); // editing: the sheet shows whole, no keyboard first
-}
-
-// A plain Cancel/Confirm sheet for a single destructive decision (used by Import).
-export function openConfirmSheet({ title, body, confirmLabel, onConfirm }) {
-  const el = openSheet(`
-    <h2>${esc(title)}</h2>
-    <div class="hint" style="margin:10px 0 4px">${body}</div>
-    <div class="btnrow">
-      <button class="btn ghost" data-cancel>${t('cancel')}</button>
-      <button class="btn primary" data-confirm>${esc(confirmLabel)}</button>
-    </div>`);
-  $('[data-cancel]', el).addEventListener('click', closeSheet);
-  $('[data-confirm]', el).addEventListener('click', () => { closeSheet(); onConfirm(); });
-}
-
-// Shown once right after the app applies an update (a fresh reload landed on
-// a newer version). `note` is the changelog line for that version, if any.
-// `notes` is [{v, lines}] newest first — every release since the last one
-// seen, so skipping versions loses nothing. onClose(dontShowAgain) fires
-// however the sheet is dismissed (button or backdrop).
-export function openUpdateSheet(version, notes, onClose) {
-  const many = notes.length > 1;
-  const list = notes.map((n) => `${many ? `<h3>${t('version', { v: esc(n.v) })}</h3>` : ''}
-    <ul>${(n.lines.length ? n.lines : [t('updatedGeneric')]).map((l) => `<li>${esc(l)}</li>`).join('')}</ul>`).join('');
-  let el = null;
-  const read = () => onClose(!!(el && $('[data-dontshow]', el).checked));
-  el = openSheet(`
-    <h2>🎉 ${t('updatedTitle', { v: esc(version) })}</h2>
-    <div class="notes">${list}</div>
-    <label class="dontshow"><input type="checkbox" data-dontshow>${t('dontShowAgain')}</label>
-    <div class="btnrow"><button class="btn primary wide" data-close>${t('close')}</button></div>`, read);
-  el.classList.add('update');
-  $('[data-close]', el).addEventListener('click', () => { read(); closeSheet(); });
-}
-
-// Reset needs a stronger, more deliberate choice than a single OK button: the
-// safe path (back up, then erase) is the prominent one, erasing without a
-// backup is a plain text link, and cancelling needs no confirmation.
-export function openResetSheet(onBackupThenErase, onEraseOnly) {
-  const el = openSheet(`
-    <h2>⚠️ ${t('resetData')}</h2>
-    <p class="hint" style="margin:10px 0 16px">${t('confirmReset')}</p>
-    <button class="btn primary wide" data-backup-erase>💾 ${t('backupThenErase')}</button>
-    <p class="center" style="margin-top:14px"><button class="link" data-erase-only>${t('eraseWithoutBackup')}</button></p>
-    <div class="btnrow" style="margin-top:10px"><button class="btn ghost wide" data-cancel>${t('cancel')}</button></div>`);
-  $('[data-cancel]', el).addEventListener('click', closeSheet);
-  $('[data-backup-erase]', el).addEventListener('click', () => { closeSheet(); onBackupThenErase(); });
-  $('[data-erase-only]', el).addEventListener('click', () => { closeSheet(); onEraseOnly(); });
-}
-
-// Read-only recap for a done/missed/skipped moment, with Undo when it's still
-// fresh enough to matter (mirrors the inline Undo already on the row itself).
-// `onLate` is passed only while a missed moment can still be completed late
-// (see engine.canCompleteLate): the button lifts the penalty for a quarter
-// of the points, so a bad day is recoverable without being free.
-export function openRecapSheet(o, { onUndo, onLate, latePts } = {}) {
-  const desc = habitDesc(o.habit);
-  const lang = getLang();
-  const statusWord = o.status === 'done' ? (o.late ? t('completedLate') : t('completed')) : o.status === 'missed' ? t('missed') : t('skipped');
-  const ptsText = (o.pts > 0 ? '+' : '') + o.pts + ' pts';
-  const canUndo = !!onUndo && (o.status === 'done' || o.status === 'skipped') && Date.now() - o.at < 5 * 60000;
-  const canLate = !!onLate;
-  const el = openSheet(`
-    <h2>${esc(o.habit.emoji)} ${habitName(o.habit)}</h2>
-    ${desc ? `<p class="hint" style="margin-top:2px">${desc}</p>` : ''}
-    <div class="card" style="margin-top:14px">
-      ${toggleRow(t('timeRange'), '', `<span>${slotOf(o)}</span>`)}
-      ${toggleRow(statusWord, o.at ? fmtClock(o.at, lang) : '', `<span style="font-weight:700">${ptsText}</span>`)}
-    </div>
-    ${canLate ? `<p class="hint" style="margin-top:10px">${t('doneLateHint', { pts: latePts })}</p>` : ''}
-    <div class="btnrow">
-      ${canUndo ? `<button class="btn" data-undo>${t('undo')}</button>` : ''}
-      ${canLate ? `<button class="btn ok" data-late>✅ ${t('doneLate')}</button>` : ''}
-      <button class="btn ${canUndo || canLate ? '' : 'primary wide'}" data-close>${t('close')}</button>
-    </div>`);
-  $('[data-close]', el).addEventListener('click', closeSheet);
-  if (canUndo) $('[data-undo]', el).addEventListener('click', () => { closeSheet(); onUndo(); });
-  if (canLate) $('[data-late]', el).addEventListener('click', () => { closeSheet(); onLate(); });
-}
-
-// Lets an upcoming moment be resolved ahead of its scheduled time, without
-// waiting for it to become the current one — e.g. "I already did this later
-// today" or "I know I'll skip this one".
-export function openUpcomingSheet(o, { onDoNow, onSkip } = {}) {
-  const desc = habitDesc(o.habit);
-  const lang = getLang();
-  const el = openSheet(`
-    <h2>${esc(o.habit.emoji)} ${habitName(o.habit)}</h2>
-    ${desc ? `<p class="hint" style="margin-top:2px">${desc}</p>` : ''}
-    <p class="hint" style="margin-top:10px">${slotOf(o)} · ${t('in', { t: fmtDuration(o.start - Date.now(), lang) })}</p>
-    <div class="btnrow" style="margin-top:16px">
-      <button class="btn ok" data-donenow>✓ ${t('doNow')}</button>
-      <button class="btn danger" data-skip>${t('skip')}</button>
-    </div>
-    <button class="btn ghost wide" style="margin-top:10px" data-close>${t('close')}</button>`);
-  $('[data-close]', el).addEventListener('click', closeSheet);
-  $('[data-donenow]', el).addEventListener('click', () => { closeSheet(); onDoNow(); });
-  $('[data-skip]', el).addEventListener('click', () => { closeSheet(); onSkip(); });
-}
-
-// ---- toasts & sparkles --------------------------------------------------------
-
 // ---- import / restore preview ---------------------------------------------------
 // Turns diffStates() output into +/−/~ rows: what the incoming data adds,
 // removes and changes compared to what is on the device right now.
@@ -1222,34 +609,4 @@ export function diffHtml(d) {
   if (d.same.length) html += `<div class="diff-row same">= ${t('diffSame', { n: d.same.length })}</div>`;
   if (d.xp.from !== d.xp.to) html += `<div class="diff-row pts">⭐ ${t('diffPoints', { a: d.xp.from, b: d.xp.to })}</div>`;
   return html + '</div>';
-}
-
-export function toast(text, kind = '', opts = {}) {
-  const box = $('#toasts');
-  const el = document.createElement('div');
-  el.className = 'toast ' + kind;
-  el.innerHTML = `<span>${esc(text)}</span>${opts.action ? `<button class="btn small">${esc(opts.action.label)}</button>` : ''}`;
-  if (opts.action) $('button', el).addEventListener('click', () => { opts.action.fn(); kill(); });
-  box.appendChild(el);
-  while (box.children.length > 3) box.firstChild.remove();
-  let dead = false;
-  const kill = () => { if (dead) return; dead = true; el.classList.add('out'); setTimeout(() => el.remove(), 260); };
-  setTimeout(kill, opts.ms || (opts.action ? 5000 : 2200));
-  return kill;
-}
-
-export function sparkles(x, y, emojis = ['✨', '⭐', '🎉', '💫']) {
-  if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
-  for (let i = 0; i < 10; i++) {
-    const s = document.createElement('span');
-    s.className = 'sparkle';
-    s.textContent = emojis[i % emojis.length];
-    const a = (Math.PI * 2 * i) / 10 + Math.random() * 0.5, d = 70 + Math.random() * 60;
-    s.style.left = x + 'px'; s.style.top = y + 'px';
-    s.style.setProperty('--dx', Math.cos(a) * d + 'px');
-    s.style.setProperty('--dy', Math.sin(a) * d - 40 + 'px');
-    s.style.setProperty('--rot', Math.random() * 360 - 180 + 'deg');
-    document.body.appendChild(s);
-    setTimeout(() => s.remove(), 950);
-  }
 }

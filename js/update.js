@@ -10,8 +10,8 @@ let onReadyCb = null;
 let lastCheck = 0;
 const CHECK_EVERY = 60 * 60 * 1000;
 
-function announce(worker) {
-  if (worker && onReadyCb) onReadyCb();
+function announce() {
+  if (onReadyCb) onReadyCb();
 }
 
 export function applyUpdate() {
@@ -54,12 +54,12 @@ export function initUpdates(onReady) {
     setRegistration(r);
     setPushRegistration(r);
     lastCheck = Date.now();
-    if (r.waiting && navigator.serviceWorker.controller) announce(r.waiting);
+    if (r.waiting && navigator.serviceWorker.controller) announce();
     r.addEventListener('updatefound', () => {
       const nw = r.installing;
       if (!nw) return;
       nw.addEventListener('statechange', () => {
-        if (nw.state === 'installed' && navigator.serviceWorker.controller) announce(nw);
+        if (nw.state === 'installed' && navigator.serviceWorker.controller) announce();
       });
     });
   }).catch(() => { /* e.g. file:// or private mode */ });
