@@ -82,12 +82,30 @@ thin or noisy data.
 same/removed, colour-coded, tooltip) and only applies on the last page's
 confirm — never loses points, snapshots to recovery first.
 
-**UI** (`js/ui.js`, pure string-returning render functions plus
-`openSheet`/`closeSheet` bottom sheets): `renderLive` / `renderProgress` /
-`renderMoments` / `renderSetup` / `renderOnboarding`. A delegated click
-handler on `#app` is keyed by `data-action` (`app.js`); `data-stop` blocks a
-row's own action (unless the stopper is the tapped button itself);
-`data-setting` is the generic settings-change handler. Sheets:
+**UI**, split by job (since 1.30.0): `js/dom.js` (`$`, `$$`, `esc`,
+`shake`, `pctText`, `signed`), `js/toast.js` (`toast`, `sparkles`,
+`celebrate`), `js/sheet.js` (the one bottom sheet + its history handling +
+`confirmDialog`, a promise-based styled replacement for the native
+`confirm()`), `js/widgets.js` (row builders shared by renderers and sheets:
+`toggleRow` — which gives its first input/select the row label as
+`aria-label` —, `sw`, `sel`, `slotRow`, `habitName`, `slotsText`…),
+`js/sheets.js` (every non-quest sheet: habit, quick, template, explain,
+badge, pause, boost, confirm, update, reset, recap, upcoming) and `js/ui.js`
+(the pure string-returning renderers `renderLive` / `renderProgress` /
+`renderMoments` / `renderSetup` / `renderOnboarding`, `tabbar`, `diffHtml`,
+`a11y()`), which re-exports the other five so `import * as U from './ui.js'`
+stays the single door for `app.js`. Quest sheets live in `agenda.js`.
+Behaviour: a delegated click handler on `#app` looks the tapped element's
+`data-action` up in `ACTIONS` (`app.js`), the merge of six per-area maps
+(`SHELL_ACTIONS`, `LIVE_ACTIONS`, `QUEST_ACTIONS`, `MOMENT_ACTIONS`,
+`SETUP_ACTIONS`, `OB_ACTIONS`; each handler gets `(btn, now)`); `data-stop`
+blocks a row's own action (unless the stopper is the tapped button itself);
+`data-setting` is the generic settings-change handler. After every render
+`U.a11y(app)` gives tappable non-button elements `tabindex=0 role=button`,
+and Enter / Space on them clicks (keydown in `app.js`); the tab bar carries
+`aria-current`. `frame()` re-renders whichever tab is open at midnight.
+Rough-patch detection is `engine.missRun(now)` (tested); `app.js` only
+decides what to show. Sheets:
 `openSheet(html, onDismiss)` — `onDismiss` runs on tap-outside / Escape /
 phone back (`dismissSheet`), not on the sheet's own buttons; `sheetOpen()`
 lets a timer avoid tearing down an editor. History: the boot entry is

@@ -11,7 +11,7 @@ import * as U from './ui.js';
 import { initUpdates, applyUpdate, checkForUpdate } from './update.js';
 import { versionsSince } from './changelog.js';
 import { defaultAnswers, proposeMoments, QUESTIONS, clampCount } from './setup.js';
-import { dayKey, addDays, at, nowHM, minutesToHM, parseHM, fmtDuration, fmtClock, fmtDate, fmtDateTime, fileStamp } from './time.js';
+import { dayKey, addDays, at, nowHM, minutesToHM, parseHM, fmtDuration, fmtClock, fmtDay, fmtDateTime, fileStamp, weekday } from './time.js';
 import * as AutoImport from './autobackup.js';
 import { diffStates } from './diff.js';
 import * as G from './game.js';
@@ -64,12 +64,12 @@ const hooks = {
   onStart(o) {
     const pts = E.BASE_PTS[o.habit.importance] || 20;
     N.notify(t('nStart', { emoji: o.habit.emoji, name: pick(o.habit.name) }),
-      t('nStartBody', { t: fmtDuration(o.end - o.start, state.lang), pts }), o.key, o.habit.importance, notifActions(o));
+      t('nStartBody', { t: fmtDuration(o.end - o.start), pts }), o.key, o.habit.importance, notifActions(o));
     N.feedback('start', o.habit.importance);
   },
   onEnding(o) {
     N.notify(t('nStart', { emoji: o.habit.emoji, name: pick(o.habit.name) }),
-      t('nEndingBody', { t: fmtDuration(o.end - Date.now(), state.lang) }), o.key, o.habit.importance, notifActions(o));
+      t('nEndingBody', { t: fmtDuration(o.end - Date.now()) }), o.key, o.habit.importance, notifActions(o));
     N.feedback('warn', o.habit.importance);
   },
   onMissed(o, pen) {
@@ -82,6 +82,7 @@ const hooks = {
 // ---- render loop -----------------------------------------------------------------
 function render(now = Date.now()) {
   dirty = false;
+  renderedDay = dayKey(new Date(now));
   if (view === 'ob') {
     app.innerHTML = U.renderOnboarding(ob.step, {
       a: ob.a, proposals: ob.proposals, selected: ob.selected,
@@ -97,7 +98,6 @@ function render(now = Date.now()) {
       push: Push.supported() ? { ...Push.info(), caveat: Push.caveat() } : null,
     });
   } else if (view === 'agenda') {
-    renderedDay = dayKey(new Date(now));
     const seeded = seedQuestPresets();
     if (seeded) setTimeout(() => U.toast('🗺️ ' + t('agSeeded', { n: seeded }), 'good', { ms: 6000 }), 400);
     app.innerHTML = A.renderAgenda(now);
@@ -114,7 +114,6 @@ function render(now = Date.now()) {
       updateReady, recovery: state.habits.length ? null : getRecoverySnapshot(), expanded,
       tomorrow: state.habits.filter((h) => h.once === tmrw && h.enabled !== false),
     });
-    renderedDay = dayKey(new Date(now));
     const cur = E.currentOf(occs);
     const key = cur ? cur.key : '';
     if (key && key !== lastCurrentKey) {
@@ -123,6 +122,7 @@ function render(now = Date.now()) {
     }
     lastCurrentKey = key;
   }
+  U.a11y(app);
 }
 
 function frame() {
@@ -154,10 +154,11 @@ function frame() {
   }
   for (const k of Array.from(phases.keys())) if (!seen.has(k)) { phases.delete(k); expanded.delete(k); fresh.delete(k); phaseChanged = true; }
   if (changed) Push.syncSoon();
-  if (view === 'agenda' && (dirty || dayKey(new Date(now)) !== renderedDay)) render(now);
-  if (view !== 'live') return;
-  if (dirty || changed || phaseChanged || dayKey(new Date(now)) !== renderedDay) render(now);
-  else U.updateCountdowns(occs, now);
+  const newDay = dayKey(new Date(now)) !== renderedDay; // midnight: every tab shows "today"
+  if (view === 'live') {
+    if (dirty || changed || phaseChanged || newDay) render(now);
+    else U.updateCountdowns(occs, now);
+  } else if (view !== 'ob' && (newDay || (view === 'agenda' && dirty))) render(now);
 }
 
 let pendingQuest = '';
@@ -197,15 +198,14 @@ document.addEventListener('visibilitychange', () => {
 // ---- helpers -----------------------------------------------------------------------
 const findOcc = (key) => occs.find((o) => o.key === key);
 const findHabit = (id) => state.habits.find((h) => h.id === id);
-const shakeEl = (el) => { el.classList.add('shake'); setTimeout(() => el.classList.remove('shake'), 500); };
 
 // Premade one-time moments: only one per emoji + name. Saving over another
 // premade (not the one being edited) is an edit of that one, so it asks
 // first. Returns false when the user backs out.
-function upsertTemplate(id, { name, emoji, minutes, importance }) {
+async function upsertTemplate(id, { name, emoji, minutes, importance }) {
   const key = G.momentKey({ name, emoji });
   const other = state.templates.find((x) => x.id !== id && G.momentKey(x) === key);
-  if (other && !confirm(t('templateReplace', { name: other.emoji + ' ' + other.name }))) return false;
+  if (other && !(await U.confirmDialog(t('templateReplace', { name: other.emoji + ' ' + other.name }), { okLabel: t('save') }))) return false;
   state.templates = state.templates.filter((x) => x.id !== id && x !== other);
   state.templates.push({ id: id || uid(), name, emoji, minutes, importance });
   save();
@@ -392,13 +392,9 @@ function addImportedPlan(p) {
 // while the misses happened.
 function checkRoughPatch(now) {
   const today = dayKey(new Date(now));
-  const resolved = [...E.occurrencesOfDay(addDays(today, -1)), ...E.occurrencesOfDay(today)]
-    .filter((o) => o.status !== 'open' && o.at).sort((a, b) => a.at - b.at);
-  let run = 0;
-  for (let i = resolved.length - 1; i >= 0; i--) { if (resolved[i].status === 'missed') run++; else break; }
+  const { run, last } = E.missRun(now);
   if (run < 3) return;
   const g = state.game;
-  const last = resolved[resolved.length - 1];
   if (run % 3 === 0 && g.lastGreetAt !== last.at) {
     g.lastGreetAt = last.at;
     g.greetCount = (g.greetCount || 0) + 1;
@@ -441,7 +437,7 @@ async function shareProgress(badge) {
         { value: '🎯 ' + (s.period.rate === null ? '–' : Math.round(s.period.rate * 100) + '%'), label: t('successRate') },
         { value: '⚡ ' + s.lifetime.early, label: t('earlyWord') },
       ],
-      week: s.week.map((d) => ({ value: d.pts, label: t('dayLetters')[new Date(d.day + 'T12:00').getDay()], today: d.day === today })),
+      week: s.week.map((d) => ({ value: d.pts, label: t('dayLetters')[weekday(d.day)], today: d.day === today })),
       footer: APP_URL.replace('https://', ''),
       dark: !matchMedia('(prefers-color-scheme: light)').matches,
     });
@@ -640,7 +636,305 @@ app.addEventListener('touchend', (e) => {
 }, { passive: true });
 
 // ---- events (delegated) ------------------------------------------------------------
-app.addEventListener('click', async (e) => {
+// ---- tap handlers, one map per area. Each gets the tapped element and `now`; `return` leaves early. ----
+
+// tabs, stats and the progress tab
+const SHELL_ACTIONS = {
+  'tab': (btn) => { showView(btn.dataset.view); },
+  'explain': (btn, now) => { U.openExplainSheet(btn.dataset.topic, G.computeStats(now, occs), occs); N.feedback('tap'); },
+  'badge': (btn, now) => {
+    const b = G.BADGES.find((x) => x.id === btn.dataset.id); if (!b) return;
+    const p = G.badgeProgress(b, G.computeStats(now, occs));
+    U.openBadgeSheet(b, p, { onShare: () => shareProgress(b) });
+  },
+  'share-progress': () => { shareProgress(); },
+  'share-app': () => { shareApp(); },
+  'greet-dismiss': () => { state.game.greeting = null; save(); N.feedback('tap'); refresh(); },
+  'pause-info': (btn, now) => {
+    N.feedback('tap');
+    U.openPauseSheet({ tokens: state.game.pauseTokens || 0, xp: state.game.pauseXp || 0, until: E.pausedUntil(now) }, (n) => {
+      const until = E.startPause(n, Date.now()); if (!until) return;
+      N.feedback('tap'); phases.clear(); refresh(); Push.syncSoon();
+      U.toast('⏸️ ' + t('pausedBanner', { until: fmtClock(until) }), 'good');
+    });
+  },
+  'badge-page': (btn) => { changeBadgePage(Number(btn.dataset.d)); },
+};
+
+// the Now tab: acting on moments
+const LIVE_ACTIONS = {
+  'done': (btn, now) => {
+    const o = findOcc(btn.dataset.key); if (!o) return;
+    const b = btn.getBoundingClientRect();
+    doDone(o, now, { x: b.left + b.width / 2, y: b.top + b.height / 2 });
+  },
+  'snooze': (btn, now) => {
+    const o = findOcc(btn.dataset.key); if (!o) return;
+    if (!doSnooze(o, now)) U.shake(btn);
+  },
+  'skip': (btn, now) => {
+    const o = findOcc(btn.dataset.key); if (!o) return;
+    const r = E.skip(o, now); if (!r) return;
+    N.dismiss(o.key);
+    U.toast(t('skipped') + ' · ' + r.pts, 'bad');
+    refresh();
+  },
+  'undo': (btn) => {
+    const o = findOcc(btn.dataset.key); if (!o) return;
+    if (E.undo(o)) { N.feedback('tap'); refresh(); }
+  },
+  'toggle-expand': (btn) => {
+    const key = btn.dataset.key; if (!key) return;
+    if (expanded.has(key)) expanded.delete(key); else expanded.add(key);
+    N.feedback('tap'); refresh();
+  },
+  'recap': (btn, now) => {
+    const o = findOcc(btn.dataset.key); if (!o) return;
+    U.openRecapSheet(o, {
+      onUndo: () => { if (E.undo(o)) { N.feedback('tap'); refresh(); } },
+      latePts: E.latePts(o, now),
+      onLate: E.canCompleteLate(o, now) ? () => {
+        const r = E.completeLate(o, now);
+        if (!r) return;
+        N.feedback('tap');
+        U.toast('🩹 ' + t('doneLateToast', { pts: (r.pts >= 0 ? '+' : '') + r.pts }), 'good');
+        refresh(); celebrateBadges(600);
+      } : undefined,
+    });
+  },
+  'upcoming-detail': (btn, now) => {
+    const o = findOcc(btn.dataset.key); if (!o) return;
+    U.openUpcomingSheet(o, {
+      onDoNow: () => { doDone(o, now); },
+      onSkip: () => {
+        const r = E.skip(o, now); if (!r) return;
+        N.dismiss(o.key);
+        U.toast(t('skipped') + ' · ' + r.pts, 'bad');
+        refresh();
+      },
+    });
+  },
+  'quick': (btn, now) => {
+    U.openQuickSheet(async ({ name, emoji, minutes, importance, start, tomorrow, saveTemplate }) => {
+      const day = dayKey(new Date(now));
+      const id = uid();
+      const h = {
+        id, preset: null, name, emoji, desc: '', slots: [{ start, end: minutesToHM((parseHM(start) + minutes) % 1440) }],
+        days: [], importance, snooze: true, enabled: true, once: tomorrow ? addDays(day, 1) : day, createdAt: now,
+      };
+      if (saveTemplate && !(await upsertTemplate(null, { name, emoji, minutes, importance }))) return false;
+      state.habits.push(h);
+      save(); N.feedback('tap'); refresh();
+      const text = tomorrow ? '📅 ' + t('quickAddedTomorrow', { t: fmtClock(at(addDays(day, 1), start)) })
+        : parseHM(start) > parseHM(nowHM(new Date(now))) ? '⏰ ' + t('quickAddedLater', { t: fmtClock(at(day, start)) })
+        : '✅ ' + t('quickAdded');
+      // Ten seconds to take it back at no cost: the moment simply never existed.
+      U.toast(text, '', { ms: 10000, action: { label: t('undo'), fn: () => {
+        state.habits = state.habits.filter((h) => h.id !== id);
+        for (const d of Object.values(state.days)) for (const k of Object.keys(d)) if (k.startsWith(id + '#')) delete d[k];
+        phases.clear(); save(); refresh();
+      } } });
+    }, { templates: state.templates, onSaveTemplate: async (d) => { if (!(await upsertTemplate(null, d))) return false; U.toast(t('templateSaved'), 'good'); } });
+  },
+};
+
+// the Quests tab
+const QUEST_ACTIONS = {
+  'ag-new': () => {
+    A.openGoalSheet(P.newPlan(), { onSave: (p) => { state.plans.push(p); save(); N.feedback('tap'); render(); } });
+  },
+  'ag-edit': (btn) => { const p = findPlan(btn.dataset.id); if (p) editPlan(p); },
+  'ag-start': (btn, now) => {
+    const p = findPlan(btn.dataset.id); if (!p) return;
+    A.openStartSheet(p, (day) => {
+      const run = P.start(p, day, Date.now()); if (!run) return;
+      P.advance(Date.now());
+      N.feedback('tap'); render();
+      U.toast('▶️ ' + t('agStarted', { name: run.name, day: day === dayKey(new Date()) ? t('today').toLowerCase() : fmtDay(day) }), 'good');
+    });
+  },
+  'ag-done': (btn, now) => {
+    const p = findPlan(btn.dataset.id); if (!p) return;
+    const levelBefore = E.levelFor(state.game.xp);
+    const i = Number(btn.dataset.i), task = btn.dataset.task;
+    const r = P.completeTask(p, i, task, now); if (!r) return;
+    const b = btn.getBoundingClientRect();
+    U.sparkles(b.left + b.width / 2, b.top + b.height / 2);
+    N.feedback('done'); render();
+    U.toast((r.full ? '🏁 ' : '✓ ') + t('agTaskDone', { n: r.pts }) + (r.full ? ' · ' + t('agStepDone') : ''), 'good', {
+      ms: 6000, action: { label: t('undo'), fn: () => undoPlanTask(p, i, task) },
+    });
+    celebrateGains(levelBefore, state.game.pauseTokens || 0, 700);
+  },
+  'ag-decide': (btn, now) => {
+    const p = findPlan(btn.dataset.id); if (!p) return;
+    if (!P.decide(p, Number(btn.dataset.i), Number(btn.dataset.opt), now)) return;
+    N.feedback('tap'); render();
+    if (p.status === 'done') { announceGoalEnd(p, p.finished); celebrateBadges(1500); } // the answer was the last step
+  },
+  'ag-detail': (btn, now) => {
+    const p = findPlan(btn.dataset.id); if (!p) return;
+    const active = p.status === 'active';
+    A.openDetailSheet(p, now, {
+      onEdit: active ? () => editPlan(p) : null,
+      onForfeit: active ? () => { P.forfeit(p, Date.now()); N.feedback('miss'); U.toast('🏳️ ' + t('agForfeitedToast', { name: p.name })); render(); } : null,
+      onUndo: active ? (i, taskId) => undoPlanTask(p, i, taskId) : null,
+      onDup: () => { state.plans.push(P.clonePlan(p)); save(); render(); U.toast('📋 ' + t('agDuplicated'), 'good'); },
+      onShare: () => shareQuest(p),
+      onDelete: p.status === 'done' ? () => { P.remove(p.id); render(); } : null,
+    });
+  },
+  'ag-share': (btn) => { const p = findPlan(btn.dataset.id); if (p) shareQuest(p); },
+  'ag-import': () => { A.openImportSheet('', addImportedPlan); },
+};
+
+// the Moments tab: moments and premades
+const MOMENT_ACTIONS = {
+  'add': (btn, now) => {
+    U.openHabitSheet(null, (h) => {
+      const nh = { id: uid(), preset: null, once: null, createdAt: Date.now(), ...h };
+      if (G.nameConflict(nh)) { U.toast(t('nameTaken'), 'bad'); return false; }
+      state.habits.push(nh);
+      touchHabits(); save(); refresh();
+    });
+  },
+  'edit': (btn) => {
+    const h = findHabit(btn.dataset.id); if (!h) return;
+    U.openHabitSheet(h, (data) => {
+      // Keep translatable preset texts when the user did not change them.
+      if (typeof h.name === 'object' && data.name === pick(h.name)) data.name = h.name;
+      if (typeof h.desc === 'object' && data.desc === pick(h.desc)) data.desc = h.desc;
+      if (G.nameConflict({ ...h, ...data })) { U.toast(t('nameTaken'), 'bad'); return false; }
+      Object.assign(h, data); touchHabits(); save(); refresh();
+    },
+      () => { state.habits = state.habits.filter((x) => x !== h); touchHabits(); save(); refresh(); });
+  },
+  'tpl-del': (btn) => {
+    state.templates = state.templates.filter((x) => x.id !== btn.dataset.id);
+    save(); render();
+  },
+  'tpl-add': () => { U.openTemplateSheet(null, async (d) => { if (!(await upsertTemplate(null, d))) return false; render(); }); },
+  'tpl-edit': (btn) => {
+    const tpl = state.templates.find((x) => x.id === btn.dataset.id); if (!tpl) return;
+    U.openTemplateSheet(tpl, async (d) => { if (!(await upsertTemplate(tpl.id, d))) return false; render(); },
+      () => { state.templates = state.templates.filter((x) => x.id !== tpl.id); save(); render(); });
+  },
+  'preset': (btn) => {
+    const p = PRESETS.find((x) => x.id === btn.dataset.preset);
+    if (p && !state.habits.some((h) => h.preset === p.id)) { addPreset(p); save(); N.feedback('tap'); refresh(); }
+  },
+};
+
+// the Setup tab
+const SETUP_ACTIONS = {
+  'quest-reminder-auto': () => { state.settings.questReminder = ''; save(); Push.syncSoon(); N.feedback('tap'); render(); },
+  'notif-enable': async () => {
+    const r = await N.requestPermission();
+    if (r === 'granted') { U.toast(t('obNotifGranted'), 'good'); N.notify(t('nTest'), t('nTestBody'), 'test'); }
+    render();
+  },
+  'notif-test': () => { N.notify(t('nTest'), t('nTestBody'), 'test'); N.feedback('start'); },
+  'push-sync': () => {
+    Push.sync(true).then((ok) => { U.toast(ok ? t('pushSyncedNow') : t('pushFailed'), ok ? 'good' : 'bad'); render(); });
+  },
+  'test-sound': () => { N.testSound(); },
+  'test-vibration': () => { N.testVibration(); },
+  'export': () => {
+    // On the setup's last page, backing up validates the setup first, so the file holds it.
+    if (view === 'ob') finishSetup();
+    exportData();
+  },
+  'import': () => { U.$('#importFile').click(); },
+  'import-auto': () => { runAutoImport(); },
+  'change-folder': () => { changeBackupFolder(); },
+  'reset': () => {
+    U.openResetSheet(
+      async () => {
+        const ok = await exportData();
+        if (!ok) { U.toast(t('resetCancelled')); return; }
+        resetAll(); setLang(state.lang); resetOb(); view = 'ob'; render();
+      },
+      () => { resetAll(); setLang(state.lang); resetOb(); view = 'ob'; render(); },
+    );
+  },
+  'restore-recovery': () => {
+    const snap = getRecoverySnapshot();
+    if (!snap) return;
+    U.openConfirmSheet({
+      title: t('restore'),
+      body: t('restoreConfirm', { t: fmtDateTime(snap.at) }) + U.diffHtml(diffStates(state, snap.data)),
+      confirmLabel: t('restore'),
+      onConfirm: () => {
+        snapshotRecovery('before-restore');
+        restoreSnapshot(snap.data);
+        setLang(state.lang);
+        phases.clear();
+        U.toast(t('restoreDone'), 'good');
+        view = state.onboarded ? 'live' : 'ob';
+        dirty = true;
+        if (view === 'live') startTicker(); else render();
+      },
+    });
+  },
+  'check-update': () => {
+    if (checkingUpdate) return;
+    checkingUpdate = true;
+    render();
+    checkForUpdate(true).then((has) => {
+      checkingUpdate = false;
+      updateReady = has;
+      // A real update was found: the same background listener that would
+      // announce it in the live view already showed the "update ready"
+      // toast with its own action button, so don't repeat it here.
+      if (!has) U.toast(t('upToDate'), 'good');
+      render();
+    });
+  },
+  'apply-update': () => { if (!applyUpdate()) location.reload(); },
+  'install': () => {
+    if (installPrompt) { installPrompt.prompt(); installPrompt.userChoice.then(() => { installPrompt = null; render(); }); }
+  },
+  'restart-ob': () => { resetOb(); view = 'ob'; render(); scrollTo(0, 0); },
+};
+
+// the first-run setup
+const OB_ACTIONS = {
+  'ob-lang': (btn) => { state.lang = btn.dataset.lang; setLang(state.lang); save(); render(); },
+  'ob-preset': (btn) => {
+    const id = btn.dataset.preset;
+    if (ob.selected.has(id)) ob.selected.delete(id); else ob.selected.add(id);
+    if (state.onboarded) render(); else btn.classList.toggle('on', ob.selected.has(id));
+  },
+  'ob-work': (btn) => { ob.a.work = btn.dataset.v === 'yes'; render(); },
+  'ob-answer': (btn) => {
+    const q = ob.a.q[btn.dataset.q];
+    q.v = q.v === btn.dataset.v ? null : btn.dataset.v; // tap again to clear
+    render();
+  },
+  'ob-count': (btn) => {
+    const def = QUESTIONS.find((x) => x.id === btn.dataset.q);
+    const q = ob.a.q[def.id];
+    q.n = clampCount(def, q.n + Number(btn.dataset.d));
+    render();
+  },
+  'ob-skip': () => {
+    if (ob.step === 1) Object.assign(ob.a, { wake: '07:00', bed: '22:30', work: null });
+    if (ob.step === 2) for (const q of Object.values(ob.a.q)) q.v = null;
+    if (ob.step === 3) ob.selected.clear();
+    obAdvance();
+  },
+  'ob-next': () => { obAdvance(); },
+  'ob-back': () => { ob.step = Math.max(0, ob.step - 1); render(); scrollTo(0, 0); },
+  'ob-start': () => {
+    finishSetup();
+    state.onboarded = true; save();
+    view = 'live'; dirty = true; startTicker(); scrollTo(0, 0);
+  },
+};
+OB_ACTIONS['ob-notif'] = SETUP_ACTIONS['notif-enable']; // same thing, asked from elsewhere
+const ACTIONS = { ...SHELL_ACTIONS, ...LIVE_ACTIONS, ...QUEST_ACTIONS, ...MOMENT_ACTIONS, ...SETUP_ACTIONS, ...OB_ACTIONS };
+
+app.addEventListener('click', (e) => {
   const btn = e.target.closest('[data-action]');
   // A switch inside a tappable row is handled on `change`, not here — unless
   // the stopper is itself the button being tapped (a delete cross in a row).
@@ -651,307 +945,8 @@ app.addEventListener('click', async (e) => {
   N.unlockAudio();
   N.stopAlarm(); // any tap silences a strong alert
   const now = Date.now();
-
-  switch (a) {
-    case 'tab': showView(btn.dataset.view); break;
-    case 'explain': U.openExplainSheet(btn.dataset.topic, G.computeStats(now, occs), occs); N.feedback('tap'); break;
-    case 'quest-reminder-auto': state.settings.questReminder = ''; save(); Push.syncSoon(); N.feedback('tap'); render(); break;
-    case 'badge': {
-      const b = G.BADGES.find((x) => x.id === btn.dataset.id); if (!b) break;
-      const p = G.badgeProgress(b, G.computeStats(now, occs));
-      U.openBadgeSheet(b, p, { onShare: () => shareProgress(b) });
-      break;
-    }
-    case 'share-progress': shareProgress(); break;
-    case 'share-app': shareApp(); break;
-    case 'greet-dismiss': state.game.greeting = null; save(); N.feedback('tap'); refresh(); break;
-    case 'pause-info':
-      N.feedback('tap');
-      U.openPauseSheet({ tokens: state.game.pauseTokens || 0, xp: state.game.pauseXp || 0, until: E.pausedUntil(now) }, (n) => {
-        const until = E.startPause(n, Date.now()); if (!until) return;
-        N.feedback('tap'); phases.clear(); refresh(); Push.syncSoon();
-        U.toast('⏸️ ' + t('pausedBanner', { until: fmtClock(until) }), 'good');
-      });
-      break;
-
-    // ---- quests (agenda) ----
-    case 'ag-new':
-      A.openGoalSheet(P.newPlan(), { onSave: (p) => { state.plans.push(p); save(); N.feedback('tap'); render(); } });
-      break;
-    case 'ag-edit': { const p = findPlan(btn.dataset.id); if (p) editPlan(p); break; }
-    case 'ag-start': {
-      const p = findPlan(btn.dataset.id); if (!p) break;
-      A.openStartSheet(p, (day) => {
-        const run = P.start(p, day, Date.now()); if (!run) return;
-        P.advance(Date.now());
-        N.feedback('tap'); render();
-        U.toast('▶️ ' + t('agStarted', { name: run.name, day: day === dayKey(new Date()) ? t('today').toLowerCase() : fmtDate(new Date(day + 'T12:00')) }), 'good');
-      });
-      break;
-    }
-    case 'ag-done': {
-      const p = findPlan(btn.dataset.id); if (!p) break;
-      const levelBefore = E.levelFor(state.game.xp);
-      const i = Number(btn.dataset.i), task = btn.dataset.task;
-      const r = P.completeTask(p, i, task, now); if (!r) break;
-      const b = btn.getBoundingClientRect();
-      U.sparkles(b.left + b.width / 2, b.top + b.height / 2);
-      N.feedback('done'); render();
-      U.toast((r.full ? '🏁 ' : '✓ ') + t('agTaskDone', { n: r.pts }) + (r.full ? ' · ' + t('agStepDone') : ''), 'good', {
-        ms: 6000, action: { label: t('undo'), fn: () => undoPlanTask(p, i, task) },
-      });
-      celebrateGains(levelBefore, state.game.pauseTokens || 0, 700);
-      break;
-    }
-    case 'ag-decide': {
-      const p = findPlan(btn.dataset.id); if (!p) break;
-      if (!P.decide(p, Number(btn.dataset.i), Number(btn.dataset.opt), now)) break;
-      N.feedback('tap'); render();
-      if (p.status === 'done') { announceGoalEnd(p, p.finished); celebrateBadges(1500); } // the answer was the last step
-      break;
-    }
-    case 'ag-detail': {
-      const p = findPlan(btn.dataset.id); if (!p) break;
-      const active = p.status === 'active';
-      A.openDetailSheet(p, now, {
-        onEdit: active ? () => editPlan(p) : null,
-        onForfeit: active ? () => { P.forfeit(p, Date.now()); N.feedback('miss'); U.toast('🏳️ ' + t('agForfeitedToast', { name: p.name })); render(); } : null,
-        onUndo: active ? (i, taskId) => undoPlanTask(p, i, taskId) : null,
-        onDup: () => { state.plans.push(P.clonePlan(p)); save(); render(); U.toast('📋 ' + t('agDuplicated'), 'good'); },
-        onShare: () => shareQuest(p),
-        onDelete: p.status === 'done' ? () => { P.remove(p.id); render(); } : null,
-      });
-      break;
-    }
-    case 'ag-share': { const p = findPlan(btn.dataset.id); if (p) shareQuest(p); break; }
-    case 'ag-import': A.openImportSheet('', addImportedPlan); break;
-
-    case 'done': {
-      const o = findOcc(btn.dataset.key); if (!o) break;
-      const b = btn.getBoundingClientRect();
-      doDone(o, now, { x: b.left + b.width / 2, y: b.top + b.height / 2 });
-      break;
-    }
-    case 'snooze': {
-      const o = findOcc(btn.dataset.key); if (!o) break;
-      if (!doSnooze(o, now)) shakeEl(btn);
-      break;
-    }
-    case 'skip': {
-      const o = findOcc(btn.dataset.key); if (!o) break;
-      const r = E.skip(o, now); if (!r) break;
-      N.dismiss(o.key);
-      U.toast(t('skipped') + ' · ' + r.pts, 'bad');
-      refresh(); break;
-    }
-    case 'undo': {
-      const o = findOcc(btn.dataset.key); if (!o) break;
-      if (E.undo(o)) { N.feedback('tap'); refresh(); }
-      break;
-    }
-    case 'toggle-expand': {
-      const key = btn.dataset.key; if (!key) break;
-      if (expanded.has(key)) expanded.delete(key); else expanded.add(key);
-      N.feedback('tap'); refresh();
-      break;
-    }
-    case 'recap': {
-      const o = findOcc(btn.dataset.key); if (!o) break;
-      U.openRecapSheet(o, {
-        onUndo: () => { if (E.undo(o)) { N.feedback('tap'); refresh(); } },
-        latePts: E.latePts(o, now),
-        onLate: E.canCompleteLate(o, now) ? () => {
-          const r = E.completeLate(o, now);
-          if (!r) return;
-          N.feedback('tap');
-          U.toast('🩹 ' + t('doneLateToast', { pts: (r.pts >= 0 ? '+' : '') + r.pts }), 'good');
-          refresh(); celebrateBadges(600);
-        } : undefined,
-      });
-      break;
-    }
-    case 'badge-page': {
-      changeBadgePage(Number(btn.dataset.d));
-      break;
-    }
-    case 'upcoming-detail': {
-      const o = findOcc(btn.dataset.key); if (!o) break;
-      U.openUpcomingSheet(o, {
-        onDoNow: () => { doDone(o, now); },
-        onSkip: () => {
-          const r = E.skip(o, now); if (!r) return;
-          N.dismiss(o.key);
-          U.toast(t('skipped') + ' · ' + r.pts, 'bad');
-          refresh();
-        },
-      });
-      break;
-    }
-    case 'quick':
-      U.openQuickSheet(({ name, emoji, minutes, importance, start, tomorrow, saveTemplate }) => {
-        const day = dayKey(new Date(now));
-        const id = uid();
-        const h = {
-          id, preset: null, name, emoji, desc: '', slots: [{ start, end: minutesToHM((parseHM(start) + minutes) % 1440) }],
-          days: [], importance, snooze: true, enabled: true, once: tomorrow ? addDays(day, 1) : day, createdAt: now,
-        };
-        if (saveTemplate && !upsertTemplate(null, { name, emoji, minutes, importance })) return false;
-        state.habits.push(h);
-        save(); N.feedback('tap'); refresh();
-        const text = tomorrow ? '📅 ' + t('quickAddedTomorrow', { t: fmtClock(at(addDays(day, 1), start)) })
-          : parseHM(start) > parseHM(nowHM(new Date(now))) ? '⏰ ' + t('quickAddedLater', { t: fmtClock(at(day, start)) })
-          : '✅ ' + t('quickAdded');
-        // Ten seconds to take it back at no cost: the moment simply never existed.
-        U.toast(text, '', { ms: 10000, action: { label: t('undo'), fn: () => {
-          state.habits = state.habits.filter((h) => h.id !== id);
-          for (const d of Object.values(state.days)) for (const k of Object.keys(d)) if (k.startsWith(id + '#')) delete d[k];
-          phases.clear(); save(); refresh();
-        } } });
-      }, { templates: state.templates, onSaveTemplate: (d) => { if (!upsertTemplate(null, d)) return false; U.toast(t('templateSaved'), 'good'); } });
-      break;
-
-    case 'add':
-      U.openHabitSheet(null, (h) => {
-        const nh = { id: uid(), preset: null, once: null, createdAt: Date.now(), ...h };
-        if (G.nameConflict(nh)) { U.toast(t('nameTaken'), 'bad'); return false; }
-        state.habits.push(nh);
-        touchHabits(); save(); refresh();
-      });
-      break;
-    case 'edit': {
-      const h = findHabit(btn.dataset.id); if (!h) break;
-      U.openHabitSheet(h, (data) => {
-        // Keep translatable preset texts when the user did not change them.
-        if (typeof h.name === 'object' && data.name === pick(h.name)) data.name = h.name;
-        if (typeof h.desc === 'object' && data.desc === pick(h.desc)) data.desc = h.desc;
-        if (G.nameConflict({ ...h, ...data })) { U.toast(t('nameTaken'), 'bad'); return false; }
-        Object.assign(h, data); touchHabits(); save(); refresh();
-      },
-        () => { state.habits = state.habits.filter((x) => x !== h); touchHabits(); save(); refresh(); });
-      break;
-    }
-    case 'tpl-del':
-      state.templates = state.templates.filter((x) => x.id !== btn.dataset.id);
-      save(); render();
-      break;
-    case 'tpl-add':
-      U.openTemplateSheet(null, (d) => { if (!upsertTemplate(null, d)) return false; render(); });
-      break;
-    case 'tpl-edit': {
-      const tpl = state.templates.find((x) => x.id === btn.dataset.id); if (!tpl) break;
-      U.openTemplateSheet(tpl, (d) => { if (!upsertTemplate(tpl.id, d)) return false; render(); },
-        () => { state.templates = state.templates.filter((x) => x.id !== tpl.id); save(); render(); });
-      break;
-    }
-    case 'preset': {
-      const p = PRESETS.find((x) => x.id === btn.dataset.preset);
-      if (p && !state.habits.some((h) => h.preset === p.id)) { addPreset(p); save(); N.feedback('tap'); refresh(); }
-      break;
-    }
-    case 'notif-enable': case 'ob-notif': {
-      const r = await N.requestPermission();
-      if (r === 'granted') { U.toast(t('obNotifGranted'), 'good'); N.notify(t('nTest'), t('nTestBody'), 'test'); }
-      render(); break;
-    }
-    case 'notif-test': N.notify(t('nTest'), t('nTestBody'), 'test'); N.feedback('start'); break;
-    case 'push-sync': Push.sync(true).then((ok) => { U.toast(ok ? t('pushSyncedNow') : t('pushFailed'), ok ? 'good' : 'bad'); render(); }); break;
-    case 'test-sound': N.testSound(); break;
-    case 'test-vibration': N.testVibration(); break;
-    case 'export':
-      // On the setup's last page, backing up validates the setup first, so the file holds it.
-      if (view === 'ob') finishSetup();
-      exportData();
-      break;
-    case 'import': U.$('#importFile').click(); break;
-    case 'import-auto': runAutoImport(); break;
-    case 'change-folder': changeBackupFolder(); break;
-    case 'reset':
-      U.openResetSheet(
-        async () => {
-          const ok = await exportData();
-          if (!ok) { U.toast(t('resetCancelled')); return; }
-          resetAll(); setLang(state.lang); resetOb(); view = 'ob'; render();
-        },
-        () => { resetAll(); setLang(state.lang); resetOb(); view = 'ob'; render(); },
-      );
-      break;
-    case 'restore-recovery': {
-      const snap = getRecoverySnapshot();
-      if (!snap) break;
-      U.openConfirmSheet({
-        title: t('restore'),
-        body: t('restoreConfirm', { t: fmtDateTime(snap.at) }) + U.diffHtml(diffStates(state, snap.data)),
-        confirmLabel: t('restore'),
-        onConfirm: () => {
-          snapshotRecovery('before-restore');
-          restoreSnapshot(snap.data);
-          setLang(state.lang);
-          phases.clear();
-          U.toast(t('restoreDone'), 'good');
-          view = state.onboarded ? 'live' : 'ob';
-          dirty = true;
-          if (view === 'live') startTicker(); else render();
-        },
-      });
-      break;
-    }
-    case 'check-update':
-      if (checkingUpdate) break;
-      checkingUpdate = true;
-      render();
-      checkForUpdate(true).then((has) => {
-        checkingUpdate = false;
-        updateReady = has;
-        // A real update was found: the same background listener that would
-        // announce it in the live view already showed the "update ready"
-        // toast with its own action button, so don't repeat it here.
-        if (!has) U.toast(t('upToDate'), 'good');
-        render();
-      });
-      break;
-    case 'apply-update': if (!applyUpdate()) location.reload(); break;
-    case 'install':
-      if (installPrompt) { installPrompt.prompt(); installPrompt.userChoice.then(() => { installPrompt = null; render(); }); }
-      break;
-    case 'restart-ob': resetOb(); view = 'ob'; render(); scrollTo(0, 0); break;
-
-    // onboarding
-    case 'ob-lang': state.lang = btn.dataset.lang; setLang(state.lang); save(); render(); break;
-    case 'ob-preset': {
-      const id = btn.dataset.preset;
-      if (ob.selected.has(id)) ob.selected.delete(id); else ob.selected.add(id);
-      if (state.onboarded) render(); else btn.classList.toggle('on', ob.selected.has(id));
-      break;
-    }
-    case 'ob-work': ob.a.work = btn.dataset.v === 'yes'; render(); break;
-    case 'ob-answer': {
-      const q = ob.a.q[btn.dataset.q];
-      q.v = q.v === btn.dataset.v ? null : btn.dataset.v; // tap again to clear
-      render();
-      break;
-    }
-    case 'ob-count': {
-      const def = QUESTIONS.find((x) => x.id === btn.dataset.q);
-      const q = ob.a.q[def.id];
-      q.n = clampCount(def, q.n + Number(btn.dataset.d));
-      render();
-      break;
-    }
-    case 'ob-skip':
-      if (ob.step === 1) Object.assign(ob.a, { wake: '07:00', bed: '22:30', work: null });
-      if (ob.step === 2) for (const q of Object.values(ob.a.q)) q.v = null;
-      if (ob.step === 3) ob.selected.clear();
-      obAdvance();
-      break;
-    case 'ob-next': obAdvance(); break;
-    case 'ob-back': ob.step = Math.max(0, ob.step - 1); render(); scrollTo(0, 0); break;
-    case 'ob-start':
-      finishSetup();
-      state.onboarded = true; save();
-      view = 'live'; dirty = true; startTicker(); scrollTo(0, 0);
-      break;
-    default: break;
-  }
+  const fn = ACTIONS[a];
+  if (fn) fn(btn, now, e);
 });
 
 app.addEventListener('change', (e) => {
@@ -1014,7 +1009,11 @@ app.addEventListener('change', (e) => {
 });
 const STRING_SETTINGS = new Set(['alertStyle', 'soundName', 'soundOutput', 'vibPattern', 'questReminder', 'dayStart', 'dayEnd']);
 
-document.addEventListener('keydown', (e) => { if (e.key === 'Escape') U.dismissSheet(); });
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') { if (U.dialogOpen()) U.closeDialog(false); else U.dismissSheet(); return; }
+  // A tappable row reached with the keyboard acts like a button.
+  if ((e.key === 'Enter' || e.key === ' ') && e.target.matches && e.target.matches('[role="button"][data-action]')) { e.preventDefault(); e.target.click(); }
+});
 
 // ---- notification buttons -----------------------------------------------------------------
 if ('serviceWorker' in navigator) {
