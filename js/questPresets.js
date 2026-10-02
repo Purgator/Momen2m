@@ -39,8 +39,8 @@ export const QUEST_PRESETS = [
   {
     id: 'clean', emoji: '🧽', name: { en: 'Spring-clean weekend', fr: 'Week-end grand ménage' },
     steps: [
-      { title: { en: 'Saturday', fr: 'Samedi' }, days: 1, tasks: [['👕', { en: 'Declutter the wardrobe', fr: 'Trier la garde-robe' }], ['🪟', { en: 'Windows', fr: 'Les vitres' }]], next: 1 },
-      { title: { en: 'Sunday', fr: 'Dimanche' }, days: 1, tasks: [['🍳', { en: 'Kitchen deep clean', fr: 'Cuisine à fond' }], ['🎁', { en: 'Donate a bag', fr: 'Donner un sac' }]], next: -1 },
+      { title: { en: 'Clear out', fr: 'Désencombrer' }, days: 1, tasks: [['👕', { en: 'Declutter the wardrobe', fr: 'Trier la garde-robe' }], ['🪟', { en: 'Windows', fr: 'Les vitres' }]], next: 1 },
+      { title: { en: 'Finish up', fr: 'Finitions' }, days: 1, tasks: [['🍳', { en: 'Kitchen deep clean', fr: 'Cuisine à fond' }], ['🎁', { en: 'Donate a bag', fr: 'Donner un sac' }]], next: -1 },
     ],
   },
 ];

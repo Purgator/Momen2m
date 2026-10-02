@@ -4,7 +4,7 @@ import { t } from './i18n.js';
 import { state } from './store.js';
 import { esc, $, $$, openSheet, closeSheet, tabbar, toast } from './ui.js';
 import { suggestEmoji } from './emoji.js';
-import { dayKey, addDays, fmtDate } from './time.js';
+import { dayKey, addDays, fmtDate, dayStart } from './time.js';
 import { drawQR } from './qr.js';
 import * as P from './plans.js';
 
@@ -34,7 +34,7 @@ export function renderAgenda(now) {
     for (const x of P.openTasks(p, today)) {
       todayHtml += `<div class="item ag-task" data-action="ag-detail" data-id="${p.id}">
         <div class="emo">${esc(x.task.emoji || '•')}</div>
-        <div><div class="name">${esc(x.task.name)}</div><div class="sub">${goalTitle(p)} · ${stepName(p, x.block)}${x.late ? ` · <span class="neg">${t('agLate')}</span>` : ''}</div></div>
+        <div><div class="name">${esc(x.task.name)}</div><div class="sub">${goalTitle(p)} · ${stepName(p, x.block)}${x.late ? ` · <span class="neg">${t('agLateSince', { day: fmtDate(dayStart(x.to)) })}</span>` : ''}</div></div>
         <button class="btn small ok" data-action="ag-done" data-id="${p.id}" data-i="${x.i}" data-task="${esc(x.task.id)}">✓ +${x.pts}</button></div>`;
     }
   }
