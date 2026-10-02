@@ -4,7 +4,7 @@
 import { state, save, needsBackup } from './store.js';
 import { levelFor, xpForLevel, dayComplete, todayPoints } from './engine.js';
 import { pointsOn as agendaPointsOn, stats as agendaStats } from './plans.js';
-import { dayKey, addDays } from './time.js';
+import { dayKey, addDays, weekday } from './time.js';
 import { permission } from './notify.js';
 
 export const LEVELS_PER_RANK = 2;
@@ -73,7 +73,7 @@ export function computeStats(now, todayOccs = []) {
         d.done++;
         if (r.early) early++;
         if (r.at) { const h = new Date(r.at).getHours(); if (h < 7) dawn++; if (h >= 22 || h < 4) night++; }
-        if ([0, 6].includes(new Date(day + 'T12:00').getDay())) weekend++;
+        if ([0, 6].includes(weekday(day))) weekend++;
         distinct.add(habitIdOf(key));
       } else if (r.status === 'missed') d.missed++;
       else if (r.status === 'skipped') d.skipped++;

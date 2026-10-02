@@ -63,6 +63,12 @@ h2 { font-size: 20px; font-weight: 700; }
 .topbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 4px 2px 14px; }
 .clock { font-size: 34px; font-weight: 800; letter-spacing: -.02em; font-variant-numeric: tabular-nums; line-height: 1; }
 .stats { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; justify-content: flex-end; }
+/* Four pills next to the clock must fit one row on a 375 px phone, in French too. */
+@media (max-width: 400px) {
+  .clock { font-size: 28px; }
+  .stats { gap: 6px; }
+  .stat { padding: 5px 8px; font-size: 12px; }
+}
 .stat { background: var(--card); border: 1px solid var(--line); border-radius: 999px; padding: 6px 10px; font-size: 13px; font-weight: 600; white-space: nowrap; }
 .stat.today { color: var(--ok); }
 .stat.today.neg { color: var(--danger); }
@@ -165,9 +171,10 @@ h2 { font-size: 20px; font-weight: 700; }
   display: flex; background: var(--bg2); border-top: 1px solid var(--line);
 }
 .tab {
-  flex: 1; border: 0; background: none; color: var(--muted); font-weight: 700; font-size: 12px;
+  flex: 1; min-width: 0; padding: 0 2px; border: 0; background: none; color: var(--muted); font-weight: 700; font-size: 12px;
   display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; cursor: pointer;
 }
+.tab .lbl { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .tab .ico { font-size: 22px; line-height: 1; position: relative; padding: 3px 14px; border-radius: 12px; transition: background .2s; }
 .tab.on { color: var(--accent2); }
 .tab.on .ico { background: rgba(108, 112, 255, .22); }
@@ -254,6 +261,16 @@ input[type="time"] { font-variant-numeric: tabular-nums; }
 .card.pad { padding: 16px; }
 .btnrow { display: flex; gap: 10px; margin-top: 16px; }
 .btnrow .btn { flex: 1; }
+
+/* ---- confirm dialog (floats above a sheet) -------------------------------- */
+.dialog-wrap { position: fixed; inset: 0; z-index: 30; display: flex; align-items: center; justify-content: center; padding: 24px; background: rgba(5, 7, 20, .45); opacity: 0; transition: opacity .15s; }
+.dialog-wrap.open { opacity: 1; }
+.dialog { background: var(--bg2); border: 1px solid var(--line); border-radius: 18px; padding: 18px; max-width: 360px; width: 100%; box-shadow: 0 12px 40px rgba(0, 0, 0, .35); transform: scale(.96); transition: transform .15s; }
+.dialog-wrap.open .dialog { transform: scale(1); }
+.dialog h3 { font-size: 17px; margin-bottom: 6px; }
+.dialog p { color: var(--text); line-height: 1.4; }
+.dialog .btnrow { margin-top: 14px; }
+.btn.danger { background: var(--danger); color: #fff; }
 
 /* ---- bottom sheet -------------------------------------------------------- */
 .backdrop { position: fixed; inset: 0; background: rgba(5, 7, 20, .55); z-index: 20; opacity: 0; transition: opacity .2s; }

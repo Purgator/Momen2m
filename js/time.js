@@ -56,6 +56,11 @@ const dateFmt = new Intl.DateTimeFormat(navigator.language || 'en', { weekday: '
 export function fmtDate(ts) {
   return dateFmt.format(ts);
 }
+// A day key ("2026-09-11") as a short date — read at noon, so a DST switch
+// never shifts it to the day before.
+export function fmtDay(key) {
+  return dateFmt.format(new Date(key + 'T12:00'));
+}
 export function fmtDateTime(ts) {
   return dateTimeFmt.format(ts);
 }
@@ -79,7 +84,7 @@ export function fmtCountdown(ms) {
 }
 
 // Rough duration such as "25 min" or "2 h 05".
-export function fmtDuration(ms, lang) {
+export function fmtDuration(ms) {
   const m = Math.max(1, Math.round(ms / 60000));
   if (m < 60) return m + ' min';
   const h = Math.floor(m / 60), r = m % 60;

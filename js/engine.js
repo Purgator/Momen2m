@@ -30,7 +30,10 @@ export function occurrencesOfDay(day) {
     if (!habitOnDay(h, day)) continue;
     (h.slots || []).forEach((slot, i) => {
       const start0 = at(day, slot.start);
-      const originalEnd = at(day, slot.end, parseHM(slot.end) <= parseHM(slot.start) ? 1 : 0);
+      let originalEnd = at(day, slot.end, parseHM(slot.end) <= parseHM(slot.start) ? 1 : 0);
+      // Clocks going forward swallow an hour: a slot inside it (02:30–03:30) would
+      // start and end at the same instant. Keep its nominal length instead.
+      if (originalEnd <= start0) originalEnd = start0 + (((parseHM(slot.end) - parseHM(slot.start)) % 1440 + 1440) % 1440 || 1440) * 60000;
       if (h.createdAt && originalEnd <= h.createdAt) return; // window ended before the moment existed
       const key = occKey(h.id, i);
       const rec = record(day, key, false);
@@ -154,6 +157,18 @@ function lastDeadline(day) {
   let max = 0;
   for (const o of occurrencesOfDay(day)) if (o.end > max) max = o.end;
   return max;
+}
+
+// Consecutive misses counted back from the latest resolved moment of
+// yesterday and today; a done or skipped moment ends the run. `last` is that
+// latest resolved moment (the greeting is keyed on it).
+export function missRun(now) {
+  const today = dayKey(new Date(now));
+  const resolved = [...occurrencesOfDay(addDays(today, -1)), ...occurrencesOfDay(today)]
+    .filter((o) => o.status !== 'open' && o.at).sort((a, b) => a.at - b.at);
+  let run = 0;
+  for (let i = resolved.length - 1; i >= 0; i--) { if (resolved[i].status === 'missed') run++; else break; }
+  return { run, last: resolved[resolved.length - 1] || null };
 }
 
 // Settles fully elapsed past days: marks misses and updates the streak.
