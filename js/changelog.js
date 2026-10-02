@@ -3,6 +3,13 @@
 // exhaustive (the detailed notes live on the GitHub release). Both languages.
 export const CHANGELOG = {
   en: {
+    '1.30.0': [
+      '🧹 Under the hood: the interface code was reorganised into smaller modules — nothing changes on screen, updates will come faster.',
+      '💬 Delete and give-up confirmations use the app\'s own dialog instead of the browser pop-up.',
+      '♿ Switches and lists have proper names for screen readers; tappable rows can be reached with a keyboard.',
+      '🌙 Every tab refreshes at midnight, not only Now and Quests.',
+      '🕑 A moment set in the hour the clocks skip in spring keeps its length instead of vanishing.',
+    ],
     '1.29.0': [
       '📅 A late quest task says since when ("late since Thu 1 Oct"), so two runs of the same quest are no longer a puzzle.',
       '🧽 The spring-clean example quest names its steps "Clear out" and "Finish up" instead of Saturday / Sunday — steps follow the day you start, not the calendar.',
@@ -116,6 +123,13 @@ export const CHANGELOG = {
     '1.8.1': ['🔔 More reliable background reminders.'],
   },
   fr: {
+    '1.30.0': [
+      '🧹 Sous le capot : le code de l’interface est réorganisé en modules plus petits — rien ne change à l’écran, les mises à jour viendront plus vite.',
+      '💬 Les confirmations de suppression et d’abandon utilisent la boîte de dialogue de l’app, plus celle du navigateur.',
+      '♿ Interrupteurs et listes ont un vrai nom pour les lecteurs d’écran ; les lignes tactiles sont accessibles au clavier.',
+      '🌙 Chaque onglet se rafraîchit à minuit, pas seulement Maintenant et Quêtes.',
+      '🕑 Un moment placé dans l’heure sautée au changement d’heure de printemps garde sa durée au lieu de disparaître.',
+    ],
     '1.29.0': [
       '📅 Une tâche de quête en retard dit depuis quand (« en retard depuis le jeu. 1 oct. ») : deux lancements de la même quête ne se confondent plus.',
       '🧽 La quête d’exemple du grand ménage nomme ses étapes « Désencombrer » et « Finitions » au lieu de Samedi / Dimanche — les étapes suivent le jour où tu démarres, pas le calendrier.',
