@@ -106,7 +106,12 @@ back handler never pushes — returning to a parent sheet reuses the parent's
 entry. `closeSheet` pops on a 0 ms timer so a sibling opened right after
 (Edit, Share) takes the entry over. Never call `history.back()` or
 `pushState` directly around sheets. Editors of existing things don't focus a
-field (the sheet shows whole before the keyboard); only brand-new ones do. `settings.dayStart/dayEnd` come from
+field (the sheet shows whole before the keyboard); only brand-new ones do.
+A running quest's *current* step (last of `path`) opens with its task list
+frozen behind a slide-to-unlock (`agenda.js slideToUnlock`, pointer events,
+≥ 90 % of the track); past steps stay frozen, future ones are free. The
+viewport is `maximum-scale=1` + `touch-action: pan-x pan-y`: a pinch-zoomed
+page left the fixed tab bar floating mid-screen on iOS. `settings.dayStart/dayEnd` come from
 the setup's wake/bed answers (back-filled from the `wake`/`sleep` preset
 moments for older saves) and are editable in Setup › "Your day" (two clock inputs with one-word
 captions; the quest reminder row shows the effective hour, `P.reminderHM`,
