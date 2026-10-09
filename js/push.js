@@ -129,6 +129,15 @@ export async function probe() {
   } catch { return false; }
 }
 
+// What the relay itself reports, for the diagnostics report. Never throws.
+export async function relayStatus() {
+  const root = cfg.url.replace(/\/+$/, '');
+  const get = async (url) => {
+    try { const r = await fetch(url); return r.ok ? await r.json() : 'http ' + r.status; } catch (err) { return 'unreachable: ' + (err && err.message || err); }
+  };
+  return { health: await get(root + '/v1/health'), device: state.push.deviceId ? await get(base()) : null };
+}
+
 // Known device-side reasons a push might not arrive, for the settings hint.
 export function caveat() {
   const ua = navigator.userAgent;

@@ -17,6 +17,7 @@ import { diffStates } from './diff.js';
 import * as G from './game.js';
 import { drawShareCard, share } from './share.js';
 import * as Push from './push.js';
+import * as Diag from './diag.js';
 import * as P from './plans.js';
 import * as A from './agenda.js';
 import { seedOnce as seedQuestPresets } from './questPresets.js';
@@ -836,6 +837,15 @@ const SETUP_ACTIONS = {
   'notif-test': () => { N.notify(t('nTest'), t('nTestBody'), 'test'); N.feedback('start'); },
   'push-sync': () => {
     Push.sync(true).then((ok) => { U.toast(ok ? t('pushSyncedNow') : t('pushFailed'), ok ? 'good' : 'bad'); render(); });
+  },
+  'diag-share': async () => {
+    const res = await share({ text: await Diag.report() });
+    if (res === 'shared' || res === 'copied') U.toast(t(res === 'shared' ? 'shared' : 'sharedCopied'), 'good');
+    else if (res === false) U.toast(t('shareFailed'), 'bad');
+  },
+  'diag-copy': async () => {
+    try { await navigator.clipboard.writeText(await Diag.report()); U.toast(t('sharedCopied'), 'good'); }
+    catch { U.toast(t('shareFailed'), 'bad'); }
   },
   'test-sound': () => { N.testSound(); },
   'test-vibration': () => { N.testVibration(); },

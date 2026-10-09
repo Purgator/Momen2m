@@ -3,6 +3,9 @@
 // exhaustive (the detailed notes live on the GitHub release). Both languages.
 export const CHANGELOG = {
   en: {
+    '1.31.0': [
+      '🩺 New Share / Copy diagnostics buttons in Setup: one tap gives a report to send when a reminder goes missing.',
+    ],
     '1.30.0': [
       '🧹 Under the hood: the interface code was reorganised into smaller modules — nothing changes on screen, updates will come faster.',
       '💬 Delete and give-up confirmations use the app\'s own dialog instead of the browser pop-up.',
@@ -123,6 +126,9 @@ export const CHANGELOG = {
     '1.8.1': ['🔔 More reliable background reminders.'],
   },
   fr: {
+    '1.31.0': [
+      '🩺 Nouveaux boutons Partager / Copier le diagnostic dans Réglages : un appui donne un rapport à envoyer quand un rappel n’arrive pas.',
+    ],
     '1.30.0': [
       '🧹 Sous le capot : le code de l’interface est réorganisé en modules plus petits — rien ne change à l’écran, les mises à jour viendront plus vite.',
       '💬 Les confirmations de suppression et d’abandon utilisent la boîte de dialogue de l’app, plus celle du navigateur.',

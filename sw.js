@@ -1,6 +1,6 @@
 // Momen2m service worker: offline app shell + versioned cache + notification clicks.
 // VERSION is bumped by tools/bump.js; a changed file is what triggers an update.
-const VERSION = '1.30.0';
+const VERSION = '1.31.0';
 // Optional push relay settings (relay.config.js is deployment-specific and may be empty/missing).
 try { importScripts('relay.config.js'); } catch { /* no relay for this copy */ }
 const CACHE = 'momen2m-' + VERSION;
@@ -37,6 +37,7 @@ const ASSETS = [
   './js/qr.js',
   './js/questPresets.js',
   './js/push.js',
+  './js/diag.js',
   './relay.config.js',
   './js/diff.js',
   './js/game.js',
@@ -116,12 +117,14 @@ self.addEventListener('notificationclick', (event) => {
 self.addEventListener('push', (event) => {
   let p = null;
   try { p = event.data ? event.data.json() : null; } catch { p = null; }
-  if (!p || !p.title) return;
+  if (!p || !p.title) { event.waitUntil(logPush({ at: Date.now(), bad: true })); return; }
   event.waitUntil((async () => {
     const wins = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
     const visible = wins.some((c) => c.visibilityState === 'visible');
     for (const c of wins) c.postMessage({ type: 'PUSH', key: p.key || p.tag || '' });
-    if (visible) return;
+    // Kept for the diagnostics report: what reached the phone, and what we did with it.
+    const entry = { at: Date.now(), due: Number(p.at) || 0, kind: p.kind || '', silent: !!p.silent, visible, shown: false };
+    if (visible) { await logPush(entry); return; }
     const options = {
       body: p.body || '', tag: p.tag || undefined, data: { key: p.key || p.tag || '' },
       icon: 'icons/icon-192.png', badge: 'icons/badge-96.png', timestamp: Date.now(), renotify: true,
@@ -129,7 +132,8 @@ self.addEventListener('push', (event) => {
     };
     if (!p.silent && Array.isArray(p.vibrate) && p.vibrate.length) options.vibrate = p.vibrate;
     if (Array.isArray(p.actions) && p.actions.length) options.actions = p.actions;
-    await self.registration.showNotification(p.title, options);
+    try { await self.registration.showNotification(p.title, options); entry.shown = true; } catch (err) { entry.error = String(err && err.message || err).slice(0, 100); }
+    await logPush(entry);
   })());
 });
 
@@ -153,6 +157,29 @@ function b64uToBytes(str) {
   const out = new Uint8Array(raw.length);
   for (let i = 0; i < raw.length; i++) out[i] = raw.charCodeAt(i);
   return out;
+}
+
+// Rolling log of the last pushes received (read by js/diag.js). Best-effort.
+async function logPush(entry) {
+  try {
+    const log = (await idbGet('momen2m-fs', 'handles', 'pushLog')) || [];
+    log.unshift(entry);
+    await idbPut('momen2m-fs', 'handles', 'pushLog', log.slice(0, 15));
+  } catch { /* diagnostics only */ }
+}
+
+function idbPut(dbName, store, key, value) {
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.open(dbName, 1);
+    req.onupgradeneeded = () => req.result.createObjectStore(store);
+    req.onerror = () => reject(req.error);
+    req.onsuccess = () => {
+      const tx = req.result.transaction(store, 'readwrite');
+      tx.objectStore(store).put(value, key);
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error);
+    };
+  });
 }
 
 function idbGet(dbName, store, key) {
