@@ -397,6 +397,10 @@ export function renderSetup(opts) {
       </div>
       ${opts.push ? pushRow(opts.push, perm) : ''}
       <p class="hint" style="margin-top:10px">${opts.push ? t('notifBackgroundNotePush') : t('notifBackgroundNote')}</p>
+      <div class="btnrow" style="margin-top:10px">
+        <button class="btn small" data-action="diag-share">🩺 ${t('diagShare')}</button>
+        <button class="btn small" data-action="diag-copy">📋 ${t('diagCopy')}</button>
+      </div>
     </div>
 
     <div class="section">

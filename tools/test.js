@@ -392,6 +392,24 @@ globalThis.window = globalThis;
     assert.strictEqual(S.state.days[today]['meds#0'].early, false);
   });
 
+  await test('diagnostics report names every link of the push chain and leaks no moment names', async () => {
+    const { formatReport } = await import(url('diag.js'));
+    const now = Date.UTC(2026, 9, 9, 12, 0);
+    const base = {
+      tz: 'Europe/Paris', version: '1.31.0', standalone: true, online: true, ua: 'UA', permission: 'granted',
+      s: { notifications: true, sound: false, soundOutput: 'both', reminderBefore: 5 },
+      configured: true, supported: true, push: { enabled: true, deviceId: 'abc123', lastSync: now - 3 * 3600000, pending: 12, lastError: 'network: x' },
+      caveat: '', sw: 'active · controlling this page: yes', sub: 'fcm.googleapis.com', permState: 'granted',
+      plan: { count: 12, next: now + 600000 },
+      relay: { health: { ok: true, configured: true }, device: { subscribed: false, pending: 0, lastSync: 0, nextAt: null } },
+      log: [{ at: now - 60000, due: now - 90000, kind: 'start', shown: false, error: 'boom' }],
+    };
+    const r = formatReport(base, now);
+    for (const needle of ['abc123', 'last error: network: x', 'sound: OFF', 'subscribed=false', 'show FAILED: boom', '30 s after due', '3 h ago', 'fcm.googleapis.com']) assert.ok(r.includes(needle), 'missing: ' + needle);
+    const bare = formatReport({ ...base, sub: '', relay: null, log: [], plan: { count: 0, next: 0 } }, now);
+    assert.ok(bare.includes('push subscription: NONE') && bare.includes('none recorded'));
+  });
+
   await test('push plan mirrors the in-app reminders for the coming week', async () => {
     const { buildPlan, PLAN_DAYS } = await import(url('plan.js'));
     const now = D(0, '12:00');
