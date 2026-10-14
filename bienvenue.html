@@ -1,0 +1,361 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Bienvenue sur Momen2m</title>
+  <meta name="description" content="Momen2m est une petite application gratuite qui vous rappelle les moments simples de la journée, en douceur. Cette page vous la présente et vous aide à l’installer.">
+  <meta name="color-scheme" content="light dark">
+  <meta name="theme-color" content="#f7f6f2" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#0f1220" media="(prefers-color-scheme: dark)">
+  <meta property="og:title" content="Bienvenue sur Momen2m">
+  <meta property="og:description" content="Votre journée, un moment à la fois. Une petite application gratuite qui vous rappelle les choses simples, en douceur.">
+  <meta property="og:image" content="https://purgator.github.io/Momen2m/icons/icon-512.png">
+  <meta property="og:url" content="https://purgator.github.io/Momen2m/bienvenue.html">
+  <meta property="og:type" content="website">
+  <link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+  <style>
+    :root {
+      --bg: #f7f6f2;
+      --card: #ffffff;
+      --line: #e3e1d9;
+      --text: #1f2233;
+      --muted: #5c6079;
+      --accent: #5458f0;
+      --accent-ink: #ffffff;
+      --soft: #eceeff;
+      --radius: 20px;
+      color-scheme: light;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #0f1220;
+        --card: #1b2038;
+        --line: #2b3153;
+        --text: #eef0ff;
+        --muted: #aab0d8;
+        --accent: #8a8dff;
+        --accent-ink: #0f1220;
+        --soft: #222847;
+        color-scheme: dark;
+      }
+    }
+    * { box-sizing: border-box; }
+    html { -webkit-text-size-adjust: 100%; }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      font-size: 20px;
+      line-height: 1.6;
+      -webkit-font-smoothing: antialiased;
+    }
+    main {
+      max-width: 42rem;
+      margin: 0 auto;
+      padding: 32px 16px 56px;
+    }
+    header {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      margin-bottom: 28px;
+    }
+    header img {
+      width: 72px;
+      height: 72px;
+      border-radius: 18px;
+      flex: none;
+    }
+    header .name {
+      font-size: 1.1rem;
+      font-weight: 700;
+      letter-spacing: .01em;
+      margin: 0;
+    }
+    header .tagline {
+      margin: 2px 0 0;
+      color: var(--muted);
+      font-size: 1rem;
+    }
+    h1 {
+      font-size: 2rem;
+      line-height: 1.2;
+      margin: 0 0 20px;
+    }
+    h2 {
+      font-size: 1.35rem;
+      line-height: 1.3;
+      margin: 44px 0 14px;
+    }
+    h3 {
+      font-size: 1.1rem;
+      margin: 24px 0 8px;
+    }
+    p { margin: 0 0 18px; }
+    .lead { font-size: 1.15rem; }
+    .warm {
+      background: var(--soft);
+      border-radius: var(--radius);
+      padding: 20px 22px;
+      margin: 24px 0;
+    }
+    .warm p:last-child { margin-bottom: 0; }
+    ul.points {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+    }
+    ul.points li {
+      display: flex;
+      gap: 14px;
+      align-items: flex-start;
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      padding: 16px 18px;
+      margin-bottom: 12px;
+    }
+    ul.points .ico {
+      font-size: 1.6rem;
+      line-height: 1.2;
+      flex: none;
+      width: 2rem;
+      text-align: center;
+    }
+    ol.steps {
+      padding-left: 0;
+      margin: 0 0 8px;
+      list-style: none;
+      counter-reset: step;
+    }
+    ol.steps li {
+      counter-increment: step;
+      display: flex;
+      gap: 14px;
+      align-items: flex-start;
+      margin-bottom: 14px;
+    }
+    ol.steps li::before {
+      content: counter(step);
+      flex: none;
+      width: 2rem;
+      height: 2rem;
+      border-radius: 50%;
+      background: var(--accent);
+      color: var(--accent-ink);
+      font-weight: 700;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      margin-top: .15rem;
+    }
+    .cta {
+      text-align: center;
+      margin: 36px 0 12px;
+    }
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      min-height: 64px;
+      width: 100%;
+      max-width: 26rem;
+      padding: 14px 28px;
+      border-radius: 999px;
+      background: var(--accent);
+      color: var(--accent-ink);
+      font-size: 1.25rem;
+      font-weight: 700;
+      text-decoration: none;
+      border: 0;
+      cursor: pointer;
+      font-family: inherit;
+    }
+    .btn:focus-visible, a:focus-visible, button:focus-visible {
+      outline: 3px solid var(--accent);
+      outline-offset: 3px;
+    }
+    .btn.secondary {
+      background: var(--card);
+      color: var(--text);
+      border: 2px solid var(--line);
+      min-height: 56px;
+      font-size: 1.05rem;
+    }
+    .url {
+      margin-top: 14px;
+      color: var(--muted);
+      font-size: 1rem;
+      overflow-wrap: anywhere;
+    }
+    .url a { color: var(--accent); font-weight: 600; }
+    .qr {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 10px;
+      margin: 26px auto 8px;
+      color: var(--muted);
+      font-size: 1rem;
+      text-align: center;
+    }
+    .qr svg {
+      width: 176px;
+      height: 176px;
+      border-radius: 12px;
+      border: 1px solid var(--line);
+      background: #fff;
+    }
+    .platforms {
+      display: grid;
+      gap: 16px;
+    }
+    @media (min-width: 640px) { .platforms { grid-template-columns: 1fr 1fr; } }
+    .platform {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      padding: 18px 20px 6px;
+    }
+    .platform h3 { margin-top: 0; }
+    kbd {
+      font-family: inherit;
+      font-weight: 600;
+      background: var(--soft);
+      border-radius: 6px;
+      padding: 1px 7px;
+    }
+    .share { text-align: center; margin: 40px 0 0; }
+    .share p { color: var(--muted); font-size: 1rem; margin-top: 10px; min-height: 1.6em; }
+    footer {
+      margin-top: 48px;
+      padding-top: 20px;
+      border-top: 1px solid var(--line);
+      color: var(--muted);
+      font-size: .95rem;
+    }
+    footer a { color: var(--accent); }
+    @media (max-width: 420px) {
+      body { font-size: 19px; }
+      h1 { font-size: 1.75rem; }
+    }
+    @media print {
+      body { background: #fff; color: #000; font-size: 13pt; }
+      main { max-width: none; padding: 0; }
+      .warm, ul.points li, .platform { border-color: #bbb; background: #fff; }
+      .btn, .share { display: none; }
+      .url { color: #000; }
+      .qr svg { width: 150px; height: 150px; border: 0; }
+      h2 { page-break-after: avoid; }
+    }
+  </style>
+</head>
+<body>
+<main>
+  <header>
+    <img src="icons/icon-192.png" alt="" width="72" height="72">
+    <div>
+      <p class="name">Momen2m</p>
+      <p class="tagline">Votre journée, un moment à la fois.</p>
+    </div>
+  </header>
+
+  <h1>Bienvenue&nbsp;!</h1>
+
+  <p class="lead">Si vous lisez cette page, c’est sans doute qu’une personne qui vous veut du bien vous l’a transmise. Prenez le temps qu’il vous faut&nbsp;: il n’y a rien à réussir ici, et rien à faire tout de suite.</p>
+
+  <p>Momen2m est une petite application gratuite, pensée pour les journées où les choses simples demandent un vrai effort&nbsp;: boire un verre d’eau, se lever et marcher un peu, prendre ses médicaments, manger à l’heure, aller se coucher. Ces journées-là, tout le monde en connaît. Momen2m est là pour vous les rendre un peu plus légères.</p>
+
+  <p>Vous décrivez votre journée une seule fois, avec les moments qui comptent pour vous. Ensuite, quand l’heure d’un moment arrive, il apparaît sur votre écran avec un petit compte à rebours. Vous le faites, vous appuyez sur <kbd>Fait</kbd>, et vous gagnez des points. C’est tout.</p>
+
+  <div class="warm">
+    <p><strong>Et si vous oubliez&nbsp;?</strong> Ce n’est pas grave. Momen2m ne gronde jamais, ne vous compare à personne et recommence chaque matin avec vous. Chaque petit pas compte, même le plus petit.</p>
+  </div>
+
+  <h2>Ce qui vous attend</h2>
+  <ul class="points">
+    <li><span class="ico">💧</span><span>Des moments tout prêts à choisir (eau, marche, repas, médicaments, coucher…) et la possibilité d’ajouter les vôtres, avec vos mots.</span></li>
+    <li><span class="ico">🔔</span><span>Un rappel au bon moment, avec un son et une vibration que vous réglez comme vous le souhaitez.</span></li>
+    <li><span class="ico">⭐</span><span>Des points, des encouragements et des badges, pour voir vos progrès jour après jour.</span></li>
+    <li><span class="ico">🔒</span><span>Vos informations restent sur votre téléphone. Pas de compte à créer, pas de publicité, rien à payer.</span></li>
+    <li><span class="ico">🇫🇷</span><span>En français, automatiquement.</span></li>
+  </ul>
+
+  <div class="cta">
+    <a class="btn" href="https://purgator.github.io/Momen2m/">Ouvrir Momen2m</a>
+    <p class="url">ou tapez cette adresse dans votre navigateur&nbsp;:<br><a href="https://purgator.github.io/Momen2m/">purgator.github.io/Momen2m</a></p>
+  </div>
+
+  <div class="qr">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 33 33" shape-rendering="crispEdges" role="img" aria-label="QR code vers purgator.github.io/Momen2m"><rect width="33" height="33" fill="#fff"/><path d="M2 2h1v1h-1zM3 2h1v1h-1zM4 2h1v1h-1zM5 2h1v1h-1zM6 2h1v1h-1zM7 2h1v1h-1zM8 2h1v1h-1zM10 2h1v1h-1zM11 2h1v1h-1zM17 2h1v1h-1zM18 2h1v1h-1zM20 2h1v1h-1zM21 2h1v1h-1zM22 2h1v1h-1zM24 2h1v1h-1zM25 2h1v1h-1zM26 2h1v1h-1zM27 2h1v1h-1zM28 2h1v1h-1zM29 2h1v1h-1zM30 2h1v1h-1zM2 3h1v1h-1zM8 3h1v1h-1zM16 3h1v1h-1zM17 3h1v1h-1zM24 3h1v1h-1zM30 3h1v1h-1zM2 4h1v1h-1zM4 4h1v1h-1zM5 4h1v1h-1zM6 4h1v1h-1zM8 4h1v1h-1zM10 4h1v1h-1zM13 4h1v1h-1zM14 4h1v1h-1zM15 4h1v1h-1zM16 4h1v1h-1zM17 4h1v1h-1zM21 4h1v1h-1zM22 4h1v1h-1zM24 4h1v1h-1zM26 4h1v1h-1zM27 4h1v1h-1zM28 4h1v1h-1zM30 4h1v1h-1zM2 5h1v1h-1zM4 5h1v1h-1zM5 5h1v1h-1zM6 5h1v1h-1zM8 5h1v1h-1zM10 5h1v1h-1zM11 5h1v1h-1zM13 5h1v1h-1zM19 5h1v1h-1zM20 5h1v1h-1zM22 5h1v1h-1zM24 5h1v1h-1zM26 5h1v1h-1zM27 5h1v1h-1zM28 5h1v1h-1zM30 5h1v1h-1zM2 6h1v1h-1zM4 6h1v1h-1zM5 6h1v1h-1zM6 6h1v1h-1zM8 6h1v1h-1zM10 6h1v1h-1zM11 6h1v1h-1zM12 6h1v1h-1zM13 6h1v1h-1zM15 6h1v1h-1zM21 6h1v1h-1zM24 6h1v1h-1zM26 6h1v1h-1zM27 6h1v1h-1zM28 6h1v1h-1zM30 6h1v1h-1zM2 7h1v1h-1zM8 7h1v1h-1zM11 7h1v1h-1zM14 7h1v1h-1zM16 7h1v1h-1zM19 7h1v1h-1zM20 7h1v1h-1zM21 7h1v1h-1zM24 7h1v1h-1zM30 7h1v1h-1zM2 8h1v1h-1zM3 8h1v1h-1zM4 8h1v1h-1zM5 8h1v1h-1zM6 8h1v1h-1zM7 8h1v1h-1zM8 8h1v1h-1zM10 8h1v1h-1zM12 8h1v1h-1zM14 8h1v1h-1zM16 8h1v1h-1zM18 8h1v1h-1zM20 8h1v1h-1zM22 8h1v1h-1zM24 8h1v1h-1zM25 8h1v1h-1zM26 8h1v1h-1zM27 8h1v1h-1zM28 8h1v1h-1zM29 8h1v1h-1zM30 8h1v1h-1zM11 9h1v1h-1zM13 9h1v1h-1zM15 9h1v1h-1zM16 9h1v1h-1zM17 9h1v1h-1zM18 9h1v1h-1zM19 9h1v1h-1zM22 9h1v1h-1zM2 10h1v1h-1zM3 10h1v1h-1zM4 10h1v1h-1zM5 10h1v1h-1zM8 10h1v1h-1zM10 10h1v1h-1zM15 10h1v1h-1zM16 10h1v1h-1zM17 10h1v1h-1zM18 10h1v1h-1zM19 10h1v1h-1zM20 10h1v1h-1zM23 10h1v1h-1zM26 10h1v1h-1zM27 10h1v1h-1zM28 10h1v1h-1zM30 10h1v1h-1zM2 11h1v1h-1zM4 11h1v1h-1zM7 11h1v1h-1zM9 11h1v1h-1zM11 11h1v1h-1zM19 11h1v1h-1zM20 11h1v1h-1zM21 11h1v1h-1zM22 11h1v1h-1zM23 11h1v1h-1zM24 11h1v1h-1zM25 11h1v1h-1zM26 11h1v1h-1zM30 11h1v1h-1zM2 12h1v1h-1zM6 12h1v1h-1zM8 12h1v1h-1zM10 12h1v1h-1zM16 12h1v1h-1zM18 12h1v1h-1zM19 12h1v1h-1zM22 12h1v1h-1zM26 12h1v1h-1zM28 12h1v1h-1zM29 12h1v1h-1zM3 13h1v1h-1zM4 13h1v1h-1zM5 13h1v1h-1zM13 13h1v1h-1zM14 13h1v1h-1zM15 13h1v1h-1zM16 13h1v1h-1zM20 13h1v1h-1zM21 13h1v1h-1zM22 13h1v1h-1zM23 13h1v1h-1zM24 13h1v1h-1zM25 13h1v1h-1zM30 13h1v1h-1zM2 14h1v1h-1zM3 14h1v1h-1zM5 14h1v1h-1zM8 14h1v1h-1zM9 14h1v1h-1zM10 14h1v1h-1zM11 14h1v1h-1zM13 14h1v1h-1zM19 14h1v1h-1zM22 14h1v1h-1zM27 14h1v1h-1zM28 14h1v1h-1zM4 15h1v1h-1zM5 15h1v1h-1zM11 15h1v1h-1zM12 15h1v1h-1zM13 15h1v1h-1zM15 15h1v1h-1zM17 15h1v1h-1zM18 15h1v1h-1zM21 15h1v1h-1zM23 15h1v1h-1zM24 15h1v1h-1zM28 15h1v1h-1zM29 15h1v1h-1zM30 15h1v1h-1zM5 16h1v1h-1zM7 16h1v1h-1zM8 16h1v1h-1zM9 16h1v1h-1zM11 16h1v1h-1zM12 16h1v1h-1zM14 16h1v1h-1zM16 16h1v1h-1zM18 16h1v1h-1zM19 16h1v1h-1zM20 16h1v1h-1zM21 16h1v1h-1zM22 16h1v1h-1zM23 16h1v1h-1zM24 16h1v1h-1zM26 16h1v1h-1zM28 16h1v1h-1zM29 16h1v1h-1zM30 16h1v1h-1zM2 17h1v1h-1zM3 17h1v1h-1zM4 17h1v1h-1zM6 17h1v1h-1zM11 17h1v1h-1zM12 17h1v1h-1zM14 17h1v1h-1zM15 17h1v1h-1zM23 17h1v1h-1zM26 17h1v1h-1zM29 17h1v1h-1zM2 18h1v1h-1zM5 18h1v1h-1zM6 18h1v1h-1zM7 18h1v1h-1zM8 18h1v1h-1zM9 18h1v1h-1zM11 18h1v1h-1zM13 18h1v1h-1zM18 18h1v1h-1zM21 18h1v1h-1zM22 18h1v1h-1zM23 18h1v1h-1zM26 18h1v1h-1zM27 18h1v1h-1zM29 18h1v1h-1zM3 19h1v1h-1zM5 19h1v1h-1zM6 19h1v1h-1zM9 19h1v1h-1zM10 19h1v1h-1zM14 19h1v1h-1zM15 19h1v1h-1zM17 19h1v1h-1zM18 19h1v1h-1zM19 19h1v1h-1zM22 19h1v1h-1zM25 19h1v1h-1zM27 19h1v1h-1zM28 19h1v1h-1zM29 19h1v1h-1zM2 20h1v1h-1zM5 20h1v1h-1zM6 20h1v1h-1zM7 20h1v1h-1zM8 20h1v1h-1zM9 20h1v1h-1zM10 20h1v1h-1zM12 20h1v1h-1zM13 20h1v1h-1zM14 20h1v1h-1zM17 20h1v1h-1zM19 20h1v1h-1zM22 20h1v1h-1zM24 20h1v1h-1zM25 20h1v1h-1zM26 20h1v1h-1zM28 20h1v1h-1zM9 21h1v1h-1zM14 21h1v1h-1zM17 21h1v1h-1zM18 21h1v1h-1zM19 21h1v1h-1zM20 21h1v1h-1zM21 21h1v1h-1zM23 21h1v1h-1zM24 21h1v1h-1zM28 21h1v1h-1zM3 22h1v1h-1zM4 22h1v1h-1zM6 22h1v1h-1zM8 22h1v1h-1zM10 22h1v1h-1zM11 22h1v1h-1zM13 22h1v1h-1zM14 22h1v1h-1zM15 22h1v1h-1zM17 22h1v1h-1zM18 22h1v1h-1zM20 22h1v1h-1zM21 22h1v1h-1zM22 22h1v1h-1zM23 22h1v1h-1zM24 22h1v1h-1zM25 22h1v1h-1zM26 22h1v1h-1zM27 22h1v1h-1zM28 22h1v1h-1zM10 23h1v1h-1zM11 23h1v1h-1zM14 23h1v1h-1zM15 23h1v1h-1zM16 23h1v1h-1zM18 23h1v1h-1zM19 23h1v1h-1zM20 23h1v1h-1zM22 23h1v1h-1zM26 23h1v1h-1zM27 23h1v1h-1zM28 23h1v1h-1zM29 23h1v1h-1zM30 23h1v1h-1zM2 24h1v1h-1zM3 24h1v1h-1zM4 24h1v1h-1zM5 24h1v1h-1zM6 24h1v1h-1zM7 24h1v1h-1zM8 24h1v1h-1zM11 24h1v1h-1zM12 24h1v1h-1zM13 24h1v1h-1zM14 24h1v1h-1zM15 24h1v1h-1zM18 24h1v1h-1zM19 24h1v1h-1zM20 24h1v1h-1zM21 24h1v1h-1zM22 24h1v1h-1zM24 24h1v1h-1zM26 24h1v1h-1zM27 24h1v1h-1zM29 24h1v1h-1zM2 25h1v1h-1zM8 25h1v1h-1zM11 25h1v1h-1zM20 25h1v1h-1zM22 25h1v1h-1zM26 25h1v1h-1zM27 25h1v1h-1zM29 25h1v1h-1zM2 26h1v1h-1zM4 26h1v1h-1zM5 26h1v1h-1zM6 26h1v1h-1zM8 26h1v1h-1zM12 26h1v1h-1zM14 26h1v1h-1zM16 26h1v1h-1zM17 26h1v1h-1zM19 26h1v1h-1zM22 26h1v1h-1zM23 26h1v1h-1zM24 26h1v1h-1zM25 26h1v1h-1zM26 26h1v1h-1zM28 26h1v1h-1zM29 26h1v1h-1zM2 27h1v1h-1zM4 27h1v1h-1zM5 27h1v1h-1zM6 27h1v1h-1zM8 27h1v1h-1zM10 27h1v1h-1zM11 27h1v1h-1zM12 27h1v1h-1zM13 27h1v1h-1zM14 27h1v1h-1zM16 27h1v1h-1zM17 27h1v1h-1zM18 27h1v1h-1zM23 27h1v1h-1zM26 27h1v1h-1zM27 27h1v1h-1zM30 27h1v1h-1zM2 28h1v1h-1zM4 28h1v1h-1zM5 28h1v1h-1zM6 28h1v1h-1zM8 28h1v1h-1zM10 28h1v1h-1zM13 28h1v1h-1zM15 28h1v1h-1zM19 28h1v1h-1zM20 28h1v1h-1zM22 28h1v1h-1zM23 28h1v1h-1zM25 28h1v1h-1zM28 28h1v1h-1zM30 28h1v1h-1zM2 29h1v1h-1zM8 29h1v1h-1zM10 29h1v1h-1zM11 29h1v1h-1zM12 29h1v1h-1zM13 29h1v1h-1zM16 29h1v1h-1zM17 29h1v1h-1zM18 29h1v1h-1zM22 29h1v1h-1zM23 29h1v1h-1zM26 29h1v1h-1zM27 29h1v1h-1zM29 29h1v1h-1zM2 30h1v1h-1zM3 30h1v1h-1zM4 30h1v1h-1zM5 30h1v1h-1zM6 30h1v1h-1zM7 30h1v1h-1zM8 30h1v1h-1zM10 30h1v1h-1zM14 30h1v1h-1zM16 30h1v1h-1zM17 30h1v1h-1zM20 30h1v1h-1zM22 30h1v1h-1zM24 30h1v1h-1zM25 30h1v1h-1zM27 30h1v1h-1zM29 30h1v1h-1z" fill="#111"/></svg>
+    <span>Vous pouvez aussi viser ce code avec l’appareil photo de votre téléphone.</span>
+  </div>
+
+  <h2>L’installer sur votre téléphone</h2>
+  <p>Momen2m ne se télécharge pas depuis une boutique d’applications. Vous l’ajoutez sur l’écran d’accueil de votre téléphone, et il se comporte ensuite comme une application normale. Cela prend deux minutes. Demander un coup de main à un proche est une très bonne idée.</p>
+
+  <div class="platforms">
+    <section class="platform">
+      <h3>Sur iPhone</h3>
+      <ol class="steps">
+        <li><span>Ouvrez <strong>Safari</strong> et allez sur <strong>purgator.github.io/Momen2m</strong>.</span></li>
+        <li><span>Appuyez sur le bouton <strong>Partager</strong> (le carré avec une flèche), puis sur <strong>Sur l’écran d’accueil</strong>, puis sur <strong>Ajouter</strong>.</span></li>
+        <li><span>Ouvrez Momen2m <strong>depuis la nouvelle icône</strong> sur votre écran d’accueil.</span></li>
+      </ol>
+    </section>
+    <section class="platform">
+      <h3>Sur Android</h3>
+      <ol class="steps">
+        <li><span>Ouvrez <strong>Chrome</strong> et allez sur <strong>purgator.github.io/Momen2m</strong>.</span></li>
+        <li><span>Appuyez sur <strong>Installer</strong> quand le téléphone vous le propose, ou ouvrez le menu <strong>⋮</strong> et choisissez <strong>Installer l’application</strong>.</span></li>
+        <li><span>Ouvrez Momen2m depuis votre écran d’accueil.</span></li>
+      </ol>
+    </section>
+  </div>
+
+  <p style="margin-top:20px">Ensuite, l’application vous guide en trois étapes. Quand elle vous demande l’autorisation de vous envoyer des notifications, répondez <strong>oui</strong>&nbsp;: c’est ainsi qu’elle pourra vous prévenir au bon moment.</p>
+
+  <h2>Pour commencer en douceur</h2>
+  <ul class="points">
+    <li><span class="ico">🌱</span><span>Commencez avec deux ou trois moments seulement. Vous pourrez en ajouter d’autres plus tard, quand vous en aurez envie.</span></li>
+    <li><span class="ico">⏰</span><span>Un rappel arrive au mauvais moment&nbsp;? <kbd>Reporter</kbd> le décale un peu. Vous ne pouvez pas aujourd’hui&nbsp;? <kbd>Passer</kbd> le met de côté, sans histoire.</span></li>
+    <li><span class="ico">🤝</span><span>Un proche peut vous aider à régler les moments et les heures. Une fois en place, il n’y a plus qu’à se laisser guider.</span></li>
+  </ul>
+
+  <div class="share">
+    <button class="btn secondary" type="button" id="share">Partager cette page</button>
+    <p id="share-msg"></p>
+  </div>
+
+  <footer>
+    <p>Momen2m est fait avec soin par une seule personne, sans entreprise derrière. Il est gratuit, sans publicité, et le restera. Son code est ouvert&nbsp;: <a href="https://github.com/Purgator/Momen2m">github.com/Purgator/Momen2m</a>.</p>
+  </footer>
+</main>
+<script>
+  (function () {
+    var btn = document.getElementById('share');
+    var msg = document.getElementById('share-msg');
+    var url = 'https://purgator.github.io/Momen2m/bienvenue.html';
+    btn.addEventListener('click', function () {
+      if (navigator.share) {
+        navigator.share({ title: 'Bienvenue sur Momen2m', text: 'Votre journée, un moment à la fois.', url: url }).catch(function () {});
+        return;
+      }
+      if (navigator.clipboard) {
+        navigator.clipboard.writeText(url).then(function () {
+          msg.textContent = 'Adresse copiée. Vous pouvez la coller dans un message.';
+        }, function () {
+          msg.textContent = url;
+        });
+      } else {
+        msg.textContent = url;
+      }
+    });
+  })();
+</script>
+</body>
+</html>

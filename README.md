@@ -15,6 +15,11 @@ Nothing else. No feed, no menus to dig through, no account.
 Works on **iPhone** (Safari) and **Android** (Chrome) as an installable web app. English and
 French, chosen automatically from your device.
 
+Sharing Momen2m with someone who has never heard of it? A warm, plain-language welcome page in
+French, with the install steps and a QR code, lives at
+**[purgator.github.io/Momen2m/bienvenue.html](https://purgator.github.io/Momen2m/bienvenue.html)** — it
+prints well too.
+
 ## Features
 
 - **Three tabs** — *Setup* to describe your moments, *Now* to live them, *Progress* to see how it's going.

@@ -10,7 +10,7 @@ const dist = path.join(root, 'dist');
 fs.rmSync(dist, { recursive: true, force: true });
 const stage = path.join(dist, 'Momen2m');
 fs.mkdirSync(stage, { recursive: true });
-const files = ['index.html', 'manifest.webmanifest', 'sw.js', 'version.js', 'css', 'js', 'icons', '.nojekyll', 'LICENSE'];
+const files = ['index.html', 'bienvenue.html', 'manifest.webmanifest', 'sw.js', 'version.js', 'css', 'js', 'icons', '.nojekyll', 'LICENSE'];
 for (const f of files) fs.cpSync(path.join(root, f), path.join(stage, f), { recursive: true });
 // Self-hosted copies get an empty relay config (no 404, no relay). Deployment-specific
 // values never ship in the zip: see relay.config.example.js.
