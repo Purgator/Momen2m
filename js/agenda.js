@@ -28,8 +28,10 @@ export function renderAgenda(now) {
   for (const p of active) {
     const pend = P.pendingDecision(p, today);
     if (pend) {
+      // Shown as soon as the step is done; what follows starts after the step's days, or the day of a later answer.
+      const when = today > pend.to ? t('agNextFromAnswer') : t('agNextOn', { day: dateOf(addDays(pend.to, 1)) });
       todayHtml += `<div class="card pad ag-decide"><div class="ag-q">🧭 ${esc(pend.block.decision.question) || t('agDecide')}</div>
-        <p class="hint ag-link" data-action="ag-detail" data-id="${p.id}">${goalTitle(p)} · ${stepName(p, pend.block)}</p>
+        <p class="hint ag-link" data-action="ag-detail" data-id="${p.id}">${goalTitle(p)} · ${stepName(p, pend.block)} · ${when}</p>
         <div class="btnrow wrap">${pend.block.decision.options.map((o, k) => `<button class="btn" data-action="ag-decide" data-id="${p.id}" data-i="${pend.i}" data-opt="${k}">${esc(o.label)}</button>`).join('')}</div></div>`;
     }
     for (const x of P.openTasks(p, today)) {
@@ -48,7 +50,7 @@ export function renderAgenda(now) {
     const { steps, decision } = P.projection(p);
     const stepRow = (x) => `${stepName(p, x.block)} <small class="muted">${daysText(x.block.days)} · ${t('agTasksN', { n: x.block.tasks.length })}</small>`;
     for (const x of sched.concat(steps)) if (x.from > today && x.from <= horizon) soon.push({ day: x.from, p, html: stepRow(x) });
-    if (decision && sched.length) {
+    if (decision && sched.length && !P.pendingDecision(p, today)) { // a question already asked above is not "coming up"
       const day = addDays(sched[sched.length - 1].to, 1);
       if (day > today && day <= horizon) soon.push({ day, p, html: `🧭 ${esc(decision.question) || t('agDecide')} <small class="muted">${decision.options.map((o) => esc(o.label)).join(' / ')}</small>` });
     }
@@ -61,7 +63,7 @@ export function renderAgenda(now) {
     const cur = sched.find((x) => x.from <= today && today <= x.to);
     const days = P.pathDays(p), idx = P.dayIndex(p, today), pct = P.goalPct(p, sched);
     const line = idx < 1 ? t('agStartsOn', { day: dateOf(p.startDay) }) : t('agDay', { x: Math.min(days, idx), n: days });
-    const sub = cur ? stepName(p, cur.block) : P.pendingDecision(p, today) ? t('agPending') : '';
+    const sub = P.pendingDecision(p, today) ? t('agPending') : cur ? stepName(p, cur.block) : '';
     return `<div class="card pad ag-goal" data-action="ag-detail" data-id="${p.id}">
       <div class="ag-head"><span class="ag-emo">${esc(p.emoji)}</span><div><div class="name">${esc(p.name)}</div>
         <div class="sub">${line}${sub ? ' · ' + sub : ''}</div></div><b class="ag-pct">${pctText(pct)}</b></div>
