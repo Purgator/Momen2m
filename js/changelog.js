@@ -3,6 +3,9 @@
 // exhaustive (the detailed notes live on the GitHub release). Both languages.
 export const CHANGELOG = {
   en: {
+    '1.33.0': [
+      '💌 A welcome page in French to share with someone new to Momen2m: purgator.github.io/Momen2m/bienvenue.html — a warm intro, the install steps and a QR code.',
+    ],
     '1.32.0': [
       '🧭 A quest question is asked as soon as every task of its step is done — no need to wait for the step’s last day.',
       '📅 Answer a question late and what follows starts the day you answer, instead of being backdated and already late.',
@@ -131,6 +134,9 @@ export const CHANGELOG = {
     '1.8.1': ['🔔 More reliable background reminders.'],
   },
   fr: {
+    '1.33.0': [
+      '💌 Une page de bienvenue en français à partager avec quelqu’un qui découvre Momen2m : purgator.github.io/Momen2m/bienvenue.html — une présentation chaleureuse, les étapes d’installation et un QR code.',
+    ],
     '1.32.0': [
       '🧭 La question d’une quête est posée dès que toutes les tâches de son étape sont faites — sans attendre le dernier jour de l’étape.',
       '📅 Réponds en retard et la suite commence le jour de ta réponse, au lieu d’être antidatée et déjà en retard.',
