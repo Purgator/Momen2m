@@ -46,7 +46,7 @@ jobs:
       - name: Stage site
         run: |
           mkdir -p _site
-          cp -r index.html manifest.webmanifest sw.js version.js relay.config.js css js icons .nojekyll LICENSE _site/
+          cp -r index.html bienvenue.html manifest.webmanifest sw.js version.js relay.config.js css js icons .nojekyll LICENSE _site/
       - uses: actions/upload-pages-artifact@v3
         with:
           path: _site
