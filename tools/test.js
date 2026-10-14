@@ -649,7 +649,7 @@ globalThis.window = globalThis;
     assert.strictEqual(P.openTasks(p, T.addDays(today, 3)).length, 0);
     assert.ok(P.decide(p, 1, 1, D(3, '10:00')));
     assert.deepStrictEqual(p.path, [b1.id, b2.id, b4.id], '"No" leads to the second coat');
-    assert.strictEqual(P.schedule(p)[2].from, T.addDays(today, 3), 'dated right after step 2, whatever day the answer came');
+    assert.strictEqual(P.schedule(p)[2].from, T.addDays(today, 3), 'dated right after step 2: the answer came the day it was first asked');
     P.completeTask(p, 2, tid(b4, 0), D(3, '11:00'));
     P.advance(D(4, '08:00'));
     assert.strictEqual(p.path[p.path.length - 1], b3.id);
@@ -708,6 +708,62 @@ globalThis.window = globalThis;
     P.advance(D(3, '08:00'));
     assert.ok(P.decide(p, 3, 1, D(4, '08:00')), 'second rest day over: "Stop" — the answer itself ends the quest');
     assert.deepStrictEqual([p.status, p.finished.pct, p.finished.days, p.finished.pts], ['done', 1, 4, 400], 'rest days count in the length but not in the completion');
+    S.state.plans = [];
+  });
+
+  await test('agenda: a question shows once its step is done; a late answer dates what follows from the answer day', async () => {
+    const P = await import(url('plans.js'));
+    S.state.plans = [];
+    Object.assign(S.state.game, { xp: 0, goalsDone: 0, goalsFlawless: 0, goalLongest: 0, goalTasks: 0, goalPts: 0 });
+    const tpl = P.newPlan(); tpl.name = 'Sprint';
+    const [b1] = tpl.blocks; b1.title = 'Try'; b1.days = 2; b1.tasks = [{ id: 'a', name: 'Run', emoji: '' }];
+    const b2 = P.newBlock(); b2.title = 'Again'; b2.tasks = [{ id: 'b', name: 'Run again', emoji: '' }];
+    tpl.blocks.push(b2);
+    b1.decision = { question: 'Once more?', options: [{ label: 'Again', next: b2.id }, { label: 'Stop', next: null }] };
+    S.state.plans.push(tpl);
+    const day = (n) => T.addDays(today, n);
+    // Early: the step is done on its first day, the question is asked right away, the step still runs its two days.
+    let p = P.start(tpl, today, D(0, '08:00'));
+    assert.strictEqual(P.pendingDecision(p, today), null, 'nothing to answer while the task is open');
+    P.completeTask(p, 0, p.blocks[0].tasks[0].id, D(0, '09:00'));
+    assert.strictEqual(P.pendingDecision(p, today).i, 0, 'every task done: the question is asked on day 1 of 2');
+    assert.deepStrictEqual([P.dueOn(today).questions, P.dueOn(day(1)).questions], [1, 1], 'and the reminder counts it from now on');
+    assert.ok(P.decide(p, 0, 0, D(0, '09:30')), '"Again" answered early');
+    assert.deepStrictEqual([P.pendingDecision(p, today), p.path.length], [null, 1], 'answered: no question, no new step yet');
+    assert.deepStrictEqual(P.advance(D(1, '08:00')), { finished: [], changed: false }, 'day 2 of the step: still running');
+    P.advance(D(2, '08:00'));
+    assert.deepStrictEqual([p.path.length, P.schedule(p)[1].from], [2, day(2)], 'the next step follows the days of the step, not the answer');
+    assert.deepStrictEqual([P.dayIndex(p, today), P.dayIndex(p, day(1)), P.dayIndex(p, day(2))], [1, 2, 3]);
+    assert.deepStrictEqual(P.completeTask(p, 1, p.blocks[1].tasks[0].id, D(2, '09:00')).pts, 15);
+    assert.strictEqual(P.advance(D(2, '09:00')).finished.length, 1, 'last step done: over');
+    // Late: the step ends unanswered on day 2; answered two days later, the next step starts that day — not already over.
+    p = P.start(tpl, today, D(0, '08:00'));
+    P.advance(D(2, '08:00'));
+    assert.strictEqual(P.pendingDecision(p, day(2)).i, 0, 'step over: the question waits');
+    P.advance(D(3, '08:00'));
+    assert.deepStrictEqual([p.path.length, P.dayIndex(p, day(3)), P.dueOn(day(3)).questions], [1, 2, 1], 'waiting: the quest stands at its 2 days walked');
+    assert.ok(P.decide(p, 0, 0, D(4, '09:00')));
+    const next = P.schedule(p)[1];
+    assert.deepStrictEqual([next.from, next.to], [day(4), day(4)], 'dated from the day of the answer');
+    const open = P.openTasks(p, day(4));
+    assert.deepStrictEqual(open.map((x) => [x.task.name, x.late, x.pts]), [['Run', true, 1], ['Run again', false, 5]], 'the new step is on time; the old task stays late');
+    assert.deepStrictEqual([P.dayIndex(p, day(4)), P.pathDays(p)], [3, 3], 'the gap does not count as quest days');
+    delete p.decidedOn;
+    assert.strictEqual(P.schedule(p)[1].from, day(2), 'a run saved before answers were dated: the old rule (no gap)');
+    P.forfeit(p, D(4, '10:00'));
+    // A step without tasks only asks once its days are over.
+    const rest = P.newPlan(); rest.name = 'Rest';
+    rest.blocks[0].days = 2; rest.blocks[0].decision = { question: 'More?', options: [{ label: 'Yes', next: rest.blocks[0].id }, { label: 'No', next: null }] };
+    S.state.plans.push(rest);
+    const r = P.start(rest, today, D(0, '08:00'));
+    assert.deepStrictEqual([P.pendingDecision(r, today), P.pendingDecision(r, day(1)), !!P.pendingDecision(r, day(2))], [null, null, true]);
+    P.forfeit(r, D(0, '10:00'));
+    // Early "Stop" with every task done: the quest ends on the spot, paid for its planned days.
+    p = P.start(tpl, today, D(0, '08:00'));
+    P.completeTask(p, 0, p.blocks[0].tasks[0].id, D(0, '09:00'));
+    const xp = S.state.game.xp;
+    assert.ok(P.decide(p, 0, 1, D(0, '09:30')));
+    assert.deepStrictEqual([p.status, p.finished.days, p.finished.flawless, S.state.game.xp - xp], ['done', 2, true, 200], '"Stop" on day 1: over, 50 × 2 days × 2');
     S.state.plans = [];
   });
 

@@ -3,6 +3,11 @@
 // exhaustive (the detailed notes live on the GitHub release). Both languages.
 export const CHANGELOG = {
   en: {
+    '1.32.0': [
+      '🧭 A quest question is asked as soon as every task of its step is done — no need to wait for the step’s last day.',
+      '📅 Answer a question late and what follows starts the day you answer, instead of being backdated and already late.',
+      '🔔 The daily quest reminder also mentions a question you have not answered yet.',
+    ],
     '1.31.0': [
       '🩺 New Share / Copy diagnostics buttons in Setup: one tap gives a report to send when a reminder goes missing.',
     ],
@@ -126,6 +131,11 @@ export const CHANGELOG = {
     '1.8.1': ['🔔 More reliable background reminders.'],
   },
   fr: {
+    '1.32.0': [
+      '🧭 La question d’une quête est posée dès que toutes les tâches de son étape sont faites — sans attendre le dernier jour de l’étape.',
+      '📅 Réponds en retard et la suite commence le jour de ta réponse, au lieu d’être antidatée et déjà en retard.',
+      '🔔 Le rappel quotidien des quêtes mentionne aussi une question restée sans réponse.',
+    ],
     '1.31.0': [
       '🩺 Nouveaux boutons Partager / Copier le diagnostic dans Réglages : un appui donne un rapport à envoyer quand un rappel n’arrive pas.',
     ],
