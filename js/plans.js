@@ -8,7 +8,7 @@
 // % behind.
 import { state, save, uid } from './store.js';
 import { addPlainXp } from './engine.js';
-import { dayKey, addDays, at, parseHM, minutesToHM } from './time.js';
+import { dayKey, addDays, dayStart, at, parseHM, minutesToHM } from './time.js';
 import { t } from './i18n.js';
 
 export const TASK_PTS = 5;          // a task done during its step
@@ -24,7 +24,7 @@ export function newBlock() { return { id: uid(), title: '', days: 1, tasks: [], 
 export function newTask() { return { id: uid(), name: '', emoji: '' }; }
 export function newPlan() {
   const b = newBlock();
-  return { id: uid(), kv: KEY_VERSION, name: '', emoji: '🎯', blocks: [b], root: b.id, status: 'draft', startDay: null, path: [], done: {}, decisions: {}, finished: null, createdAt: Date.now() };
+  return { id: uid(), kv: KEY_VERSION, name: '', emoji: '🎯', blocks: [b], root: b.id, status: 'draft', startDay: null, path: [], done: {}, decisions: {}, decidedOn: {}, finished: null, createdAt: Date.now() };
 }
 
 // A fresh draft with the same steps (new ids, links remapped).
@@ -42,7 +42,8 @@ export function clonePlan(p) {
 }
 
 export const blockOf = (p, id) => p.blocks.find((b) => b.id === id) || null;
-// Progress keys: "<path index>/<task id>"; decisions: by path index.
+// Progress keys: "<path index>/<task id>"; decisions (chosen option) and
+// decidedOn (the day of the answer) by path index.
 export const taskKey = (i, taskId) => i + '/' + taskId;
 export const isDone = (p, i, task) => !!p.done[taskKey(i, task.id)];
 
@@ -93,7 +94,9 @@ export function estimate(p) {
 }
 
 // The steps taken so far, dated: each starts the day after the previous one
-// ends, whatever day the question in between was answered.
+// ends — or, when the question in between was answered later than that, the
+// day of the answer (nothing is backdated, so the next step is not already
+// late the moment it begins).
 export function schedule(p) {
   const out = [];
   let day = p.startDay;
@@ -101,6 +104,8 @@ export function schedule(p) {
     const b = blockOf(p, id); if (!b || out.length < i) return;
     out.push({ i, block: b, from: day, to: addDays(day, b.days - 1) });
     day = addDays(day, b.days);
+    const answered = (p.decidedOn || {})[i];
+    if (b.decision && answered && answered > day) day = answered;
   });
   return out;
 }
@@ -113,15 +118,25 @@ export function goalPct(p, sched = schedule(p)) {
   return w ? s / w : 0;
 }
 export const pathDays = (p) => schedule(p).reduce((n, x) => n + x.block.days, 0);
+const daysBetween = (a, b) => Math.round((dayStart(b) - dayStart(a)) / 86400000);
+// Which day of the quest today is: 0 before it starts; in the step covering
+// today, the days walked before it plus the position inside it; while waiting
+// on an answer (between steps, or after the last one), the days walked so far.
 export function dayIndex(p, today) {
-  return Math.round((new Date(today + 'T12:00') - new Date(p.startDay + 'T12:00')) / 86400000) + 1;
+  let n = 0;
+  for (const x of schedule(p)) {
+    if (today < x.from) return n;
+    if (today <= x.to) return n + daysBetween(x.from, today) + 1;
+    n += x.block.days;
+  }
+  return n;
 }
 
 // Starting runs a copy: the saved quest stays in "Ready to start", and editing
 // the run never touches it. Not before today.
 export function start(template, day, now = Date.now()) {
   if (template.status !== 'draft' || !blockOf(template, template.root) || day < dayKey(new Date(now))) return null;
-  const run = { ...clonePlan(template), status: 'active', startDay: day, done: {}, decisions: {}, startedAt: now, templateId: template.id };
+  const run = { ...clonePlan(template), status: 'active', startDay: day, done: {}, decisions: {}, decidedOn: {}, startedAt: now, templateId: template.id };
   run.path = [run.root];
   state.plans.push(run);
   save();
@@ -138,12 +153,16 @@ export function forfeit(p, now) {
   return p.finished;
 }
 
-// The last step, when its days are over and its question is still unanswered.
+// The last step's question while it is unanswered: once the step's days are
+// over, or as soon as every task of the step is done (a step without tasks
+// only ends with its days). Answering early does not cut the step short.
 export function pendingDecision(p, today) {
   const sched = schedule(p);
   const last = sched[sched.length - 1];
-  if (!last || today <= last.to || !last.block.decision || p.decisions[last.i] !== undefined) return null;
-  return last;
+  if (!last || !last.block.decision || p.decisions[last.i] !== undefined) return null;
+  const over = today > last.to;
+  const done = today >= last.from && last.block.tasks.length > 0 && blockPct(p, last) >= 1;
+  return over || done ? last : null;
 }
 
 // What can be done today: the current step's tasks, plus earlier steps' (late).
@@ -202,6 +221,8 @@ export function decide(p, i, idx, now) {
   const x = schedule(p)[i];
   if (p.status !== 'active' || !x || !x.block.decision || !x.block.decision.options[idx]) return false;
   p.decisions[i] = idx;
+  if (!p.decidedOn) p.decidedOn = {};
+  p.decidedOn[i] = dayKey(new Date(now));
   save();
   advance(now);
   return true;
@@ -221,14 +242,15 @@ export function advance(now) {
       const last = sched[sched.length - 1];
       if (!last) break;
       const b = last.block;
-      // The final step with every task done: the quest is over, whatever days it had left.
-      if (!b.decision && !b.next && b.tasks.length && blockPct(p, last) >= 1) { changed = true; finished.push({ plan: p, ...finish(p, now) }); break; }
-      if (today <= last.to) break;
+      // What follows this step: a step id, null for the end, undefined while its question waits.
       let next;
-      if (b.decision) { const i = p.decisions[last.i]; if (i === undefined) break; next = (b.decision.options[i] || {}).next || null; }
-      else next = b.next;
+      if (b.decision) { const i = p.decisions[last.i]; next = i === undefined ? undefined : (b.decision.options[i] || {}).next || null; }
+      else next = b.next || null;
+      // The final step with every task done: the quest is over, whatever days it had left.
+      if (next !== undefined && !blockOf(p, next) && b.tasks.length && blockPct(p, last) >= 1) { changed = true; finished.push({ plan: p, ...finish(p, now) }); break; }
+      if (today <= last.to || next === undefined) break;
       changed = true;
-      if (next && blockOf(p, next)) { p.path.push(next); save(); continue; }
+      if (blockOf(p, next)) { p.path.push(next); save(); continue; }
       finished.push({ plan: p, ...finish(p, now) });
       break;
     }
@@ -323,7 +345,7 @@ export function dueOn(day) {
     for (const x of steps) if (x.from <= day) tasks += x.block.tasks.length; // by then, still doable (late at worst)
     if (decision && sched.length) {
       const end = steps.length ? steps[steps.length - 1].to : sched[sched.length - 1].to;
-      if (day > end) questions++;
+      if (day > end || pendingDecision(p, day)) questions++; // waiting by then, or already (every task of the step done)
     }
   }
   return { tasks, questions };
