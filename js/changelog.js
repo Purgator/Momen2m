@@ -3,9 +3,12 @@
 // exhaustive (the detailed notes live on the GitHub release). Both languages.
 export const CHANGELOG = {
   en: {
+    '1.36.1': [
+      '🔧 The “what changed” note of 1.36.0 showed garbled characters; fixed, with a check so it cannot ship again.',
+    ],
     '1.36.0': [
-      'ðŸ‘‰ Every tip in Progress is now tappable: turn notifications on, back up, edit the moment, jump to the right tabâ€¦',
-      'ðŸ’¬ A tip with nothing automatic behind it says so, with links to ask for a change or discuss the app on GitHub.',
+      '👉 Every tip in Progress is now tappable: turn notifications on, back up, edit the moment, jump to the right tab…',
+      '💬 A tip with nothing automatic behind it says so, with links to ask for a change or discuss the app on GitHub.',
     ],
     '1.35.0': [
       '🕒 A timing advice in Progress is now tappable: it proposes the moved window and applies it in one tap, or opens the editor prefilled.',
@@ -147,9 +150,12 @@ export const CHANGELOG = {
     '1.8.1': ['🔔 More reliable background reminders.'],
   },
   fr: {
+    '1.36.1': [
+      '🔧 La note « quoi de neuf » de la 1.36.0 affichait des caractères bizarres ; corrigé, avec un contrôle pour que ça ne reparte plus.',
+    ],
     '1.36.0': [
-      'ðŸ‘‰ Chaque conseil dans ProgrÃ¨s se touche : activer les notifications, sauvegarder, modifier le moment, aller au bon ongletâ€¦',
-      'ðŸ’¬ Un conseil sans action automatique le dit, avec des liens pour demander un changement ou discuter de lâ€™appli sur GitHub.',
+      '👉 Chaque conseil dans Progrès se touche : activer les notifications, sauvegarder, modifier le moment, aller au bon onglet…',
+      '💬 Un conseil sans action automatique le dit, avec des liens pour demander un changement ou discuter de l’appli sur GitHub.',
     ],
     '1.35.0': [
       '🕒 Un conseil d’horaire dans Progrès se touche : il propose le créneau déplacé et l’applique en un geste, ou ouvre l’éditeur prérempli.',
