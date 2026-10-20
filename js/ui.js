@@ -300,6 +300,7 @@ export function renderProgress(s, now, page = 0) {
         <div class="btnrow" style="margin-top:12px">
           <button class="btn primary" data-action="share-progress">📤 ${t('shareProgress')}</button>
           <button class="btn" data-action="share-app">💌 ${t('inviteFriend')}</button>
+          ${getLang() === 'fr' ? `<button class="btn" data-action="share-welcome">📄 ${t('shareWelcome')}</button>` : ''}
         </div>
       </div>
     </div>
