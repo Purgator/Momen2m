@@ -3,6 +3,9 @@
 // exhaustive (the detailed notes live on the GitHub release). Both languages.
 export const CHANGELOG = {
   en: {
+    '1.34.0': [
+      'ðŸ“„ New button in Progress â†’ Share (French): send the welcome page to someone new to Momen2m.',
+    ],
     '1.33.0': [
       '💌 A welcome page in French to share with someone new to Momen2m: purgator.github.io/Momen2m/bienvenue.html — a warm intro, the install steps and a QR code.',
     ],
@@ -134,6 +137,9 @@ export const CHANGELOG = {
     '1.8.1': ['🔔 More reliable background reminders.'],
   },
   fr: {
+    '1.34.0': [
+      'ðŸ“„ Nouveau bouton dans ProgrÃ¨s â†’ Partager : envoyer la page de bienvenue Ã  quelquâ€™un qui dÃ©couvre Momen2m.',
+    ],
     '1.33.0': [
       '💌 Une page de bienvenue en français à partager avec quelqu’un qui découvre Momen2m : purgator.github.io/Momen2m/bienvenue.html — une présentation chaleureuse, les étapes d’installation et un QR code.',
     ],

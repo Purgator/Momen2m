@@ -417,6 +417,7 @@ function checkRoughPatch(now) {
 
 // ---- sharing -------------------------------------------------------------------
 const APP_URL = 'https://purgator.github.io/Momen2m/';
+const WELCOME_URL = APP_URL + 'bienvenue.html';
 
 async function shareProgress(badge) {
   const now = Date.now();
@@ -453,6 +454,14 @@ async function shareProgress(badge) {
 
 async function shareApp() {
   const res = await share({ text: t('inviteText'), url: APP_URL });
+  if (res === 'shared' || res === 'copied') U.toast(t(res === 'shared' ? 'shared' : 'sharedCopied'), 'good');
+  else if (res === false) U.toast(t('shareFailed'), 'bad');
+}
+
+// The French welcome page (bienvenue.html): a warm intro with install steps,
+// meant for someone who has never heard of the app.
+async function shareWelcome() {
+  const res = await share({ text: t('welcomeText'), url: WELCOME_URL });
   if (res === 'shared' || res === 'copied') U.toast(t(res === 'shared' ? 'shared' : 'sharedCopied'), 'good');
   else if (res === false) U.toast(t('shareFailed'), 'bad');
 }
@@ -650,6 +659,7 @@ const SHELL_ACTIONS = {
   },
   'share-progress': () => { shareProgress(); },
   'share-app': () => { shareApp(); },
+  'share-welcome': () => { shareWelcome(); },
   'greet-dismiss': () => { state.game.greeting = null; save(); N.feedback('tap'); refresh(); },
   'pause-info': (btn, now) => {
     N.feedback('tap');
