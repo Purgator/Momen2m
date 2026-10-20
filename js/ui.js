@@ -15,6 +15,12 @@ import { PRESETS } from './presets.js';
 import { QUESTIONS, isTriggered, reviewStatus } from './setup.js';
 import { BASE_PTS, PAUSE_MAX, canSnooze, currentOf, todayPoints, boostActive, pausedUntil } from './engine.js';
 import { levelInfo, BADGES, BADGE_PAGE, badgeProgress, tips as gameTips } from './game.js';
+
+// What a tap on a tip does, as the i18n key of its row label (app.js acts on it).
+const TIP_GO = {
+  adviceEarlier: 'adviceTap', adviceLater: 'adviceTap', tipNotif: 'tipGoNotif', tipBackup: 'tipGoBackup',
+  tipHardest: 'tipGoEdit', tipSnooze: 'tipGoMoments', tipLeftToday: 'tipGoNow', tipStreakKeep: 'tipGoNow', tipNearLevel: 'tipGoLevel',
+};
 import { pointsOn as agendaPointsOn, dueOn as questsDueOn, reminderHM as questReminderHM } from './plans.js';
 import { fmtClock, fmtCountdown, fmtDuration, fmtAgo, fmtDay, fmtDateTime, fmtWhenShort, dayKey } from './time.js';
 import { permission, TONE_NAMES, PATTERN_NAMES } from './notify.js';
@@ -292,9 +298,10 @@ export function renderProgress(s, now, page = 0) {
       <h2>${t('tipsTitle')}</h2>
       <div class="card tips">${tipList.map((x) => {
         const text = t(x.key, x.vars ? { ...x.vars, name: x.vars.name ? habitName({ name: x.vars.name }) : '' } : undefined);
-        // A timing advice is a tap away from being applied: it opens the schedule sheet.
-        if (x.habitId) return `<p class="advice" role="button" tabindex="0" data-action="advice" data-id="${esc(x.habitId)}" data-slot="${x.slot}" data-to="${esc(x.vars.to)}">💡 ${text}<span class="go">${t('adviceTap')} ›</span></p>`;
-        return `<p>💡 ${text}</p>`;
+        // Every tip is a tap away from acting on it (see the `tip` action in app.js);
+        // the label says what the tap does, "More" when the app has nothing automatic.
+        const go = TIP_GO[x.key] || 'tipGoMore';
+        return `<p class="advice" role="button" tabindex="0" data-action="tip" data-key="${esc(x.key)}" ${x.habitId ? `data-id="${esc(x.habitId)}"` : ''} ${x.slot !== undefined ? `data-slot="${x.slot}" data-to="${esc(x.vars.to)}"` : ''}>💡 ${text}<span class="go">${t(go)} ›</span></p>`;
       }).join('')}</div>
     </div>
 

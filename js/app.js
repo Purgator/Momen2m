@@ -823,15 +823,24 @@ const MOMENT_ACTIONS = {
     });
   },
   'edit': (btn) => { const h = findHabit(btn.dataset.id); if (h) editHabit(h); },
-  // A timing advice from Progress: propose the shifted window, apply it in a tap
-  // or hand the prefilled editor over for a finer adjustment.
-  'advice': (btn) => {
-    const h = findHabit(btn.dataset.id); if (!h) return;
-    const i = Number(btn.dataset.slot); if (!h.slots || !h.slots[i]) return;
-    U.openAdviceSheet(h, i, btn.dataset.to, {
-      onApply: (slot) => { h.slots[i] = slot; touchHabits(); save(); refresh(); U.toast(t('adviceApplied'), 'good'); },
-      onAdjust: (slot) => { const draft = JSON.parse(JSON.stringify(h)); draft.slots[i] = slot; editHabit(h, draft); },
-    });
+  // A tip tapped in Progress: act on it when the app can (labels in ui.js's
+  // TIP_GO), otherwise say so and point to GitHub.
+  'tip': (btn, now, e) => {
+    const k = btn.dataset.key, h = btn.dataset.id ? findHabit(btn.dataset.id) : null;
+    if (k === 'adviceEarlier' || k === 'adviceLater') {
+      // Propose the shifted window: apply it in a tap, or refine it in the prefilled editor.
+      const i = Number(btn.dataset.slot); if (!h || !h.slots || !h.slots[i]) return;
+      U.openAdviceSheet(h, i, btn.dataset.to, {
+        onApply: (slot) => { h.slots[i] = slot; touchHabits(); save(); refresh(); U.toast(t('adviceApplied'), 'good'); },
+        onAdjust: (slot) => { const draft = JSON.parse(JSON.stringify(h)); draft.slots[i] = slot; editHabit(h, draft); },
+      });
+    } else if (k === 'tipNotif') SETUP_ACTIONS['notif-enable'](btn, now, e);
+    else if (k === 'tipBackup') SETUP_ACTIONS['export'](btn, now, e);
+    else if (k === 'tipHardest' && h) editHabit(h);
+    else if (k === 'tipSnooze') { showView('moments'); scrollTo(0, 0); }
+    else if (k === 'tipLeftToday' || k === 'tipStreakKeep') { showView('live'); scrollTo(0, 0); }
+    else if (k === 'tipNearLevel') U.openExplainSheet('level', G.computeStats(now, occs), occs);
+    else U.openTipNoActionSheet();
   },
   'tpl-del': (btn) => {
     state.templates = state.templates.filter((x) => x.id !== btn.dataset.id);
