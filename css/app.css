@@ -508,6 +508,9 @@ textarea.input { resize: vertical; }
 .hrow .pct.low { color: var(--warn); }
 .tips p { padding: 8px 0; border-bottom: 1px solid var(--line); font-size: 14px; }
 .tips p:last-child { border-bottom: 0; }
+.tips p.advice { cursor: pointer; }
+.tips p.advice .go { display: block; margin-top: 4px; color: var(--accent2); font-weight: 600; }
+.tips p.advice:active { opacity: .7; }
 .ladder { margin-top: 12px; }
 .lrow { display: flex; justify-content: space-between; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--line); font-size: 14px; }
 .lrow:last-child { border-bottom: 0; }

@@ -200,6 +200,19 @@ document.addEventListener('visibilitychange', () => {
 const findOcc = (key) => occs.find((o) => o.key === key);
 const findHabit = (id) => state.habits.find((h) => h.id === id);
 
+// The editor over an existing moment; `draft` is what it opens on (defaults to
+// the moment itself — a prefilled copy lets a suggestion be refined before saving).
+function editHabit(h, draft = h) {
+  U.openHabitSheet(draft, (data) => {
+    // Keep translatable preset texts when the user did not change them.
+    if (typeof h.name === 'object' && data.name === pick(h.name)) data.name = h.name;
+    if (typeof h.desc === 'object' && data.desc === pick(h.desc)) data.desc = h.desc;
+    if (G.nameConflict({ ...h, ...data })) { U.toast(t('nameTaken'), 'bad'); return false; }
+    Object.assign(h, data); touchHabits(); save(); refresh();
+  },
+    () => { state.habits = state.habits.filter((x) => x !== h); touchHabits(); save(); refresh(); });
+}
+
 // Premade one-time moments: only one per emoji + name. Saving over another
 // premade (not the one being edited) is an edit of that one, so it asks
 // first. Returns false when the user backs out.
@@ -809,16 +822,16 @@ const MOMENT_ACTIONS = {
       touchHabits(); save(); refresh();
     });
   },
-  'edit': (btn) => {
+  'edit': (btn) => { const h = findHabit(btn.dataset.id); if (h) editHabit(h); },
+  // A timing advice from Progress: propose the shifted window, apply it in a tap
+  // or hand the prefilled editor over for a finer adjustment.
+  'advice': (btn) => {
     const h = findHabit(btn.dataset.id); if (!h) return;
-    U.openHabitSheet(h, (data) => {
-      // Keep translatable preset texts when the user did not change them.
-      if (typeof h.name === 'object' && data.name === pick(h.name)) data.name = h.name;
-      if (typeof h.desc === 'object' && data.desc === pick(h.desc)) data.desc = h.desc;
-      if (G.nameConflict({ ...h, ...data })) { U.toast(t('nameTaken'), 'bad'); return false; }
-      Object.assign(h, data); touchHabits(); save(); refresh();
-    },
-      () => { state.habits = state.habits.filter((x) => x !== h); touchHabits(); save(); refresh(); });
+    const i = Number(btn.dataset.slot); if (!h.slots || !h.slots[i]) return;
+    U.openAdviceSheet(h, i, btn.dataset.to, {
+      onApply: (slot) => { h.slots[i] = slot; touchHabits(); save(); refresh(); U.toast(t('adviceApplied'), 'good'); },
+      onAdjust: (slot) => { const draft = JSON.parse(JSON.stringify(h)); draft.slots[i] = slot; editHabit(h, draft); },
+    });
   },
   'tpl-del': (btn) => {
     state.templates = state.templates.filter((x) => x.id !== btn.dataset.id);

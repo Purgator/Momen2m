@@ -231,6 +231,29 @@ export function openHabitSheet(habit, onSave, onDelete) {
   setTimeout(() => { if (!habit) nameIn.focus(); }, 300);
 }
 
+// A timing advice, tapped: the moment's window as it is and as proposed (same
+// length, shifted start). onApply(slot) sets it; onAdjust(slot) opens the editor.
+export function openAdviceSheet(habit, slotIndex, toStart, { onApply, onAdjust }) {
+  const cur = habit.slots[slotIndex];
+  const len = durationOf(cur);
+  const next = { start: toStart, end: minutesToHM(parseHM(toStart) + len) };
+  const today = dayKey(new Date());
+  const range = (s) => slotOf({ start: at(today, s.start), end: at(today, s.end) }); // device clock format
+  const el = openSheet(`
+    <h2>🕒 ${esc(habit.emoji)} ${habitName(habit)}</h2>
+    <p class="hint" style="margin-top:6px">${t('adviceSheetHint')}</p>
+    <div class="card ladder">
+      <div class="lrow"><span class="muted">${t('adviceNow')}</span><span>${range(cur)}</span></div>
+      <div class="lrow on"><span>${t('adviceProposed')}</span><span>${range(next)}</span></div>
+    </div>
+    <div class="btnrow">
+      <button class="btn ghost" data-adjust>${t('adviceAdjust')}</button>
+      <button class="btn primary" data-apply>${t('adviceApply')}</button>
+    </div>`);
+  $('[data-apply]', el).addEventListener('click', () => { closeSheet(); onApply(next); });
+  $('[data-adjust]', el).addEventListener('click', () => { onAdjust(next); });
+}
+
 // One-off task. onAdd({ name, emoji, minutes, importance })
 // `templates` are premade one-time moments: a tap fills the form; the "Save as
 // premade" switch turns Add into Save + Add (onSaveTemplate gets the same data).
