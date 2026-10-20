@@ -3,6 +3,9 @@
 // exhaustive (the detailed notes live on the GitHub release). Both languages.
 export const CHANGELOG = {
   en: {
+    '1.35.0': [
+      '🕒 A timing advice in Progress is now tappable: it proposes the moved window and applies it in one tap, or opens the editor prefilled.',
+    ],
     '1.34.1': [
       '🔧 The “what changed” note of the last update showed garbled characters; fixed.',
     ],
@@ -140,6 +143,9 @@ export const CHANGELOG = {
     '1.8.1': ['🔔 More reliable background reminders.'],
   },
   fr: {
+    '1.35.0': [
+      '🕒 Un conseil d’horaire dans Progrès se touche : il propose le créneau déplacé et l’applique en un geste, ou ouvre l’éditeur prérempli.',
+    ],
     '1.34.1': [
       '🔧 La note « ce qui a changé » de la dernière mise à jour affichait des caractères illisibles ; corrigé.',
     ],
