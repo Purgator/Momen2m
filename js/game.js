@@ -234,7 +234,7 @@ export function tips(s, max = 3) {
   if (perm === 'default') out.push({ key: 'tipNotif' });
   if (needsBackup()) out.push({ key: 'tipBackup' });
   const hardest = s.perHabit.filter((p) => p.total >= 3 && p.rate !== null && p.rate < 0.5).sort((a, b) => a.rate - b.rate)[0];
-  if (hardest) out.push({ key: 'tipHardest', vars: { name: hardest.habit.name, emoji: hardest.habit.emoji, pct: Math.round(hardest.rate * 100) } });
+  if (hardest) out.push({ key: 'tipHardest', vars: { name: hardest.habit.name, emoji: hardest.habit.emoji, pct: Math.round(hardest.rate * 100) }, habitId: hardest.habit.id });
   if (s.period.snoozes >= 5) out.push({ key: 'tipSnooze', vars: { n: s.period.snoozes } });
   if (s.period.done >= 5 && s.period.early / s.period.done < 0.3) out.push({ key: 'tipEarly' });
   if (s.streak === 0 && s.bestStreak > 0) out.push({ key: 'tipStreakBack', vars: { n: s.bestStreak } });

@@ -254,6 +254,20 @@ export function openAdviceSheet(habit, slotIndex, toStart, { onApply, onAdjust }
   $('[data-adjust]', el).addEventListener('click', () => { onAdjust(next); });
 }
 
+// A tip with nothing automatic behind it: say so, and show where to ask for
+// changes (GitHub issues) or talk about the app (GitHub discussions).
+export function openTipNoActionSheet() {
+  const el = openSheet(`
+    <h2>💡 ${t('tipNoActionTitle')}</h2>
+    <p class="hint" style="margin-top:6px">${t('tipNoActionBody')}</p>
+    <div class="btnrow" style="margin-top:14px">
+      <a class="btn ghost" href="https://github.com/Purgator/Momen2m/discussions" target="_blank" rel="noopener">💬 ${t('tipNoActionDiscuss')}</a>
+      <a class="btn primary" href="https://github.com/Purgator/Momen2m/issues" target="_blank" rel="noopener">✨ ${t('tipNoActionAsk')}</a>
+    </div>
+    <div class="btnrow"><button class="btn ghost wide" data-close>${t('ok')}</button></div>`);
+  $('[data-close]', el).addEventListener('click', closeSheet);
+}
+
 // One-off task. onAdd({ name, emoji, minutes, importance })
 // `templates` are premade one-time moments: a tap fills the form; the "Save as
 // premade" switch turns Add into Save + Add (onSaveTemplate gets the same data).
