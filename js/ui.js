@@ -290,7 +290,12 @@ export function renderProgress(s, now, page = 0) {
 
     <div class="section">
       <h2>${t('tipsTitle')}</h2>
-      <div class="card tips">${tipList.map((x) => `<p>💡 ${t(x.key, x.vars ? { ...x.vars, name: x.vars.name ? habitName({ name: x.vars.name }) : '' } : undefined)}</p>`).join('')}</div>
+      <div class="card tips">${tipList.map((x) => {
+        const text = t(x.key, x.vars ? { ...x.vars, name: x.vars.name ? habitName({ name: x.vars.name }) : '' } : undefined);
+        // A timing advice is a tap away from being applied: it opens the schedule sheet.
+        if (x.habitId) return `<p class="advice" role="button" tabindex="0" data-action="advice" data-id="${esc(x.habitId)}" data-slot="${x.slot}" data-to="${esc(x.vars.to)}">💡 ${text}<span class="go">${t('adviceTap')} ›</span></p>`;
+        return `<p>💡 ${text}</p>`;
+      }).join('')}</div>
     </div>
 
     <div class="section">
