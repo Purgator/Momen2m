@@ -47,6 +47,21 @@ Release flow, in order:
 3. Commit, tag `vX.Y.Z`, push (GitHub Pages deploys from `main`).
 4. `npm run package`, then `gh release create`.
 
+## Text encoding (Windows)
+
+Non-ASCII text (emoji, accents, curly quotes) gets double-encoded when it goes
+through the shell: a heredoc piped into `python -`, a `git commit -m "✨ …"`
+argument, `echo` into a file. It has reached users twice as garbled "what
+changed" notes. So:
+
+- write or edit source files with the file tools (Write/Edit), or with a script
+  saved as a UTF-8 file and run by path — never from a shell heredoc or `-c`;
+- commit messages go through a UTF-8 file: `git commit -F msg.txt`;
+- `npm test` fails and `node tools/bump.js` refuses to bump when any text file
+  holds mojibake (`tools/checktext.js`), and bump also refuses when
+  `js/changelog.js` lacks an entry for the version in `en` or `fr`. Do not
+  bypass them: fix the text.
+
 ## Product constraints
 
 - Never mention ADHD in the app or docs (explicit user request).

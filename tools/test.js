@@ -927,5 +927,14 @@ globalThis.window = globalThis;
     assert.strictEqual(E.missRun(D(1, '08:31')).run, 1, 'a fresh miss the next day starts a new count');
   });
 
+  await test('source texts: valid UTF-8, no BOM, no mojibake (what users would see as garbled characters)', () => {
+    const { mojibake, checkTree } = require('./checktext.js');
+    assert.ok(mojibake('\u00f0\u0178\u2018\u2030 Every tip'), 'a 4-byte emoji read as cp1252');
+    assert.ok(mojibake('\u00c3\u00a9t\u00c3\u00a9'), 'accents read as cp1252');
+    assert.ok(mojibake('l\u00e2\u20ac\u2122appli'), 'a curly apostrophe read as cp1252');
+    assert.ok(!mojibake('été… café — l’appli 👉 💬 Ça va à Progrès'), 'real French and emoji pass');
+    assert.deepStrictEqual(checkTree(path.join(__dirname, '..')), []);
+  });
+
   console.log(`\n${passed} tests passed`);
 })().catch((e) => { console.error(e); process.exit(1); });
