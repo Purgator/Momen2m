@@ -3,6 +3,7 @@
   "private": true,
   "type": "module",
   "description": "Momen2m push relay: a Cloudflare Worker that sends Web Push reminders at the right time.",
+  "license": "GPL-3.0-or-later",
   "scripts": {
     "deploy": "wrangler deploy",
     "dev": "wrangler dev",

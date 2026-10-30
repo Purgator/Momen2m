@@ -307,4 +307,4 @@ unreachable the app says so in Setup and keeps reminding on screen as before.
 
 ## License
 
-[MIT](LICENSE)
+[GNU General Public License v3.0 or later](LICENSE) (`GPL-3.0-or-later`)

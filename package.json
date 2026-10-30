@@ -10,5 +10,5 @@
     "package": "node tools/package.js",
     "test": "node --no-warnings tools/test.js && node relay/test.js"
   },
-  "license": "MIT"
+  "license": "GPL-3.0-or-later"
 }
