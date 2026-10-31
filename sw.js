@@ -34,6 +34,7 @@ const ASSETS = [
   './js/plan.js',
   './js/plans.js',
   './js/agenda.js',
+  './js/shop.js',
   './js/qr.js',
   './js/questPresets.js',
   './js/push.js',

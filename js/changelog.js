@@ -3,6 +3,9 @@
 // exhaustive (the detailed notes live on the GitHub release). Both languages.
 export const CHANGELOG = {
   en: {
+    '1.37.0': [
+      '🏪 Rewards shop: earn coins by completing moments, spend them on treats you choose. Unlock it by tapping the version 7 times in Setup.',
+    ],
     '1.36.1': [
       '🔧 The “what changed” note of 1.36.0 showed garbled characters; fixed, with a check so it cannot ship again.',
     ],
@@ -150,6 +153,9 @@ export const CHANGELOG = {
     '1.8.1': ['🔔 More reliable background reminders.'],
   },
   fr: {
+    '1.37.0': [
+      '🏪 Boutique de récompenses : gagnez des pièces en complétant des moments, dépensez-les pour des récompenses de votre choix. Déverrouillez-la en appuyant 7 fois sur la version dans Réglages.',
+    ],
     '1.36.1': [
       '🔧 La note « quoi de neuf » de la 1.36.0 affichait des caractères bizarres ; corrigé, avec un contrôle pour que ça ne reparte plus.',
     ],

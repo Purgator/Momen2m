@@ -521,3 +521,15 @@ textarea.input { resize: vertical; }
 .dot-day { width: 38px; height: 44px; border-radius: 12px; background: var(--card); border: 1px solid var(--line); display: flex; flex-direction: column; align-items: center; justify-content: center; font-weight: 800; color: var(--muted); }
 .dot-day small { font-size: 10px; font-weight: 700; }
 .dot-day.ok { color: var(--ok); border-color: var(--ok); } .dot-day.ko { color: var(--danger); border-color: var(--danger); }
+
+/* ---- Rewards shop ---- */
+.coin-balance { font-size: 22px; font-weight: 800; text-align: center; padding: 12px 0; }
+.treat { background: var(--card); border-radius: 12px; padding: 12px; margin-bottom: 10px; border: 1px solid var(--line); }
+.treat.poor { opacity: .55; }
+.treat-head { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+.treat-head .emo { font-size: 24px; }
+.treat-head .name { flex: 1; font-weight: 600; font-size: 15px; }
+.treat-head .price { font-weight: 700; color: var(--muted); font-size: 14px; }
+.treat .btnrow { justify-content: flex-end; gap: 6px; }
+.input-row { display: flex; gap: 6px; align-items: center; }
+.input-row .text { width: 60px; text-align: center; }

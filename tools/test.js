@@ -602,6 +602,54 @@ globalThis.window = globalThis;
     S.state.game.pauseLog = [];
   });
 
+  await test('coins: earned from gains, spent on treats, refunded on undo', () => {
+    S.state.habits = [habit('c1', '10:00', '11:00', { importance: 2 })];
+    S.state.days = {};
+    Object.assign(S.state.game, { xp: 0, coins: 0, treats: [], boostUntil: 0, pauseTokens: 0, pauseXp: 0, pauseLog: [] });
+
+    const o = E.buildOccurrences(D(0, '10:05')).find((x) => x.habit.id === 'c1');
+    E.complete(o, D(0, '10:05'));
+    assert.strictEqual(S.state.game.coins, 6, '30 pts (early bonus) / 5 = 6 coins');
+
+    // Undo refunds coins
+    const refunded = E.undo(o);
+    assert.strictEqual(refunded, true);
+    assert.strictEqual(S.state.game.coins, 0, 'coins refunded on undo');
+
+    // Late completion (after midpoint) earns base only
+    S.state.days = {};
+    const o2 = E.buildOccurrences(D(1, '10:40')).find((x) => x.habit.id === 'c1');
+    E.complete(o2, D(1, '10:40'));
+    assert.strictEqual(S.state.game.coins, 4, '20 pts (no early bonus) / 5 = 4 coins');
+
+    // Miss does not affect coins
+    S.state.days = {};
+    E.tick(D(2, '12:00'), { onMissed: () => {} });
+    assert.strictEqual(S.state.game.coins, 4, 'miss does not reduce coins');
+
+    // Buy treat
+    S.state.game.treats = [{ id: 't1', emoji: '☕', name: { en: 'Coffee' }, price: 3 }];
+    const bought = E.buyTreat('t1');
+    assert.strictEqual(bought.emoji, '☕');
+    assert.strictEqual(S.state.game.coins, 1, '3 coins spent');
+
+    // Buy when insufficient funds
+    assert.strictEqual(E.buyTreat('t1'), null, 'not enough coins');
+    assert.strictEqual(S.state.game.coins, 1, 'coins unchanged');
+
+    // Add/remove treat
+    E.addTreat({ id: 't2', emoji: '🍕', name: { en: 'Pizza' }, price: 10 });
+    assert.strictEqual(S.state.game.treats.length, 2);
+    E.removeTreat('t2');
+    assert.strictEqual(S.state.game.treats.length, 1);
+
+    // Coins never go negative
+    S.state.game.coins = 2;
+    E.addTreat({ id: 't3', emoji: '💰', name: { en: 'Expensive' }, price: 5 });
+    assert.strictEqual(E.buyTreat('t3'), null, 'insufficient funds');
+    assert.strictEqual(S.state.game.coins, 2);
+  });
+
   await test('agenda: dated steps, 5 pts a task (1 late), step bonus, questions branch, flawless goal pays double', async () => {
     const P = await import(url('plans.js'));
     S.state.plans = [];

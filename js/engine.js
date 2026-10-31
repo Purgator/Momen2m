@@ -81,7 +81,7 @@ export function currentOf(list) {
 function applyXp(delta) {
   const before = state.game.xp;
   state.game.xp = Math.max(0, before + delta);
-  if (delta > 0) earnPause(delta);
+  if (delta > 0) { earnPause(delta); earnCoins(delta); }
   return state.game.xp - before;
 }
 // Points from outside the moments (the Agenda): no boost, no pause tokens.
@@ -121,6 +121,44 @@ function earnPause(delta) {
   g.pauseXp = (g.pauseXp || 0) + delta;
   while (g.pauseXp >= PAUSE_XP && g.pauseTokens < PAUSE_MAX) { g.pauseXp -= PAUSE_XP; g.pauseTokens++; }
   if (g.pauseTokens >= PAUSE_MAX) g.pauseXp = 0;
+}
+
+// ---- coins (rewards shop) ----------------------------------------------------
+// Coins are earned from positive gains only, proportional to points. They are
+// never clawed back by misses or skips, so the shop never feels punitive.
+// One coin per COIN_XP points earned (before boost). Undo refunds coins.
+export const COIN_XP = 5; // 1 coin per 5 points of positive gain
+function earnCoins(delta) {
+  const earned = Math.floor(delta / COIN_XP);
+  if (earned > 0) state.game.coins = (state.game.coins || 0) + earned;
+}
+
+// Spend coins on a treat. Returns the treat or null if insufficient funds.
+export function buyTreat(treatId) {
+  const g = state.game;
+  const treats = g.treats || [];
+  const treat = treats.find((t) => t.id === treatId);
+  if (!treat || (g.coins || 0) < treat.price) return null;
+  g.coins -= treat.price;
+  save();
+  return treat;
+}
+
+// Add or update a treat in the list.
+export function addTreat(treat) {
+  const g = state.game;
+  g.treats = g.treats || [];
+  const idx = g.treats.findIndex((t) => t.id === treat.id);
+  if (idx >= 0) g.treats[idx] = treat;
+  else g.treats.push(treat);
+  save();
+}
+
+// Remove a treat from the list.
+export function removeTreat(treatId) {
+  const g = state.game;
+  g.treats = (g.treats || []).filter((t) => t.id !== treatId);
+  save();
 }
 
 // A 12 h "+50 % points" boost, granted after a rough patch (see app.js).
@@ -326,11 +364,15 @@ export function undo(o) {
   rec.early = false;
   // Snooze penalties stay; only the done/skip points are reverted — plainly:
   // a reverted penalty is not a gain, and a reverted gain takes back the pause
-  // progress it had filled.
+  // progress it had filled, and the coins it had granted.
   const snoozePts = -rec.snoozes * SNOOZE_PENALTY;
   const gain = (rec.pts || 0) - snoozePts;
   addPlainXp(-(rec.xp === undefined ? gain : rec.xp));
-  if (gain > 0) state.game.pauseXp = Math.max(0, (state.game.pauseXp || 0) - gain);
+  if (gain > 0) {
+    state.game.pauseXp = Math.max(0, (state.game.pauseXp || 0) - gain);
+    const refundedCoins = Math.floor(gain / COIN_XP);
+    state.game.coins = Math.max(0, (state.game.coins || 0) - refundedCoins);
+  }
   delete rec.xp;
   rec.pts = snoozePts;
   rec.status = 'open';

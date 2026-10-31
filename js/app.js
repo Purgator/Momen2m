@@ -21,6 +21,7 @@ import * as Diag from './diag.js';
 import * as P from './plans.js';
 import * as A from './agenda.js';
 import { seedOnce as seedQuestPresets } from './questPresets.js';
+import * as S from './shop.js';
 
 // Ask the browser not to garbage-collect this origin's storage under pressure.
 // Silent and best-effort: it cannot be forced, and some browsers ignore it.
@@ -33,10 +34,15 @@ const isIos = /iphone|ipad|ipod/i.test(navigator.userAgent);
 const standalone = matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
 const isIosBrowser = isIos && !standalone;
 
-const VIEWS = ['live', 'progress', 'moments', 'agenda', 'setup'];
-const viewAllowed = (v) => VIEWS.includes(v) && (v !== 'agenda' || state.settings.agenda !== false);
+const VIEWS = ['live', 'progress', 'moments', 'agenda', 'shop', 'setup'];
+const viewAllowed = (v) => VIEWS.includes(v)
+  && (v !== 'agenda' || state.settings.agenda !== false)
+  && (v !== 'shop' || state.settings.shop !== false);
 let view = !state.onboarded ? 'ob' : viewAllowed(state.lastView) ? state.lastView : 'live';
 let occs = [];
+// Secret gesture: tap the version row 7 times to unlock the shop
+let versionTapCount = 0;
+let versionTapTimer = 0;
 const phases = new Map();       // occurrence key -> last seen phase
 const fresh = new Set();        // keys that just changed phase (animate once)
 const expanded = new Set();     // keys of secondary active moments tapped open
@@ -102,6 +108,8 @@ function render(now = Date.now()) {
     const seeded = seedQuestPresets();
     if (seeded) setTimeout(() => U.toast('🗺️ ' + t('agSeeded', { n: seeded }), 'good', { ms: 6000 }), 400);
     app.innerHTML = A.renderAgenda(now);
+  } else if (view === 'shop') {
+    app.innerHTML = S.renderShop(now);
   } else if (view === 'progress') {
     occs = E.buildOccurrences(now);
     const stats = G.computeStats(now, occs);
@@ -812,6 +820,86 @@ const QUEST_ACTIONS = {
   'ag-import': () => { A.openImportSheet('', addImportedPlan); },
 };
 
+// the Rewards shop tab
+const SHOP_ACTIONS = {
+  'treat-new': () => {
+    S.openTreatSheet(null, {
+      onSave: (treat) => { E.addTreat(treat); N.feedback('tap'); render(); },
+    });
+  },
+  'treat-edit': (btn) => {
+    const treat = (state.game.treats || []).find((t) => t.id === btn.dataset.id);
+    if (!treat) return;
+    S.openTreatSheet(treat, {
+      onSave: (updated) => { E.addTreat(updated); N.feedback('tap'); render(); },
+    });
+  },
+  'treat-save': (btn) => {
+    // The sheet is already open; we need to find the current draft context.
+    // The onSave callback is stored on the sheet; delegate to shop.js handler.
+    const emoji = (document.getElementById('treat-emoji')?.value || '🎁').slice(0, 4);
+    const nameEl = document.getElementById('treat-name');
+    const priceEl = document.getElementById('treat-price');
+    const name = (nameEl?.value || '').trim();
+    const price = parseInt(priceEl?.value || '10', 10);
+    if (!name) { U.shake(nameEl); return; }
+    if (isNaN(price) || price < 1) { U.shake(priceEl); return; }
+
+    // Find if we're editing an existing treat by checking for a data-id on the sheet
+    const sheet = document.querySelector('.sheet-overlay');
+    const treatId = sheet?.dataset?.editId;
+    const lang = state.lang;
+    const existing = treatId ? (state.game.treats || []).find((t) => t.id === treatId) : null;
+    const treat = {
+      id: treatId || uid(),
+      emoji,
+      name: {
+        en: lang === 'en' ? name : (existing && typeof existing.name === 'object' ? existing.name.en || '' : ''),
+        fr: lang === 'fr' ? name : (existing && typeof existing.name === 'object' ? existing.name.fr || '' : ''),
+      },
+      price,
+    };
+    E.addTreat(treat);
+    U.closeSheet();
+    N.feedback('tap');
+    render();
+    U.toast(`${emoji} ${t('treatSaved')}`, 'good');
+  },
+  'treat-buy': (btn) => {
+    const treat = (state.game.treats || []).find((t) => t.id === btn.dataset.id);
+    const result = E.buyTreat(btn.dataset.id);
+    if (result) {
+      N.feedback('done');
+      render();
+      U.toast(`${result.emoji} ${t('treatBought')}`, 'good');
+    }
+  },
+  'treat-del': (btn) => {
+    const treats = state.game.treats || [];
+    const treat = treats.find((t) => t.id === btn.dataset.id);
+    const nameFn = () => {
+      const lang = state.lang;
+      if (treat && typeof treat.name === 'object' && treat.name !== null) return treat.name[lang] || treat.name.en || treat.name.fr || '';
+      return (treat && treat.name) || t('treat');
+    };
+    U.confirmDialog({
+      title: t('confirmDelete'),
+      body: t('treatDelConfirm', { name: nameFn() }),
+      confirmLabel: t('delete'),
+      onConfirm: () => {
+        E.removeTreat(btn.dataset.id);
+        N.feedback('tap');
+        render();
+        U.toast(t('treatDeleted'), 'bad');
+      },
+    });
+  },
+  'treat-emoji-picker': () => {
+    const input = document.getElementById('treat-emoji');
+    if (input) S.suggestEmoji(input);
+  },
+};
+
 // the Moments tab: moments and premades
 const MOMENT_ACTIONS = {
   'add': (btn, now) => {
@@ -974,7 +1062,7 @@ const OB_ACTIONS = {
   },
 };
 OB_ACTIONS['ob-notif'] = SETUP_ACTIONS['notif-enable']; // same thing, asked from elsewhere
-const ACTIONS = { ...SHELL_ACTIONS, ...LIVE_ACTIONS, ...QUEST_ACTIONS, ...MOMENT_ACTIONS, ...SETUP_ACTIONS, ...OB_ACTIONS };
+const ACTIONS = { ...SHELL_ACTIONS, ...LIVE_ACTIONS, ...QUEST_ACTIONS, ...SHOP_ACTIONS, ...MOMENT_ACTIONS, ...SETUP_ACTIONS, ...OB_ACTIONS };
 
 app.addEventListener('click', (e) => {
   const btn = e.target.closest('[data-action]');
@@ -982,6 +1070,25 @@ app.addEventListener('click', (e) => {
   // the stopper is itself the button being tapped (a delete cross in a row).
   const stop = e.target.closest('[data-stop]');
   if (stop && stop !== btn) return;
+  // Secret gesture: tap the version row 7 times to unlock the shop
+  const versionRow = e.target.closest('.version-row');
+  if (versionRow && state.settings.shop === false) {
+    versionTapCount++;
+    clearTimeout(versionTapTimer);
+    versionTapTimer = setTimeout(() => { versionTapCount = 0; }, 3000);
+    if (versionTapCount >= 7) {
+      versionTapCount = 0;
+      clearTimeout(versionTapTimer);
+      state.settings.shop = true;
+      save();
+      N.feedback('levelup');
+      U.toast('🏪 ' + t('shopUnlocked'), 'good', { ms: 5000 });
+      render();
+      return;
+    } else if (versionTapCount >= 3) {
+      U.toast(t('shopTapHint', { n: 7 - versionTapCount }), '', { ms: 2000 });
+    }
+  }
   if (!btn) return;
   const a = btn.dataset.action;
   N.unlockAudio();
@@ -1043,7 +1150,7 @@ app.addEventListener('change', (e) => {
   if (key === 'questReminder' && el.value === P.reminderHM(state.settings.dayStart)) state.settings.questReminder = ''; // back on the default: follow the day start again
   save();
   // Some rows depend on others (critical toggle, pattern lock): redraw them.
-  if (key === 'alertStyle' || key === 'vibSync' || key === 'agenda') render();
+  if (key === 'alertStyle' || key === 'vibSync' || key === 'agenda' || key === 'shop') render();
   if (key === 'agenda' || key === 'questReminder' || key === 'dayStart') { Push.syncSoon(); if (view === 'setup') render(); }
   // Preview as you go, so picking a tone or a volume is immediate.
   if (key === 'soundName' || key === 'volume') { N.unlockAudio(); N.playTone(false); N.vibrate(N.vibrationPattern(false)); }

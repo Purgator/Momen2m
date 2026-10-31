@@ -30,6 +30,7 @@ function defaults() {
       updateSummaries: true, // show a "what's new" popup right after the app updates
       backupSingleFile: true, // overwrite momen2m-backup.json; false = a new dated file per backup
       agenda: true,           // show the Quests tab (goals planned in steps)
+      shop: false,            // show the Rewards tab (hidden until unlocked)
       dayStart: '07:00',      // wake time from the setup; anchors the quest reminder
       dayEnd: '22:30',        // bed time from the setup
       questReminder: '',      // HH:MM of the daily quest reminder; '' = an hour after dayStart
@@ -53,6 +54,8 @@ function defaults() {
       questRemindedDay: '', // dayKey of the last in-app quest reminder
       badges: {},   // badge id -> ms epoch when unlocked (kept even if history is pruned)
       badgesInit: false, // set once badges already earned from old history were persisted quietly
+      coins: 0,         // spendable currency earned from positive gains
+      treats: [],       // reward list: { id, name, emoji, price }
     },
     lastSeen: Date.now(),
     lastSeenVersion: '',     // app version at last boot, used to spot a just-applied update
