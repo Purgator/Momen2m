@@ -56,6 +56,7 @@ function defaults() {
       badgesInit: false, // set once badges already earned from old history were persisted quietly
       coins: 0,         // spendable currency earned from positive gains
       treats: [],       // reward list: { id, name, emoji, price }
+      shopUnlocked: false, // set true by the secret gesture; gate for the Setup toggle
     },
     lastSeen: Date.now(),
     lastSeenVersion: '',     // app version at last boot, used to spot a just-applied update

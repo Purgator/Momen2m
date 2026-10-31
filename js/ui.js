@@ -480,7 +480,7 @@ export function renderSetup(opts) {
           : `<button class="btn small" data-action="check-update" ${opts.checkingUpdate ? 'disabled' : ''}>${opts.checkingUpdate ? '<span class="spinner"></span>' : ''}${t('checkUpdate')}</button>`, 'version-row')}
         ${toggleRow(t('updateSummaries'), t('updateSummariesHint'), sw('updateSummaries', s.updateSummaries))}
         ${toggleRow('🗺️ ' + t('agSetting'), t('agSettingHint'), sw('agenda', s.agenda !== false))}
-        ${toggleRow('🏪 ' + t('shopSetting'), t('shopSettingHint'), sw('shop', s.shop !== false))}
+        ${state.game.shopUnlocked !== false ? toggleRow('🏪 ' + t('shopSetting'), t('shopSettingHint'), sw('shop', s.shop !== false)) : ''}
         ${opts.canInstall ? toggleRow(t('install'), '', `<button class="btn small primary" data-action="install">${t('install')}</button>`) : ''}
         ${opts.isIosBrowser ? `<p class="hint" style="padding:10px 0">${t('obIosInstall')}</p>` : ''}
         <div class="toggle"><div><div class="t"><button class="link" style="padding:0" data-action="restart-ob">${t('onboardingRestart')}</button></div><div class="s">${t('obRestartHint')}</div></div></div>

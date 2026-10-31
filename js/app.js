@@ -1080,6 +1080,7 @@ app.addEventListener('click', (e) => {
       versionTapCount = 0;
       clearTimeout(versionTapTimer);
       state.settings.shop = true;
+      state.game.shopUnlocked = true;
       save();
       N.feedback('levelup');
       U.toast('🏪 ' + t('shopUnlocked'), 'good', { ms: 5000 });
