@@ -3,6 +3,9 @@
 // exhaustive (the detailed notes live on the GitHub release). Both languages.
 export const CHANGELOG = {
   en: {
+    '1.38.0': [
+      '🐛 The rewards shop toggle no longer appears in Setup before unlocking it with the secret gesture.',
+    ],
     '1.37.0': [
       '🏪 Rewards shop: earn coins by completing moments, spend them on treats you choose. Unlock it by tapping the version 7 times in Setup.',
     ],
@@ -153,6 +156,9 @@ export const CHANGELOG = {
     '1.8.1': ['🔔 More reliable background reminders.'],
   },
   fr: {
+    '1.38.0': [
+      '🐛 Le bouton de la boutique n\'apparaît plus dans Réglages avant de la déverrouiller avec le geste secret.',
+    ],
     '1.37.0': [
       '🏪 Boutique de récompenses : gagnez des pièces en complétant des moments, dépensez-les pour des récompenses de votre choix. Déverrouillez-la en appuyant 7 fois sur la version dans Réglages.',
     ],
