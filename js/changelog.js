@@ -3,6 +3,9 @@
 // exhaustive (the detailed notes live on the GitHub release). Both languages.
 export const CHANGELOG = {
   en: {
+    '1.39.1': [
+      '🗣️ Onboarding questions now display in your selected language.',
+    ],
     '1.39.0': [
       '🎁 Rewards, take two: the tab crashed and treats could not be edited; fixed.',
       '🪙 Each completion now says what it paid in coins, and a toast tells you when a treat comes within reach.',
@@ -162,6 +165,9 @@ export const CHANGELOG = {
     '1.8.1': ['🔔 More reliable background reminders.'],
   },
   fr: {
+    '1.39.1': [
+      '🗣️ Les questions de démarrage s’affichent dans la langue choisie.',
+    ],
     '1.39.0': [
       '🎁 Récompenses, deuxième essai : l’onglet plantait et les plaisirs ne se modifiaient pas ; corrigé.',
       '🪙 Chaque moment fait dit ce qu’il rapporte en pièces, et un message te prévient quand un plaisir devient accessible.',
