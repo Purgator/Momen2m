@@ -78,10 +78,10 @@ export function currentOf(list) {
 }
 
 // Returns what really moved: a penalty stops at zero, and undo pays back that.
-function applyXp(delta) {
+function applyXp(delta, plain = delta) {
   const before = state.game.xp;
   state.game.xp = Math.max(0, before + delta);
-  if (delta > 0) { earnPause(delta); earnCoins(delta); }
+  if (delta > 0) { earnPause(delta); earnCoins(plain); }
   return state.game.xp - before;
 }
 // Points from outside the moments (the Agenda): no boost, no pause tokens.
@@ -124,41 +124,29 @@ function earnPause(delta) {
 }
 
 // ---- coins (rewards shop) ----------------------------------------------------
-// Coins are earned from positive gains only, proportional to points. They are
-// never clawed back by misses or skips, so the shop never feels punitive.
-// One coin per COIN_XP points earned (before boost). Undo refunds coins.
-export const COIN_XP = 5; // 1 coin per 5 points of positive gain
-function earnCoins(delta) {
-  const earned = Math.floor(delta / COIN_XP);
-  if (earned > 0) state.game.coins = (state.game.coins || 0) + earned;
+// Coins are the spendable side of the score: every gain from a moment pays one
+// coin per COIN_XP points, counted before the boost. A miss, a skip or a snooze
+// never takes any back, so the purse only shrinks when a treat is bought; an
+// undone completion refunds exactly what it had paid (kept on the record).
+// Behind the settings.shop flag (see shop.js).
+export const COIN_XP = 5;
+export const SHOP_LOG_MAX = 50;
+export const coinsFor = (pts) => Math.floor(Math.max(0, pts) / COIN_XP);
+function earnCoins(pts) {
+  const n = coinsFor(pts);
+  if (!n) return;
+  state.game.coins = (state.game.coins || 0) + n;
+  state.game.coinsEarned = (state.game.coinsEarned || 0) + n;
 }
-
-// Spend coins on a treat. Returns the treat or null if insufficient funds.
-export function buyTreat(treatId) {
+export function canBuy(treat) { return !!treat && (state.game.coins || 0) >= (treat.price || 0); }
+export function buyTreat(treat, now) {
+  if (!canBuy(treat)) return false;
   const g = state.game;
-  const treats = g.treats || [];
-  const treat = treats.find((t) => t.id === treatId);
-  if (!treat || (g.coins || 0) < treat.price) return null;
-  g.coins -= treat.price;
+  g.coins = (g.coins || 0) - (treat.price || 0);
+  g.treatsBought = (g.treatsBought || 0) + 1;
+  g.bought = [...(g.bought || []), { at: now, name: treat.name, emoji: treat.emoji, price: treat.price }].slice(-SHOP_LOG_MAX);
   save();
-  return treat;
-}
-
-// Add or update a treat in the list.
-export function addTreat(treat) {
-  const g = state.game;
-  g.treats = g.treats || [];
-  const idx = g.treats.findIndex((t) => t.id === treat.id);
-  if (idx >= 0) g.treats[idx] = treat;
-  else g.treats.push(treat);
-  save();
-}
-
-// Remove a treat from the list.
-export function removeTreat(treatId) {
-  const g = state.game;
-  g.treats = (g.treats || []).filter((t) => t.id !== treatId);
-  save();
+  return true;
 }
 
 // A 12 h "+50 % points" boost, granted after a rough patch (see app.js).
@@ -272,18 +260,20 @@ export function complete(o, now) {
   const base = BASE_PTS[o.habit.importance] || 20;
   const early = now <= o.start + (o.originalEnd - o.start) / 2;
   const boost = boostActive(now);
-  const pts = boosted(base + (early ? Math.round(base / 2) : 0), now);
+  const plain = base + (early ? Math.round(base / 2) : 0);
+  const pts = boosted(plain, now);
   rec.status = 'done';
   rec.pts = (rec.pts || 0) + pts;
   rec.at = now;
   rec.early = early;
-  rec.xp = applyXp(pts);
+  rec.xp = applyXp(pts, plain);
+  rec.coins = coinsFor(plain);
   state.game.done++;
   if (early) state.game.early = (state.game.early || 0) + 1;
   if (o.habit.once) state.game.onceDone = (state.game.onceDone || 0) + 1;
   const perfect = dayComplete(o.day) === true;
   save();
-  return { pts, early, perfect, boost };
+  return { pts, early, perfect, boost, coins: rec.coins };
 }
 
 export const LATE_WINDOW = 24 * 60 * 60 * 1000;
@@ -305,7 +295,7 @@ export function completeLate(o, now) {
   rec.early = false;
   rec.pts = (rec.pts || 0) + delta;
   rec.at = now;
-  applyXp(delta);
+  applyXp(delta, Math.round((BASE_PTS[o.habit.importance] || 20) / 4));
   state.game.done++;
   state.game.missed = Math.max(0, (state.game.missed || 0) - 1);
   state.game.recovered = (state.game.recovered || 0) + 1;
@@ -368,11 +358,14 @@ export function undo(o) {
   const snoozePts = -rec.snoozes * SNOOZE_PENALTY;
   const gain = (rec.pts || 0) - snoozePts;
   addPlainXp(-(rec.xp === undefined ? gain : rec.xp));
-  if (gain > 0) {
-    state.game.pauseXp = Math.max(0, (state.game.pauseXp || 0) - gain);
-    const refundedCoins = Math.floor(gain / COIN_XP);
-    state.game.coins = Math.max(0, (state.game.coins || 0) - refundedCoins);
+  if (gain > 0) state.game.pauseXp = Math.max(0, (state.game.pauseXp || 0) - gain);
+  // Records from before coins were kept per record (1.38.0) fall back to the rate.
+  const coins = rec.coins === undefined ? (gain > 0 ? coinsFor(gain) : 0) : rec.coins;
+  if (coins) {
+    state.game.coins = Math.max(0, (state.game.coins || 0) - coins);
+    state.game.coinsEarned = Math.max(0, (state.game.coinsEarned || 0) - coins);
   }
+  delete rec.coins;
   delete rec.xp;
   rec.pts = snoozePts;
   rec.status = 'open';

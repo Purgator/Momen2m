@@ -54,9 +54,13 @@ function defaults() {
       questRemindedDay: '', // dayKey of the last in-app quest reminder
       badges: {},   // badge id -> ms epoch when unlocked (kept even if history is pruned)
       badgesInit: false, // set once badges already earned from old history were persisted quietly
-      coins: 0,         // spendable currency earned from positive gains
-      treats: [],       // reward list: { id, name, emoji, price }
-      shopUnlocked: false, // set true by the secret gesture; gate for the Setup toggle
+      // The rewards shop (behind settings.shop, see shop.js)
+      coins: 0,           // coins in the purse: paid by gains (engine COIN_XP), spent on treats, never lost on a penalty
+      coinsEarned: 0,     // lifetime coins earned
+      treats: [],         // the treats on sale: { id, name, emoji, price }
+      treatsBought: 0,    // lifetime treats bought (drives the badge)
+      bought: [],         // { at, name, emoji, price } of treats bought, oldest first, kept to engine SHOP_LOG_MAX
+      shopUnlocked: false, // set by the secret gesture in Setup; shows the tab's switch there
     },
     lastSeen: Date.now(),
     lastSeenVersion: '',     // app version at last boot, used to spot a just-applied update
@@ -91,6 +95,11 @@ function mergeWithDefaults(raw) {
   const slot0 = (preset) => { const h = (raw.habits || []).find((x) => x.preset === preset); return h && h.slots && h.slots[0] ? h.slots[0].start : null; };
   if (!rs.dayStart) s.settings.dayStart = slot0('wake') || s.settings.dayStart;
   if (!rs.dayEnd) s.settings.dayEnd = slot0('sleep') || s.settings.dayEnd;
+  // 1.37/1.38 kept a treat's name per language ({ en, fr }); it is one text now.
+  s.game.treats = (s.game.treats || []).map((x) => {
+    if (!x || typeof x.name !== 'object' || x.name === null) return x;
+    return { ...x, name: x.name[s.lang] || x.name.en || x.name.fr || Object.values(x.name).find(Boolean) || '' };
+  });
   return s;
 }
 

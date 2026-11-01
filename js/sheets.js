@@ -7,7 +7,7 @@ import { habitName, habitDesc, slotOf, dayLetter, dayNames, toggleRow, slotRow, 
 import { t, pick } from './i18n.js';
 import { state, save } from './store.js';
 import { suggestEmoji } from './emoji.js';
-import { BASE_PTS, SNOOZE_PENALTY, PAUSE_MAX, PAUSE_XP, PAUSE_MS, boostActive } from './engine.js';
+import { BASE_PTS, SNOOZE_PENALTY, PAUSE_MAX, PAUSE_XP, PAUSE_MS, COIN_XP, boostActive } from './engine.js';
 import { rankLadder, badgeProgress } from './game.js';
 import { pointsOn as agendaPointsOn } from './plans.js';
 import { fmtClock, fmtDuration, fmtDateTime, nowHM, minutesToHM, parseHM, dayKey, at } from './time.js';
@@ -31,6 +31,16 @@ export function openExplainSheet(topic, s, todayOccs = []) {
     const p = s.period;
     html = `<h2>🎯 ${t('successRate')} · ${pctText(p.rate)}</h2>
       <p class="hint" style="margin-top:6px">${t('explainRate', { done: p.done, missed: p.missed, skipped: p.skipped })}</p>`;
+  } else if (topic === 'coins') {
+    const g = state.game;
+    html = `<h2>🪙 ${g.coins || 0} · ${t('shopPurse')}</h2>
+      <p class="hint" style="margin-top:6px">${t('explainCoins', { n: COIN_XP })}</p>
+      <div class="card ladder" style="margin-top:10px">
+        <div class="lrow"><span>${t('ruleDone')}</span><span class="pos">🪙 +${Math.floor(BASE_PTS[1] / COIN_XP)} / +${Math.floor(BASE_PTS[2] / COIN_XP)} / +${Math.floor(BASE_PTS[3] / COIN_XP)}</span></div>
+        <div class="lrow"><span>${t('ruleEarly')}</span><span class="pos">+50%</span></div>
+        <div class="lrow"><span>${t('ruleMissed')}</span><span class="muted">🪙 0</span></div>
+        <div class="lrow"><span>${t('shopEarnedTotal', { n: g.coinsEarned || 0 })}</span><span class="muted">${t('shopBought')} · ${g.treatsBought || 0}</span></div>
+      </div>`;
   } else {
     const today = dayKey(new Date());
     const rows = todayOccs.filter((o) => o.day === today && o.status !== 'open').sort((a, b) => a.at - b.at)

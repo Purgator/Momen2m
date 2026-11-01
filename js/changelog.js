@@ -3,6 +3,12 @@
 // exhaustive (the detailed notes live on the GitHub release). Both languages.
 export const CHANGELOG = {
   en: {
+    '1.39.0': [
+      '🎁 Rewards, take two: the tab crashed and treats could not be edited; fixed.',
+      '🪙 Each completion now says what it paid in coins, and a toast tells you when a treat comes within reach.',
+      '📈 The purse shows how far you are from your next treat and keeps a list of what you bought.',
+      '💡 Adding a treat offers ready-made ideas to tap.',
+    ],
     '1.38.0': [
       '🐛 The rewards shop toggle no longer appears in Setup before unlocking it with the secret gesture.',
     ],
@@ -156,6 +162,12 @@ export const CHANGELOG = {
     '1.8.1': ['🔔 More reliable background reminders.'],
   },
   fr: {
+    '1.39.0': [
+      '🎁 Récompenses, deuxième essai : l’onglet plantait et les plaisirs ne se modifiaient pas ; corrigé.',
+      '🪙 Chaque moment fait dit ce qu’il rapporte en pièces, et un message te prévient quand un plaisir devient accessible.',
+      '📈 La bourse montre ce qu’il te manque pour le prochain plaisir et garde la liste de tes achats.',
+      '💡 Ajouter un plaisir propose des idées toutes prêtes à toucher.',
+    ],
     '1.38.0': [
       '🐛 Le bouton de la boutique n\'apparaît plus dans Réglages avant de la déverrouiller avec le geste secret.',
     ],

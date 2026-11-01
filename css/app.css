@@ -522,14 +522,13 @@ textarea.input { resize: vertical; }
 .dot-day small { font-size: 10px; font-weight: 700; }
 .dot-day.ok { color: var(--ok); border-color: var(--ok); } .dot-day.ko { color: var(--danger); border-color: var(--danger); }
 
-/* ---- Rewards shop ---- */
-.coin-balance { font-size: 22px; font-weight: 800; text-align: center; padding: 12px 0; }
-.treat { background: var(--card); border-radius: 12px; padding: 12px; margin-bottom: 10px; border: 1px solid var(--line); }
-.treat.poor { opacity: .55; }
-.treat-head { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
-.treat-head .emo { font-size: 24px; }
-.treat-head .name { flex: 1; font-weight: 600; font-size: 15px; }
-.treat-head .price { font-weight: 700; color: var(--muted); font-size: 14px; }
-.treat .btnrow { justify-content: flex-end; gap: 6px; }
-.input-row { display: flex; gap: 6px; align-items: center; }
-.input-row .text { width: 60px; text-align: center; }
+/* ---- rewards shop (behind settings.shop) --------------------------------- */
+.screen.shop { padding-bottom: calc(var(--tab-h) + var(--sab) + 32px); }
+.purse { display: flex; flex-direction: column; align-items: center; gap: 2px; text-align: center; cursor: pointer; margin-top: 12px; }
+.purse .v { font-size: 34px; font-weight: 800; letter-spacing: -.01em; }
+.purse .l { font-size: 14px; font-weight: 700; }
+.purse .s { font-size: 12px; color: var(--muted); }
+.purse .xpbar { width: 100%; max-width: 260px; margin: 8px 0 4px; }
+.item.treat.off { opacity: .7; }
+.item.treat.off .emo, .item.treat.off .name { opacity: .75; }
+.chip.on[data-idea] { background: var(--accent); border-color: var(--accent); color: #fff; }

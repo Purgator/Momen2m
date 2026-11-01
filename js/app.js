@@ -21,7 +21,7 @@ import * as Diag from './diag.js';
 import * as P from './plans.js';
 import * as A from './agenda.js';
 import { seedOnce as seedQuestPresets } from './questPresets.js';
-import * as S from './shop.js';
+import * as Shop from './shop.js';
 
 // Ask the browser not to garbage-collect this origin's storage under pressure.
 // Silent and best-effort: it cannot be forced, and some browsers ignore it.
@@ -37,12 +37,9 @@ const isIosBrowser = isIos && !standalone;
 const VIEWS = ['live', 'progress', 'moments', 'agenda', 'shop', 'setup'];
 const viewAllowed = (v) => VIEWS.includes(v)
   && (v !== 'agenda' || state.settings.agenda !== false)
-  && (v !== 'shop' || state.settings.shop !== false);
+  && (v !== 'shop' || Shop.shopOn());
 let view = !state.onboarded ? 'ob' : viewAllowed(state.lastView) ? state.lastView : 'live';
 let occs = [];
-// Secret gesture: tap the version row 7 times to unlock the shop
-let versionTapCount = 0;
-let versionTapTimer = 0;
 const phases = new Map();       // occurrence key -> last seen phase
 const fresh = new Set();        // keys that just changed phase (animate once)
 const expanded = new Set();     // keys of secondary active moments tapped open
@@ -109,7 +106,7 @@ function render(now = Date.now()) {
     if (seeded) setTimeout(() => U.toast('🗺️ ' + t('agSeeded', { n: seeded }), 'good', { ms: 6000 }), 400);
     app.innerHTML = A.renderAgenda(now);
   } else if (view === 'shop') {
-    app.innerHTML = S.renderShop(now);
+    app.innerHTML = Shop.renderShop();
   } else if (view === 'progress') {
     occs = E.buildOccurrences(now);
     const stats = G.computeStats(now, occs);
@@ -286,18 +283,24 @@ function notifActions(o) {
 function doDone(o, now, at) {
   const levelBefore = E.levelFor(state.game.xp);
   const pausesBefore = state.game.pauseTokens || 0;
+  const wanted = Shop.shopOn() ? Shop.nextTreat() : null; // the treat the purse was filling up for
   const r = E.complete(o, now); if (!r) return false;
   if (at) U.sparkles(at.x, at.y);
   N.feedback('done'); N.dismiss(o.key);
   refresh();
-  // Feedback ladder: points (+ praise), combo, perfect day, level up, badges.
+  // Feedback ladder: points (+ coins, + praise), combo, perfect day, level up, treat in reach, badges.
   const praise = t('praise');
-  const line = (r.boost ? '⚡ ' : '') + (r.early ? t('toastEarly', { n: r.pts }) : t('toastDone', { n: r.pts })) + ' · ' + praise[state.game.done % praise.length];
+  const line = (r.boost ? '⚡ ' : '') + (r.early ? t('toastEarly', { n: r.pts }) : t('toastDone', { n: r.pts }))
+    + (r.coins ? ' · 🪙 +' + r.coins : '') + ' · ' + praise[state.game.done % praise.length];
   U.toast(line, 'good');
   let delay = 700;
   const combo = G.todayCombo(occs, now);
   if (combo >= 2 && !r.perfect) { setTimeout(() => U.toast('🔥 ' + t('toastCombo', { n: combo })), delay); delay += 900; }
   if (r.perfect) { setTimeout(() => U.toast('🎉 ' + t('toastPerfectDay', { n: state.game.streak + 1 }), 'good', { ms: 3500 }), delay); delay += 900; }
+  if (wanted && E.canBuy(wanted)) {
+    setTimeout(() => U.toast('🎁 ' + t('shopInReach', { treat: wanted.emoji + ' ' + wanted.name }), 'good', { ms: 4500, action: { label: t('see'), fn: () => showView('shop') } }), delay);
+    delay += 1200;
+  }
   celebrateGains(levelBefore, pausesBefore, delay);
   return true;
 }
@@ -820,83 +823,30 @@ const QUEST_ACTIONS = {
   'ag-import': () => { A.openImportSheet('', addImportedPlan); },
 };
 
-// the Rewards shop tab
+// the Rewards tab (behind settings.shop)
 const SHOP_ACTIONS = {
-  'treat-new': () => {
-    S.openTreatSheet(null, {
-      onSave: (treat) => { E.addTreat(treat); N.feedback('tap'); render(); },
-    });
+  'treat-add': () => {
+    Shop.openTreatSheet(null, (d) => { state.game.treats = [...Shop.treats(), { id: uid(), ...d }]; save(); N.feedback('tap'); render(); });
   },
   'treat-edit': (btn) => {
-    const treat = (state.game.treats || []).find((t) => t.id === btn.dataset.id);
-    if (!treat) return;
-    S.openTreatSheet(treat, {
-      onSave: (updated) => { E.addTreat(updated); N.feedback('tap'); render(); },
+    const r = Shop.findTreat(btn.dataset.id); if (!r) return;
+    Shop.openTreatSheet(r, (d) => { Object.assign(r, d); save(); render(); }, async () => {
+      if (!(await U.confirmDialog(t('shopDeleteConfirm', { name: r.name }), { danger: true, okLabel: t('delete') }))) return;
+      state.game.treats = Shop.treats().filter((x) => x.id !== r.id); save(); U.toast(t('shopDeleted')); render();
     });
   },
-  'treat-save': (btn) => {
-    // The sheet is already open; we need to find the current draft context.
-    // The onSave callback is stored on the sheet; delegate to shop.js handler.
-    const emoji = (document.getElementById('treat-emoji')?.value || '🎁').slice(0, 4);
-    const nameEl = document.getElementById('treat-name');
-    const priceEl = document.getElementById('treat-price');
-    const name = (nameEl?.value || '').trim();
-    const price = parseInt(priceEl?.value || '10', 10);
-    if (!name) { U.shake(nameEl); return; }
-    if (isNaN(price) || price < 1) { U.shake(priceEl); return; }
-
-    // Find if we're editing an existing treat by checking for a data-id on the sheet
-    const sheet = document.querySelector('.sheet-overlay');
-    const treatId = sheet?.dataset?.editId;
-    const lang = state.lang;
-    const existing = treatId ? (state.game.treats || []).find((t) => t.id === treatId) : null;
-    const treat = {
-      id: treatId || uid(),
-      emoji,
-      name: {
-        en: lang === 'en' ? name : (existing && typeof existing.name === 'object' ? existing.name.en || '' : ''),
-        fr: lang === 'fr' ? name : (existing && typeof existing.name === 'object' ? existing.name.fr || '' : ''),
-      },
-      price,
-    };
-    E.addTreat(treat);
-    U.closeSheet();
+  'treat-buy': async (btn, now) => {
+    const r = Shop.findTreat(btn.dataset.id); if (!r || !E.canBuy(r)) return;
     N.feedback('tap');
+    if (!(await U.confirmDialog(t('shopBuyConfirm', { n: r.price, name: r.name }), { title: r.emoji + ' ' + r.name, okLabel: t('shopBuy') }))) return;
+    const first = !(state.game.treatsBought || 0);
+    if (!E.buyTreat(r, now)) return;
+    const b = btn.getBoundingClientRect();
+    U.sparkles(b.left + b.width / 2, b.top + b.height / 2);
+    N.feedback('levelup'); U.celebrate([r.emoji, '🎁', '✨']);
+    U.toast(r.emoji + ' ' + t('shopEnjoy', { n: state.game.coins || 0 }), 'good', { ms: 4000 });
     render();
-    U.toast(`${emoji} ${t('treatSaved')}`, 'good');
-  },
-  'treat-buy': (btn) => {
-    const treat = (state.game.treats || []).find((t) => t.id === btn.dataset.id);
-    const result = E.buyTreat(btn.dataset.id);
-    if (result) {
-      N.feedback('done');
-      render();
-      U.toast(`${result.emoji} ${t('treatBought')}`, 'good');
-    }
-  },
-  'treat-del': (btn) => {
-    const treats = state.game.treats || [];
-    const treat = treats.find((t) => t.id === btn.dataset.id);
-    const nameFn = () => {
-      const lang = state.lang;
-      if (treat && typeof treat.name === 'object' && treat.name !== null) return treat.name[lang] || treat.name.en || treat.name.fr || '';
-      return (treat && treat.name) || t('treat');
-    };
-    U.confirmDialog({
-      title: t('confirmDelete'),
-      body: t('treatDelConfirm', { name: nameFn() }),
-      confirmLabel: t('delete'),
-      onConfirm: () => {
-        E.removeTreat(btn.dataset.id);
-        N.feedback('tap');
-        render();
-        U.toast(t('treatDeleted'), 'bad');
-      },
-    });
-  },
-  'treat-emoji-picker': () => {
-    const input = document.getElementById('treat-emoji');
-    if (input) S.suggestEmoji(input);
+    if (first) setTimeout(() => U.toast('🏅 ' + t('shopFirstTreat'), 'good', { ms: 4500 }), 1200);
   },
 };
 
@@ -1025,7 +975,25 @@ const SETUP_ACTIONS = {
     if (installPrompt) { installPrompt.prompt(); installPrompt.userChoice.then(() => { installPrompt = null; render(); }); }
   },
   'restart-ob': () => { resetOb(); view = 'ob'; render(); scrollTo(0, 0); },
+  // The Rewards tab hides behind a secret: seven quick taps on the version
+  // line (the classic developer-mode gesture). Once unlocked, its switch
+  // stays in About so it can be turned off and on again plainly.
+  'version-tap': (btn, now) => {
+    if (state.game.shopUnlocked) return;
+    if (now - secret.at > SECRET_GAP) secret.n = 0;
+    secret.at = now; secret.n++;
+    const left = SECRET_TAPS - secret.n;
+    if (left > 0) { if (left <= 2) U.toast(t(left === 1 ? 'shopOneMore' : 'shopAlmost', { n: left }), '', { ms: 1200 }); return; }
+    secret.n = 0;
+    state.game.shopUnlocked = true; state.settings.shop = true; save();
+    const n = Shop.seedTreats();
+    N.feedback('levelup'); U.celebrate(['🎁', '🪙', '✨']);
+    U.toast('🎁 ' + t('shopUnlocked') + (n ? ' ' + t('shopSeeded', { n }) : ''), 'good', { ms: 6000, action: { label: t('see'), fn: () => showView('shop') } });
+    render();
+  },
 };
+const SECRET_TAPS = 7, SECRET_GAP = 2000;
+const secret = { n: 0, at: 0 };
 
 // the first-run setup
 const OB_ACTIONS = {
@@ -1070,26 +1038,6 @@ app.addEventListener('click', (e) => {
   // the stopper is itself the button being tapped (a delete cross in a row).
   const stop = e.target.closest('[data-stop]');
   if (stop && stop !== btn) return;
-  // Secret gesture: tap the version row 7 times to unlock the shop
-  const versionRow = e.target.closest('.version-row');
-  if (versionRow && state.settings.shop === false) {
-    versionTapCount++;
-    clearTimeout(versionTapTimer);
-    versionTapTimer = setTimeout(() => { versionTapCount = 0; }, 3000);
-    if (versionTapCount >= 7) {
-      versionTapCount = 0;
-      clearTimeout(versionTapTimer);
-      state.settings.shop = true;
-      state.game.shopUnlocked = true;
-      save();
-      N.feedback('levelup');
-      U.toast('🏪 ' + t('shopUnlocked'), 'good', { ms: 5000 });
-      render();
-      return;
-    } else if (versionTapCount >= 3) {
-      U.toast(t('shopTapHint', { n: 7 - versionTapCount }), '', { ms: 2000 });
-    }
-  }
   if (!btn) return;
   const a = btn.dataset.action;
   N.unlockAudio();
@@ -1151,6 +1099,7 @@ app.addEventListener('change', (e) => {
   if (key === 'questReminder' && el.value === P.reminderHM(state.settings.dayStart)) state.settings.questReminder = ''; // back on the default: follow the day start again
   save();
   // Some rows depend on others (critical toggle, pattern lock): redraw them.
+  if (key === 'shop' && state.settings.shop) { const n = Shop.seedTreats(); if (n) U.toast('🎁 ' + t('shopSeeded', { n }), 'good'); }
   if (key === 'alertStyle' || key === 'vibSync' || key === 'agenda' || key === 'shop') render();
   if (key === 'agenda' || key === 'questReminder' || key === 'dayStart') { Push.syncSoon(); if (view === 'setup') render(); }
   // Preview as you go, so picking a tone or a volume is immediate.

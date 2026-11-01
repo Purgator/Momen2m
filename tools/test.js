@@ -602,52 +602,50 @@ globalThis.window = globalThis;
     S.state.game.pauseLog = [];
   });
 
-  await test('coins: earned from gains, spent on treats, refunded on undo', () => {
-    S.state.habits = [habit('c1', '10:00', '11:00', { importance: 2 })];
+  await test('coins: 1 per 5 unboosted points of gain, never lost on a penalty, refunded by undo, spent on treats', () => {
+    const h = habit('coin1', '08:00', '09:00', { importance: 2 });
+    S.state.habits = [h, habit('coin2', '10:00', '11:00', { importance: 3 }), habit('coin3', '12:00', '13:00', { importance: 2 })];
     S.state.days = {};
-    Object.assign(S.state.game, { xp: 0, coins: 0, treats: [], boostUntil: 0, pauseTokens: 0, pauseXp: 0, pauseLog: [] });
-
-    const o = E.buildOccurrences(D(0, '10:05')).find((x) => x.habit.id === 'c1');
-    E.complete(o, D(0, '10:05'));
-    assert.strictEqual(S.state.game.coins, 6, '30 pts (early bonus) / 5 = 6 coins');
-
-    // Undo refunds coins
-    const refunded = E.undo(o);
-    assert.strictEqual(refunded, true);
-    assert.strictEqual(S.state.game.coins, 0, 'coins refunded on undo');
-
-    // Late completion (after midpoint) earns base only
+    Object.assign(S.state.game, { xp: 0, coins: 0, coinsEarned: 0, treatsBought: 0, bought: [], boostUntil: 0, pauseTokens: 0, pauseXp: 0, pauseLog: [] });
+    let o = E.buildOccurrences(D(0, '08:10')).find((x) => x.habit.id === 'coin1');
+    let r = E.complete(o, D(0, '08:10'));
+    assert.strictEqual(r.coins, 6, 'the completion reports its coins');
+    assert.deepStrictEqual([S.state.game.coins, S.state.game.coinsEarned], [6, 6], '(20 + 10 early) / 5');
+    assert.ok(E.undo(o));
+    assert.deepStrictEqual([S.state.game.coins, S.state.game.coinsEarned], [0, 0], 'undo refunds the coins');
+    o = E.buildOccurrences(D(0, '08:40')).find((x) => x.habit.id === 'coin1');
+    E.complete(o, D(0, '08:40'));
+    assert.strictEqual(S.state.game.coins, 4, 'not early: 20 / 5');
+    o = E.buildOccurrences(D(0, '10:10')).find((x) => x.habit.id === 'coin2');
+    E.skip(o, D(0, '10:10'));
+    assert.strictEqual(S.state.game.coins, 4, 'a skip costs no coin');
+    E.tick(D(0, '13:30'), hooks);
+    assert.strictEqual(S.state.game.coins, 4, 'a miss costs no coin');
+    o = E.buildOccurrences(D(0, '13:30')).find((x) => x.habit.id === 'coin3');
+    assert.strictEqual(o.status, 'missed');
+    E.grantBoost(D(0, '13:30'));
+    E.completeLate(o, D(0, '13:35'));
+    assert.strictEqual(S.state.game.coins, 5, 'late quarter of 20 = 5 points (unboosted) = 1 coin; the boost does not count');
     S.state.days = {};
-    const o2 = E.buildOccurrences(D(1, '10:40')).find((x) => x.habit.id === 'c1');
-    E.complete(o2, D(1, '10:40'));
-    assert.strictEqual(S.state.game.coins, 4, '20 pts (no early bonus) / 5 = 4 coins');
-
-    // Miss does not affect coins
-    S.state.days = {};
-    E.tick(D(2, '12:00'), { onMissed: () => {} });
-    assert.strictEqual(S.state.game.coins, 4, 'miss does not reduce coins');
-
-    // Buy treat
-    S.state.game.treats = [{ id: 't1', emoji: '☕', name: { en: 'Coffee' }, price: 3 }];
-    const bought = E.buyTreat('t1');
-    assert.strictEqual(bought.emoji, '☕');
-    assert.strictEqual(S.state.game.coins, 1, '3 coins spent');
-
-    // Buy when insufficient funds
-    assert.strictEqual(E.buyTreat('t1'), null, 'not enough coins');
-    assert.strictEqual(S.state.game.coins, 1, 'coins unchanged');
-
-    // Add/remove treat
-    E.addTreat({ id: 't2', emoji: '🍕', name: { en: 'Pizza' }, price: 10 });
-    assert.strictEqual(S.state.game.treats.length, 2);
-    E.removeTreat('t2');
-    assert.strictEqual(S.state.game.treats.length, 1);
-
-    // Coins never go negative
-    S.state.game.coins = 2;
-    E.addTreat({ id: 't3', emoji: '💰', name: { en: 'Expensive' }, price: 5 });
-    assert.strictEqual(E.buyTreat('t3'), null, 'insufficient funds');
-    assert.strictEqual(S.state.game.coins, 2);
+    E.grantBoost(D(1, '08:00'));
+    o = E.buildOccurrences(D(1, '08:10')).find((x) => x.habit.id === 'coin1');
+    r = E.complete(o, D(1, '08:10'));
+    assert.strictEqual(r.pts, 45, 'boosted gain');
+    assert.strictEqual(S.state.game.coins, 11, 'coins follow the unboosted 30 points: +6');
+    // A record from 1.38.0 (no coins kept on it) undoes at the rate.
+    const rec = S.state.days[o.day][o.occ];
+    delete rec.coins;
+    assert.ok(E.undo(o));
+    assert.strictEqual(S.state.game.coins, 2, '45 boosted points at the rate: 9 back');
+    S.state.game.coins = 11;
+    const treat = { id: 'r1', name: 'Coffee', emoji: '☕', price: 10 };
+    assert.ok(E.canBuy(treat));
+    assert.ok(E.buyTreat(treat, D(1, '09:00')));
+    assert.strictEqual(S.state.game.coins, 1);
+    assert.strictEqual(S.state.game.treatsBought, 1);
+    assert.ok(!E.canBuy(treat) && !E.buyTreat(treat, D(1, '09:01')), 'too poor now');
+    assert.strictEqual(S.state.game.coins, 1);
+    assert.deepStrictEqual(S.state.game.bought.map((b) => [b.name, b.price, b.at]), [['Coffee', 10, D(1, '09:00')]]);
   });
 
   await test('agenda: dated steps, 5 pts a task (1 late), step bonus, questions branch, flawless goal pays double', async () => {

@@ -1,143 +1,129 @@
-// The Rewards tab: spend coins on treats you define. Rendering and sheets only.
+// The Rewards tab: a purse of coins earned with points, spent on treats the
+// user defines (a coffee, a take-out…). Rendering and the treat sheet only —
+// the coin rules live in engine.js, behaviour in app.js via data-action.
+// The tab hides behind settings.shop, unlocked by a secret gesture in Setup.
 import { t } from './i18n.js';
-import { state } from './store.js';
-import { esc } from './dom.js';
+import { state, save, uid } from './store.js';
+import { esc, $, $$, shake } from './dom.js';
 import { openSheet, closeSheet } from './sheet.js';
-import { toast } from './toast.js';
 import { tabbar } from './ui.js';
 import { suggestEmoji } from './emoji.js';
-import * as E from './engine.js';
-import { uid } from './store.js';
+import { fmtWhenShort } from './time.js';
+import { COIN_XP, canBuy, coinsFor } from './engine.js';
 
-// Default treats seeded on first unlock
-const DEFAULT_TREATS = [
-  { id: 'default-video', emoji: '🎬', name: { en: 'Watch 15 min of videos', fr: 'Regarder 15 min de vidéos' }, price: 20 },
-  { id: 'default-coffee', emoji: '☕', name: { en: 'Buy a coffee', fr: 'Acheter un café' }, price: 50 },
-  { id: 'default-takeout', emoji: '🍕', name: { en: 'Grab some takeout', fr: 'Commander à emporter' }, price: 100 },
-];
+export const SHOP_PRICES = [10, 20, 30, 50, 75, 100, 150, 200];
+const BOUGHT_SHOWN = 6;
 
-function seedTreats() {
-  const g = state.game;
-  if (!g.treats || !g.treats.length) {
-    g.treats = DEFAULT_TREATS.map((t) => ({ ...t, id: uid() }));
-    E.save();
-  }
+export function shopOn() { return state.settings.shop === true; }
+export const treats = () => state.game.treats || [];
+export function findTreat(id) { return treats().find((x) => x.id === id); }
+
+// The first opening fills the shop with three presets, in the user's language.
+export function seedTreats() {
+  if (treats().length) return 0;
+  state.game.treats = t('shopPresets').map((p) => ({ id: uid(), ...p }));
+  save();
+  return state.game.treats.length;
 }
 
-function treatName(treat) {
-  const lang = state.lang;
-  if (typeof treat.name === 'object' && treat.name !== null) {
-    return treat.name[lang] || treat.name.en || treat.name.fr || '';
-  }
-  return treat.name || '';
+// The cheapest treat still out of reach: what the purse is filling up for.
+export function nextTreat() {
+  const coins = state.game.coins || 0;
+  return treats().filter((x) => x.price > coins).sort((a, b) => a.price - b.price)[0] || null;
 }
 
-export function renderShop(now) {
-  seedTreats();
+// What a completion is worth in coins, for the "+N 🪙" on the done toast.
+export function coinsOf(pts) { return shopOn() ? coinsFor(pts) : 0; }
+
+export function renderShop() {
   const g = state.game;
   const coins = g.coins || 0;
-  const treats = g.treats || [];
+  const list = treats();
+  const next = nextTreat();
 
-  const treatHtml = treats.map((treat) => {
-    const canAfford = coins >= treat.price;
-    return `<div class="treat ${canAfford ? '' : 'poor'}">
-      <div class="treat-head">
-        <span class="emo">${esc(treat.emoji || '🎁')}</span>
-        <div class="name">${esc(treatName(treat))}</div>
-        <div class="price">🪙 ${treat.price}</div>
-      </div>
-      <div class="btnrow">
-        <button class="btn small primary" data-action="treat-buy" data-id="${treat.id}" ${canAfford ? '' : 'disabled'}>
-          ${t('treatBuy')}
-        </button>
-        <button class="btn small" data-action="treat-edit" data-id="${treat.id}">✏️ ${t('edit')}</button>
-        <button class="btn small ghost" data-action="treat-del" data-id="${treat.id}">${t('delete')}</button>
-      </div>
-    </div>`;
+  const purseSub = next
+    ? `<div class="xpbar"><div class="xpfill" style="width:${Math.min(100, Math.round((coins / next.price) * 100))}%"></div></div>
+       <div class="s">${t('shopNextTreat', { n: next.price - coins, treat: esc(next.emoji) + ' ' + esc(next.name) })}</div>`
+    : `<div class="s">${list.length ? t('shopAllAffordable') : t('shopEarnRule', { n: COIN_XP })}</div>`;
+
+  const rows = list.map((r) => {
+    const ok = canBuy(r);
+    return `<div class="item treat ${ok ? '' : 'off'}" data-action="treat-edit" data-id="${r.id}">
+      <div class="emo">${esc(r.emoji)}</div>
+      <div><div class="name">${esc(r.name)}</div><div class="sub">${ok ? t('shopAffordable') : t('shopMissing', { n: r.price - coins })}</div></div>
+      <button class="btn small ${ok ? 'primary' : ''}" data-action="treat-buy" data-id="${r.id}" ${ok ? '' : 'disabled'} aria-label="${t('shopBuy')} · ${r.price}">🪙 ${r.price}</button></div>`;
   }).join('');
 
+  const bought = (g.bought || []).slice(-BOUGHT_SHOWN).reverse();
+  const boughtHtml = bought.map((b) => `<div class="lrow"><span>${esc(b.emoji)} ${esc(b.name)}</span><span class="muted">🪙 ${b.price} · ${fmtWhenShort(b.at)}</span></div>`).join('');
+
   return `<div class="screen shop">
-    <h1>🏪 ${t('tabShop')}</h1>
-    <p class="hint">${t('shopIntro')}</p>
-    <div class="coin-balance">🪙 ${coins} ${t('shopCoins')}</div>
+    <h1>${t('shopTitle')}</h1>
+    <div class="card pad purse" data-action="explain" data-topic="coins" data-tip="${esc(t('tipCoins', { n: coins }))}">
+      <div class="v">🪙 ${coins}</div>
+      <div class="l">${t('shopPurse')}</div>
+      ${purseSub}
+    </div>
+
     <div class="section">
-      ${treatHtml || `<p class="hint">${t('shopEmpty')}</p>`}
+      <h2>${t('shopTreats')} <button class="btn small" data-action="treat-add">➕ ${t('shopAdd')}</button></h2>
+      ${rows ? `<div class="list">${rows}</div>` : `<div class="empty"><div class="emo">🎁</div><h2>${t('shopEmpty')}</h2><p>${t('shopEmptyHint')}</p></div>`}
+      <p class="hint" style="margin-top:10px">${t('shopHint', { n: COIN_XP })}</p>
     </div>
-    <div class="btnrow" style="margin-top:16px">
-      <button class="btn primary" data-action="treat-new">➕ ${t('treatNew')}</button>
-    </div>
-  </div>${tabbar('shop')}`;
+
+    ${bought.length ? `<div class="section"><h2>${t('shopBought')} <small class="muted">${t('shopBoughtCount', { n: g.treatsBought || bought.length })}</small></h2><div class="card">${boughtHtml}</div></div>` : ''}
+  </div>
+  ${tabbar('shop')}`;
 }
 
-// ---- treat editor sheet -------------------------------------------------------
-
-function treatSheetContent(draft) {
-  const lang = state.lang;
-  const nameKey = lang === 'fr' ? 'nameFr' : 'nameEn';
-  const nameVal = typeof draft.name === 'object' && draft.name !== null
-    ? (draft.name[lang] || '')
-    : (draft.name || '');
-  return `<div class="sheet-fields">
-    <label class="field">
-      <span>${t('treatEmoji')}</span>
-      <div class="input-row"><input class="text short" id="treat-emoji" value="${esc(draft.emoji || '')}" maxlength="4" inputmode="text" autocomplete="off" />
-        <button class="btn small ghost" data-action="treat-emoji-picker">${t('emojiPicker')}</button></div>
-    </label>
-    <label class="field">
-      <span>${t('treatName')}</span>
-      <input class="text" id="treat-name" value="${esc(nameVal)}" autocomplete="off" />
-    </label>
-    <label class="field">
-      <span>${t('treatPrice')}</span>
-      <input class="text short" id="treat-price" type="number" min="1" max="9999" value="${esc(String(draft.price || 10))}" inputmode="numeric" autocomplete="off" />
-    </label>
-  </div>`;
-}
-
-export function openTreatSheet(draft, { onSave }) {
-  const isNew = !draft || !draft.id;
-  const title = isNew ? t('treatNew') : t('treatEdit');
-  openSheet({
-    title,
-    body: treatSheetContent(draft || { emoji: '🎁', name: '', price: 10 }),
-    actions: [
-      { label: t('cancel'), cls: 'ghost', action: 'sheet-close' },
-      { label: isNew ? t('save') : t('update'), cls: 'primary', action: 'treat-save', dataset: { onSave } },
-    ],
+// Add or edit a treat: emoji + name + price. A new one offers ideas to tap.
+export function openTreatSheet(treat, onSave, onDelete) {
+  const x = treat || { name: '', emoji: '🎁', price: 50 };
+  let price = x.price;
+  const ideas = treat ? [] : t('shopIdeas');
+  const el = openSheet(`
+    <h2>🎁 ${treat ? t('shopEditTreat') : t('shopNewTreat')}</h2>
+    ${ideas.length ? `<div class="field"><label>${t('shopIdeasLabel')}</label>
+      <div class="chips" data-ideas>${ideas.map((i, k) => `<button class="chip" data-idea="${k}">${esc(i.emoji)} ${esc(i.name)}</button>`).join('')}</div></div>` : ''}
+    <div class="field"><label>${t('shopTreatName')}</label>
+      <div class="row"><input class="input emoji-in" data-f="emoji" value="${esc(x.emoji)}" maxlength="4" aria-label="${t('emoji')}">
+      <input class="input" data-f="name" value="${esc(x.name)}" placeholder="${t('shopNamePlaceholder')}" autocomplete="off" enterkeyhint="done"></div></div>
+    <div class="field"><label>${t('shopPrice')}</label>
+      <div class="chips" data-price>${SHOP_PRICES.map((p) => `<button class="chip ${p === price ? 'on' : ''}" data-p="${p}">🪙 ${p}</button>`).join('')}</div>
+      <div class="row" style="margin-top:8px"><input class="input" type="number" min="1" max="9999" step="1" data-f="price" value="${price}" aria-label="${t('shopPrice')}"><span class="hint" data-worth></span></div></div>
+    <div class="btnrow">
+      ${treat ? `<button class="btn danger" data-del>🗑️ ${t('delete')}</button>` : `<button class="btn ghost" data-cancel>✖️ ${t('cancel')}</button>`}
+      <button class="btn primary" data-save>💾 ${t('save')}</button>
+    </div>`);
+  const nameIn = $('[data-f="name"]', el), emojiIn = $('[data-f="emoji"]', el), priceIn = $('[data-f="price"]', el), worth = $('[data-worth]', el);
+  let autoEmoji = !x.name;
+  const showWorth = () => { worth.textContent = price >= 1 ? t('shopWorth', { pts: price * COIN_XP }) : ''; };
+  const syncPrice = () => { $$('[data-p]', el).forEach((c) => c.classList.toggle('on', Number(c.dataset.p) === price)); showWorth(); };
+  nameIn.addEventListener('input', () => { if (autoEmoji) emojiIn.value = suggestEmoji(nameIn.value); });
+  emojiIn.addEventListener('input', () => { autoEmoji = !emojiIn.value.trim(); });
+  const ideasBox = $('[data-ideas]', el);
+  if (ideasBox) ideasBox.addEventListener('click', (e) => {
+    const c = e.target.closest('[data-idea]'); if (!c) return;
+    const i = ideas[Number(c.dataset.idea)];
+    nameIn.value = i.name; emojiIn.value = i.emoji; autoEmoji = false;
+    price = i.price; priceIn.value = price; syncPrice();
+    $$('[data-idea]', ideasBox).forEach((y) => y.classList.toggle('on', y === c));
   });
-  // Focus after sheet opens
-  setTimeout(() => {
-    const nameInput = document.getElementById('treat-name');
-    if (nameInput) nameInput.focus();
-  }, 100);
+  $('[data-price]', el).addEventListener('click', (e) => {
+    const c = e.target.closest('[data-p]'); if (!c) return;
+    price = Number(c.dataset.p); priceIn.value = price; syncPrice();
+  });
+  priceIn.addEventListener('input', () => { price = Math.round(Number(priceIn.value)) || 0; syncPrice(); });
+  showWorth();
+  const cancel = $('[data-cancel]', el); if (cancel) cancel.addEventListener('click', closeSheet);
+  $('[data-save]', el).addEventListener('click', () => {
+    const name = nameIn.value.trim();
+    if (!name) { shake(nameIn); return; }
+    if (!(price >= 1)) { shake(priceIn); return; }
+    onSave({ name, emoji: emojiIn.value.trim() || suggestEmoji(name), price });
+    closeSheet();
+  });
+  const del = $('[data-del]', el); if (del) del.addEventListener('click', () => { closeSheet(); onDelete(); });
+  nameIn.addEventListener('keydown', (e) => { if (e.key === 'Enter') $('[data-save]', el).click(); });
+  if (!treat) setTimeout(() => nameIn.focus(), 300);
 }
-
-export function handleTreatSave(btn, draft, onSave) {
-  const emoji = (document.getElementById('treat-emoji')?.value || '🎁').slice(0, 4);
-  const name = (document.getElementById('treat-name')?.value || '').trim();
-  const price = parseInt(document.getElementById('treat-price')?.value || '10', 10);
-
-  if (!name) {
-    shake(document.getElementById('treat-name'));
-    return;
-  }
-  if (isNaN(price) || price < 1) {
-    shake(document.getElementById('treat-price'));
-    return;
-  }
-
-  const lang = state.lang;
-  const treat = {
-    id: draft.id || uid(),
-    emoji,
-    name: { en: lang === 'en' ? name : (typeof draft.name === 'object' ? draft.name.en || '' : draft.name || ''), fr: lang === 'fr' ? name : (typeof draft.name === 'object' ? draft.name.fr || '' : draft.name || '') },
-    price,
-  };
-
-  onSave(treat);
-  closeSheet();
-  toast(`${emoji} ${t('treatSaved')}`, 'good');
-}
-
-export { suggestEmoji };
-

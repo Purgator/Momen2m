@@ -33,13 +33,13 @@ const RING_C = 2 * Math.PI * RING_R;
 export function tabbar(view) {
   const tab = (v, ico, label) => `<button class="tab ${view === v ? 'on' : ''}" data-action="tab" data-view="${v}" ${view === v ? 'aria-current="page"' : ''}><span class="ico">${ico}</span><span class="lbl">${label}</span></button>`;
   const due = state.settings.agenda !== false ? questsDueOn(dayKey()) : null;
-  const shopVisible = state.settings.shop !== false;
+  const shopVisible = state.settings.shop === true;
   return `<nav class="tabbar" aria-label="${t('tabs')}">
     ${tab('live', '⏱️', t('tabNow'))}
     ${tab('progress', '🏆', t('tabProgress'))}
     ${tab('moments', '📋', t('tabMoments'))}
     ${due ? tab('agenda', '🗺️' + (due.tasks || due.questions ? '<i class="dot-badge"></i>' : ''), t('tabAgenda')) : ''}
-    ${shopVisible ? tab('shop', '🏪', t('tabShop')) : ''}
+    ${shopVisible ? tab('shop', '🎁', t('tabShop')) : ''}
     ${tab('setup', '🎛️', t('tabSetup'))}
   </nav>`;
 }
@@ -179,7 +179,7 @@ export function renderLive(occs, now, opts) {
         ${g.streak ? `<button class="stat" data-action="explain" data-topic="streak" data-tip="${esc(t('tipStreak', { n: g.streak, best: g.bestStreak }))}">🔥 ${g.streak}</button>` : ''}
         <button class="stat today ${today < 0 ? 'neg' : ''}" data-action="explain" data-topic="today" data-tip="${esc(t('tipToday'))}">${today >= 0 ? '+' : ''}${today}</button>
         <button class="stat" data-action="pause-info" data-tip="${esc(t('tipPause', { n: g.pauseTokens || 0, max: PAUSE_MAX }))}">⏸️ ${g.pauseTokens || 0}</button>
-        ${state.settings.shop !== false ? `<button class="stat" data-action="tab" data-view="shop" data-tip="${esc(t('tipCoins', { n: g.coins || 0 }))}">🪙 ${g.coins || 0}</button>` : ''}
+        ${state.settings.shop === true ? `<button class="stat" data-action="tab" data-view="shop" data-tip="${esc(t('tipCoins', { n: g.coins || 0 }))}">🪙 ${g.coins || 0}</button>` : ''}
       </div>
     </div>
     <div class="xpwrap" data-action="explain" data-topic="level" data-tip="${esc(t('tipXp', { n: g.xp, hi }))}">
@@ -269,7 +269,7 @@ export function renderProgress(s, now, page = 0) {
       <button class="tile" data-action="explain" data-topic="today" data-tip="${esc(t('tipToday'))}"><span class="v">✅ ${s.lifetime.done}</span><span class="l">${t('doneWord')}</span><span class="s">${t('early', { n: s.lifetime.early })}</span></button>
       <button class="tile" data-action="explain" data-topic="today" data-tip="${esc(t('tipToday'))}"><span class="v ${s.today.pts < 0 ? 'neg' : 'pos'}">${signed(s.today.pts)}</span><span class="l">${t('today')}</span><span class="s">${t('todayCount', { done: s.today.done, total: s.today.total })}</span></button>
       ${state.settings.agenda !== false ? `<button class="tile wide" data-action="tab" data-view="agenda" data-tip="${esc(t('tipQuestPts'))}"><span class="v">🗺️ ${s.goals.pts}</span><span class="l">${t('agQuestPts')}</span><span class="s">${t('agQuestsDone', { n: s.goals.done, f: s.goals.flawless })}</span></button>` : ''}
-      ${state.settings.shop !== false ? `<button class="tile" data-action="tab" data-view="shop" data-tip="${esc(t('tipCoins', { n: state.game.coins || 0 }))}"><span class="v">🪙 ${state.game.coins || 0}</span><span class="l">${t('shopCoins')}</span></button>` : ''}
+      ${state.settings.shop === true ? `<button class="tile wide" data-action="tab" data-view="shop" data-tip="${esc(t('tipCoins', { n: state.game.coins || 0 }))}"><span class="v">🪙 ${state.game.coins || 0}</span><span class="l">${t('shopPurse')}</span><span class="s">${t('shopEarnedTotal', { n: state.game.coinsEarned || 0 })}</span></button>` : ''}
     </div>
 
     <div class="section">
@@ -475,12 +475,12 @@ export function renderSetup(opts) {
     <div class="section">
       <h2>${t('about')}</h2>
       <div class="card">
-        ${toggleRow(t('version', { v: esc(opts.version) }), opts.checkingUpdate ? t('checkingUpdate') : opts.updateReady ? t('updateAvailable') : '', opts.updateReady
+        ${toggleRow(`<span data-action="version-tap">${t('version', { v: esc(opts.version) })}</span>`, opts.checkingUpdate ? t('checkingUpdate') : opts.updateReady ? t('updateAvailable') : '', opts.updateReady
           ? `<button class="btn small primary" data-action="apply-update">${t('updateNow')}</button>`
-          : `<button class="btn small" data-action="check-update" ${opts.checkingUpdate ? 'disabled' : ''}>${opts.checkingUpdate ? '<span class="spinner"></span>' : ''}${t('checkUpdate')}</button>`, 'version-row')}
+          : `<button class="btn small" data-action="check-update" ${opts.checkingUpdate ? 'disabled' : ''}>${opts.checkingUpdate ? '<span class="spinner"></span>' : ''}${t('checkUpdate')}</button>`)}
         ${toggleRow(t('updateSummaries'), t('updateSummariesHint'), sw('updateSummaries', s.updateSummaries))}
         ${toggleRow('🗺️ ' + t('agSetting'), t('agSettingHint'), sw('agenda', s.agenda !== false))}
-        ${state.game.shopUnlocked !== false ? toggleRow('🏪 ' + t('shopSetting'), t('shopSettingHint'), sw('shop', s.shop !== false)) : ''}
+        ${state.game.shopUnlocked ? toggleRow('🎁 ' + t('shopSetting'), t('shopSettingHint'), sw('shop', s.shop === true)) : ''}
         ${opts.canInstall ? toggleRow(t('install'), '', `<button class="btn small primary" data-action="install">${t('install')}</button>`) : ''}
         ${opts.isIosBrowser ? `<p class="hint" style="padding:10px 0">${t('obIosInstall')}</p>` : ''}
         <div class="toggle"><div><div class="t"><button class="link" style="padding:0" data-action="restart-ob">${t('onboardingRestart')}</button></div><div class="s">${t('obRestartHint')}</div></div></div>
