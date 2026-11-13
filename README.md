@@ -10,6 +10,11 @@ expire and you lose some.
 
 Nothing else. No feed, no menus to dig through, no account.
 
+| | | |
+|---|---|---|
+| <img src="docs/now.png" width="260" alt="The Now tab: Lunch is the current moment, with a countdown ring showing 41 minutes left and Done, Snooze and Skip buttons"> | <img src="docs/progress.png" width="260" alt="The Progress tab: level 11, a 6-day streak, a 91% success rate and a bar chart of the last 7 days"> | <img src="docs/quests.png" width="260" alt="The Quests tab: today's tasks for two running quests, the steps coming up this week and each quest's progress"> |
+| **Now**: the current moment, its countdown and the points at stake. | **Progress**: level, streak, success rate and the week at a glance. | **Quests**: a bigger goal cut into steps, a few tasks a day. |
+
 👉 **Open the app: [purgator.github.io/Momen2m](https://purgator.github.io/Momen2m/)**
 
 Works on **iPhone** (Safari) and **Android** (Chrome) as an installable web app. English and
@@ -84,6 +89,11 @@ home-screen icon.
 1. Open **Chrome** and go to **[purgator.github.io/Momen2m](https://purgator.github.io/Momen2m/)**.
 2. Tap **Install** in the banner, or open the ⋮ menu and choose **Install app** / **Add to Home screen**.
 3. Open Momen2m from your home screen and follow the three setup steps. **Allow notifications** when asked.
+
+<p align="center">
+  <img src="docs/setup.png" width="260" alt="The guided setup: yes/no questions about water, meals, movement, medication, teeth, screens and tidying, each answer adding a moment"><br>
+  <em>The guided setup: a few yes/no questions, and your day is filled in for you.</em>
+</p>
 
 ### Good to know
 
@@ -170,6 +180,11 @@ Badges: first step, 10 / 50 / 100 / 500 done, early bird (10 early finishes), pe
 10 pm), all-rounder (5 different moments), comeback (a miss followed by a perfect day),
 ambassador (share once).
 
+<p align="center">
+  <img src="docs/badges.png" width="260" alt="Further down the Progress tab: a grid of badges, earned ones lit and a locked one showing its progress bar, then the success rate of each moment"><br>
+  <em>Badges earned and in progress, then how each moment is going.</em>
+</p>
+
 Sharing uses the system share sheet where there is one (phones), with a 1200×630 PNG card
 drawn on the device; elsewhere the text is copied to the clipboard and the card downloaded.
 Nothing is sent anywhere by Momen2m itself.
@@ -253,6 +268,11 @@ combos) and notification options.
    ```
 
 Regenerate the icons with `npm run icons` after editing `tools/gen-icons.js`.
+
+The screenshots in this README come from `npm run screenshots`: it serves the app on
+localhost, fills a fresh browser profile with made-up moments and history, and drives the
+real UI in headless Chrome. It needs [Puppeteer](https://pptr.dev), which this project does
+not install; the top of `tools/screenshots.js` says where it is looked for.
 
 ### Self-hosting
 
